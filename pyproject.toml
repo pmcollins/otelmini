@@ -24,10 +24,17 @@ classifiers = [
   "Programming Language :: Python :: Implementation :: CPython",
   "Programming Language :: Python :: Implementation :: PyPy",
 ]
-dependencies = []
+dependencies = [
+  "opentelemetry-api",
+  "opentelemetry-sdk",
+  "opentelemetry-proto",
+  "googleapis-common-protos",
+  "grpcio",
+  "oteltest",
+]
 
 [project.urls]
-Documentation = "https://github.com/unknown/otelmini#readme"
+Documentation = "https://github.com/pmcollins/otelmini#readme"
 Issues = "https://github.com/unknown/otelmini/issues"
 Source = "https://github.com/unknown/otelmini"
 
