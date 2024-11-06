@@ -1,14 +1,12 @@
-import logging
 import threading
 import time
 import typing
 from typing import Optional
 
-from grpc import RpcError, insecure_channel
-from opentelemetry import trace
+from grpc import insecure_channel, RpcError
 from opentelemetry.context import context
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2_grpc import TraceServiceStub
-from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor, TracerProvider
+from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 
 from otelmini.encode import mk_trace_request
@@ -24,23 +22,26 @@ class ExecTimer:
         self.shutdown_event = threading.Event()
         self.lock = threading.RLock()
 
-        self.tt = threading.Timer(self.interval_seconds, self._run_timer_target)
+        self.tt = self._mk_tt(interval_seconds)
 
     def start(self):
+        self.logger.debug("start")
         self.tt.start()
 
     def force_timeout(self, batch):
-        self.logger.debug("force_timeout acquiring lock")
+        self.logger.debug("force_timeout")
         with self.lock:
-            self.logger.debug("force_timeout aquired lock, cancelling timer and starting a new 0s timer")
+            self.logger.debug("force_timeout cancelling timer and starting a new 0s timer")
             self.tt.cancel()
             self.tt = self._mk_tt(0, batch)
             self.start()
 
     def shutdown(self):
+        self.logger.debug("shutdown")
         self.shutdown_event.set()
 
     def cancel(self):
+        self.logger.debug("cancel")
         self.shutdown()
         self.tt.cancel()
 
@@ -55,7 +56,7 @@ class ExecTimer:
                 self.tt = self._mk_tt(sleep_seconds, None)
                 self.start()
 
-    def _mk_tt(self, interval_seconds, batch):
+    def _mk_tt(self, interval_seconds, batch=None):
         self.logger.debug("creating %.1fs timer", interval_seconds)
         return threading.Timer(interval_seconds, self._run_timer_target, [batch])
 
@@ -71,7 +72,7 @@ class ExecTimer:
         return sleep_seconds
 
 
-class Retrier:
+class ExponentialBackoff:
     class MaxAttemptsException(Exception):
 
         def __init__(self, last_exception):
@@ -95,7 +96,7 @@ class Retrier:
                     self.logger.debug("backing off for %d seconds", seconds)
                     self.sleep(seconds)
                 else:
-                    raise Retrier.MaxAttemptsException(e)
+                    raise ExponentialBackoff.MaxAttemptsException(e)
 
 
 class OtlpGrpcExporter(SpanExporter):
@@ -103,7 +104,7 @@ class OtlpGrpcExporter(SpanExporter):
     def __init__(self, logger, addr="127.0.0.1:4317", max_retries=4, client=None, sleep=time.sleep):
         self.logger = logger
         self.client = client if client is not None else TraceServiceStub(insecure_channel(addr))
-        self.retrier = Retrier(max_retries, logger, exceptions=(RpcError,), sleep=sleep)
+        self.retrier = ExponentialBackoff(max_retries, logger, exceptions=(RpcError,), sleep=sleep)
 
     def export(self, spans: typing.Sequence[ReadableSpan]) -> SpanExportResult:
         request = mk_trace_request(spans)
@@ -111,7 +112,7 @@ class OtlpGrpcExporter(SpanExporter):
             resp = self.retrier.retry(lambda: self.client.Export(request))
             self.logger.debug("export response: %s", resp)
             return SpanExportResult.SUCCESS
-        except Retrier.MaxAttemptsException as e:
+        except ExponentialBackoff.MaxAttemptsException as e:
             self.logger.warning("max retries reached: %s", e)
             return SpanExportResult.FAILURE
 
@@ -145,7 +146,7 @@ class Accumulator:
             return out
 
 
-class BSP(SpanProcessor):
+class BatchSpanProcessor(SpanProcessor):
 
     def __init__(self, exporter: SpanExporter, batch_size, interval_seconds, logger):
         self.exporter = exporter
@@ -161,14 +162,15 @@ class BSP(SpanProcessor):
         self.logger.debug("on end")
         batch = self.accumulator.add(span)
         if batch:
+            self.logger.debug("force timeout")
             self.timer.force_timeout(batch)
 
     def _export(self, batch):
         self.logger.debug("_export")
         if batch is None:
-            self.logger.debug("batch arg is none, getting batch from accumulator")
             batch = self.accumulator.batch()
-        if batch is not None:
+            self.logger.debug("got batch from accumulator: len=[%d]", len(batch))
+        if batch is not None and len(batch) > 0:
             self.exporter.export(batch)
 
     def shutdown(self) -> None:
@@ -178,39 +180,3 @@ class BSP(SpanProcessor):
     def force_flush(self, timeout_millis: int = 30000) -> bool:
         self.logger.debug("force flush")
         return False
-
-
-def otel():
-    logging.basicConfig(level=logging.INFO)
-
-    main_logger = logging.getLogger("main")
-
-    tp = TracerProvider()
-    exporter = OtlpGrpcExporter(logging.getLogger("FakeSpanExporter"))
-    proc = BSP(exporter, batch_size=12, interval_seconds=4, logger=logging.getLogger("BSP"))
-    tp.add_span_processor(proc)
-    trace.set_tracer_provider(tp)
-
-    tracer = tp.get_tracer("my-module")
-
-    i = 0
-    main_logger.info("12 spans")
-    for _ in range(12):
-        with tracer.start_span(f"span-{i}"):
-            i += 1
-            time.sleep(0.1)
-
-    main_logger.info("sleep 6")
-    time.sleep(6)
-
-    main_logger.info("6 spans")
-    for _ in range(6):
-        with tracer.start_span(f"span-{i}"):
-            i += 1
-            time.sleep(0.1)
-
-    tp.shutdown()
-
-
-if __name__ == '__main__':
-    otel()

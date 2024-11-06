@@ -10,7 +10,7 @@ from oteltest import sink
 from oteltest.private import AccumulatingHandler
 from oteltest.telemetry import num_spans
 
-from otelmini.trace import OtlpGrpcExporter, Retrier
+from otelmini.trace import OtlpGrpcExporter, ExponentialBackoff
 
 
 @pytest.fixture
@@ -44,14 +44,14 @@ def test_eventual_runner(logger):
 def test_retrier_eventual_success(logger):
     greeter = EventualRunner(2, lambda: "hello")
     f = FakeSleeper()
-    retrier = Retrier(max_attempts=3, logger=logger, sleep=f.sleep)
+    retrier = ExponentialBackoff(max_attempts=3, logger=logger, sleep=f.sleep)
     assert retrier.retry(lambda: greeter.attempt()) == "hello"
     assert f.sleeps == [1, 2]
 
 
 def test_retrier_eventual_failure(logger):
-    retrier = Retrier(max_attempts=2, logger=logger, sleep=FakeSleeper().sleep)
-    with pytest.raises(Retrier.MaxAttemptsException):
+    retrier = ExponentialBackoff(max_attempts=2, logger=logger, sleep=FakeSleeper().sleep)
+    with pytest.raises(ExponentialBackoff.MaxAttemptsException):
         greeter = EventualRunner(2, lambda: "hello")
         retrier.retry(lambda: greeter.attempt())
 
