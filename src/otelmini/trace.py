@@ -162,5 +162,5 @@ class BatchSpanProcessor(SpanProcessor):
         self.timer.stop()
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
-        self.logger.debug("force flush")
+        self.logger.debug("force_flush")
         return False

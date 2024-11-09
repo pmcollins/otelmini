@@ -11,7 +11,6 @@ from otelmini.trace import BatchSpanProcessor, OtlpGrpcExporter
 class OtelMiniDistro(BaseDistro):
 
     def _configure(self, **kwargs):
-        logging.basicConfig(level=logging.DEBUG)
         logger = logging.getLogger("OtelMiniDistro")
         logger.info("configure running")
 
