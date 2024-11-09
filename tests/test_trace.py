@@ -1,4 +1,5 @@
 import logging
+import time
 
 import pytest
 from grpc import RpcError
@@ -10,7 +11,7 @@ from oteltest import sink
 from oteltest.private import AccumulatingHandler
 from oteltest.telemetry import num_spans
 
-from otelmini.trace import OtlpGrpcExporter, ExponentialBackoff
+from otelmini.trace import ExponentialBackoff, OtlpGrpcExporter, Timer
 
 
 @pytest.fixture
@@ -70,6 +71,16 @@ def test_faked_exporter_with_retry_failure(logger):
     spans = [mk_span("my-span")]
     resp = exporter.export(spans)
     assert resp == SpanExportResult.FAILURE
+
+
+def test_timer():
+    mylist = []
+    t = Timer(lambda: mylist.append("x"), 144)
+    t.start()
+    for i in range(6):
+        t.notify_sleeper()
+        time.sleep(0.0001)
+    assert len(mylist) == 6
 
 
 def mk_span(name):

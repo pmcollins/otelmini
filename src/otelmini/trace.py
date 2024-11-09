@@ -1,3 +1,5 @@
+import atexit
+import queue
 import threading
 import time
 import typing
@@ -12,72 +14,43 @@ from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 from otelmini.encode import mk_trace_request
 
 
-class ExecTimer:
+class Timer:
 
-    def __init__(self, target_fcn, interval_seconds, logger):
+    def __init__(self, target_fcn, interval_seconds):
+        self.thread = threading.Thread(target=self._target, daemon=True)
         self.target_fcn = target_fcn
         self.interval_seconds = interval_seconds
-        self.logger = logger
+        self.sleeper = threading.Condition()
+        self.stopper = threading.Event()
 
-        self.shutdown_event = threading.Event()
-        self.lock = threading.RLock()
-
-        self.tt = self._mk_tt(interval_seconds)
+        # in effect, at python shutdown, we run the target one more time
+        atexit.register(self._do_exit)
 
     def start(self):
-        self.logger.debug("start")
-        self.tt.start()
+        self.thread.start()
 
-    def force_timeout(self, batch):
-        self.logger.debug("force_timeout")
-        with self.lock:
-            self.logger.debug("force_timeout cancelling timer and starting a new 0s timer")
-            self.tt.cancel()
-            self.tt = self._mk_tt(0, batch)
-            self.start()
+    def _target(self):
+        while not self.stopper.is_set():
+            self.target_fcn()
+            with self.sleeper:
+                self.sleeper.wait(self.interval_seconds)
 
-    def shutdown(self):
-        self.logger.debug("shutdown")
-        self.shutdown_event.set()
+    def _do_exit(self):
+        self.stop()
 
-    def cancel(self):
-        self.logger.debug("cancel")
-        self.shutdown()
-        self.tt.cancel()
+    def notify_sleeper(self):
+        with self.sleeper:
+            self.sleeper.notify()
 
-    def _run_timer_target(self, target_fcn_arg):
-        with self.lock:
-            start_ns = time.time_ns()
-            self.target_fcn(target_fcn_arg)
-            execution_seconds = (time.time_ns() - start_ns) / 1e9
-            self.logger.debug("target function took %.1fs", execution_seconds)
-            if not self.shutdown_event.is_set():
-                sleep_seconds = self._calc_sleep_seconds(execution_seconds)
-                self.tt = self._mk_tt(sleep_seconds, None)
-                self.start()
+    def stop(self):
+        self.stopper.set()
+        self.notify_sleeper()
 
-    def _mk_tt(self, interval_seconds, batch=None):
-        self.logger.debug("creating %.1fs timer", interval_seconds)
-        return threading.Timer(interval_seconds, self._run_timer_target, [batch])
-
-    def _calc_sleep_seconds(self, execution_seconds):
-        sleep_seconds = self.interval_seconds - execution_seconds
-        if sleep_seconds <= 0:
-            self.logger.debug(
-                "execution time (%.1fs) was longer than interval (%.1fs)",
-                execution_seconds,
-                self.interval_seconds,
-            )
-            sleep_seconds = 0
-        return sleep_seconds
+    def join(self):
+        self.thread.join()
 
 
 class ExponentialBackoff:
-    class MaxAttemptsException(Exception):
-
-        def __init__(self, last_exception):
-            super().__init__("Maximum retries reached")
-            self.last_exception = last_exception
 
     def __init__(self, max_attempts, logger, base_seconds=1, sleep=time.sleep, exceptions=(Exception,)):
         self.max_attempts = max_attempts
@@ -97,6 +70,12 @@ class ExponentialBackoff:
                     self.sleep(seconds)
                 else:
                     raise ExponentialBackoff.MaxAttemptsException(e)
+
+    class MaxAttemptsException(Exception):
+
+        def __init__(self, last_exception):
+            super().__init__("Maximum retries reached")
+            self.last_exception = last_exception
 
 
 class OtlpGrpcExporter(SpanExporter):
@@ -123,26 +102,26 @@ class OtlpGrpcExporter(SpanExporter):
         return False
 
 
-class Accumulator:
+class Batcher:
 
     def __init__(self, batch_size):
         self.lock = threading.RLock()
         self.batch_size = batch_size
-        self.spans = []
+        self.items = []
 
-    def add(self, span):
+    def add(self, item):
         with self.lock:
-            self.spans.append(span)
-            if len(self.spans) == self.batch_size:
-                out = self.spans
-                self.spans = []
+            self.items.append(item)
+            if len(self.items) == self.batch_size:
+                out = self.items
+                self.items = []
                 return out
             return None
 
     def batch(self):
         with self.lock:
-            out = self.spans
-            self.spans = []
+            out = self.items
+            self.items = []
             return out
 
 
@@ -151,31 +130,36 @@ class BatchSpanProcessor(SpanProcessor):
     def __init__(self, exporter: SpanExporter, batch_size, interval_seconds, logger):
         self.exporter = exporter
         self.logger = logger
-        self.accumulator = Accumulator(batch_size)
-        self.timer = ExecTimer(self._export, interval_seconds, logger)
+        self.batcher = Batcher(batch_size)
+        self.batches = queue.Queue()
+        self.stopper = threading.Event()
+
+        self.timer = Timer(self._export, interval_seconds)
         self.timer.start()
 
     def on_start(self, span: Span, parent_context: Optional[context.Context] = None) -> None:
-        self.logger.debug("on start")
+        self.logger.debug("on_start()")
 
     def on_end(self, span: ReadableSpan) -> None:
-        self.logger.debug("on end")
-        batch = self.accumulator.add(span)
-        if batch:
-            self.logger.debug("force timeout")
-            self.timer.force_timeout(batch)
+        self.logger.debug("on_end()")
+        if not self.stopper.is_set():
+            batch = self.batcher.add(span)
+            if batch:
+                self.logger.debug("enqueue batch and poke timer")
+                self.batches.put(batch)
+                self.timer.notify_sleeper()
 
-    def _export(self, batch):
-        self.logger.debug("_export")
-        if batch is None:
-            batch = self.accumulator.batch()
-            self.logger.debug("got batch from accumulator: len=[%d]", len(batch))
+    def _export(self):
+        self.logger.debug("_export()")
+        batch = self.batches.get()
+        self.logger.debug("got batch from queue of len [%d]", len(batch))
         if batch is not None and len(batch) > 0:
             self.exporter.export(batch)
 
     def shutdown(self) -> None:
         self.logger.debug("shutdown")
-        self.timer.shutdown()
+        self.stopper.set()
+        self.timer.stop()
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
         self.logger.debug("force flush")
