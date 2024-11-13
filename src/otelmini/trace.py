@@ -5,12 +5,15 @@ import typing
 from typing import Optional
 
 from grpc import insecure_channel, RpcError
+from opentelemetry import trace
 from opentelemetry.context import context
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2_grpc import TraceServiceStub
 from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 
 from otelmini.encode import mk_trace_request
+
+tracer = trace.get_tracer(__name__)
 
 
 class Timer:
@@ -23,20 +26,26 @@ class Timer:
         self.sleeper = threading.Condition()
         self.stopper = threading.Event()
 
-        # at python shutdown, run the target one more time
+        # TODO at python shutdown, run the target one more time
         atexit.register(self.stop)
 
     def start(self):
         self.thread.start()
 
     def _target(self):
-        while not self.stopper.is_set():
+        with tracer.start_as_current_span("_target"):
+            while not self.stopper.is_set():
+                self._sleep()
+                if not self.stopper.is_set():
+                    with tracer.start_as_current_span("target_fcn"):
+                        self.target_fcn()
+
+    def _sleep(self):
+        with tracer.start_as_current_span("Timer._sleep"):
             with self.sleeper:
                 self.logger.debug("sleeper wait start")
                 self.sleeper.wait(self.interval_seconds)
                 self.logger.debug("sleeper wait done")
-            if not self.stopper.is_set():
-                self.target_fcn()
 
     def notify_sleeper(self):
         with self.sleeper:
@@ -60,16 +69,18 @@ class ExponentialBackoff:
         self.exceptions = exceptions
 
     def retry(self, func):
-        for attempt in range(self.max_attempts):
-            try:
-                return func()
-            except self.exceptions as e:
-                if attempt < self.max_attempts - 1:
-                    seconds = (2 ** attempt) * self.base_seconds
-                    self.logger.debug("backing off for %d seconds", seconds)
-                    self.sleep(seconds)
-                else:
-                    raise ExponentialBackoff.MaxAttemptsException(e)
+        with tracer.start_as_current_span("retry"):
+            for attempt in range(self.max_attempts):
+                with tracer.start_as_current_span("attempt"):
+                    try:
+                        return func()
+                    except self.exceptions as e:
+                        if attempt < self.max_attempts - 1:
+                            seconds = (2 ** attempt) * self.base_seconds
+                            self.logger.debug("backing off for %d seconds", seconds)
+                            self.sleep(seconds)
+                        else:
+                            raise ExponentialBackoff.MaxAttemptsException(e)
 
     class MaxAttemptsException(Exception):
 
@@ -87,14 +98,15 @@ class OtlpGrpcExporter(SpanExporter):
 
     def export(self, spans: typing.Sequence[ReadableSpan]) -> SpanExportResult:
         self.logger.debug("will export %d spans", len(spans))
-        request = mk_trace_request(spans)
-        try:
-            resp = self.eb.retry(lambda: self.client.Export(request))
-            self.logger.debug("export response: %s", resp)
-            return SpanExportResult.SUCCESS
-        except ExponentialBackoff.MaxAttemptsException as e:
-            self.logger.warning("max retries reached: %s", e)
-            return SpanExportResult.FAILURE
+        with tracer.start_as_current_span("export"):
+            request = mk_trace_request(spans)
+            try:
+                resp = self.eb.retry(lambda: self.client.Export(request))
+                self.logger.debug("export response: %s", resp)
+                return SpanExportResult.SUCCESS
+            except ExponentialBackoff.MaxAttemptsException as e:
+                self.logger.warning("max retries reached: %s", e)
+                return SpanExportResult.FAILURE
 
     def shutdown(self) -> None:
         pass
@@ -112,21 +124,24 @@ class Batcher:
         self.batches = []
 
     def add(self, item):
-        with self.lock:
-            self.items.append(item)
-            if len(self.items) == self.batch_size:
-                self._batch()
-                return True
-            return False
+        with tracer.start_as_current_span("add"):
+            with self.lock:
+                self.items.append(item)
+                if len(self.items) == self.batch_size:
+                    self._batch()
+                    return True
+                return False
 
     def pop(self):
-        with self.lock:
-            self._batch()
-            return self.batches.pop(0) if len(self.batches) > 0 else None
+        with tracer.start_as_current_span("pop"):
+            with self.lock:
+                self._batch()
+                return self.batches.pop(0) if len(self.batches) > 0 else None
 
     def _batch(self):
-        self.batches.append(self.items)
-        self.items = []
+        with tracer.start_as_current_span("_export"):
+            self.batches.append(self.items)
+            self.items = []
 
 
 class MiniBSP(SpanProcessor):
@@ -153,16 +168,19 @@ class MiniBSP(SpanProcessor):
 
     def _export(self):
         self.logger.debug("_export()")
-        batch = self.batcher.pop()
-        if batch is not None and len(batch) > 0:
-            self.logger.debug("got batch from queue of len [%d]", len(batch))
-            self.exporter.export(batch)
+        with tracer.start_as_current_span("_export"):
+            batch = self.batcher.pop()
+            if batch is not None and len(batch) > 0:
+                self.logger.debug("got batch from queue of len [%d]", len(batch))
+                self.exporter.export(batch)
 
     def shutdown(self) -> None:
         self.logger.debug("shutdown")
-        self.stopper.set()
-        self.timer.stop()
+        with tracer.start_as_current_span("shutdown"):
+            self.stopper.set()
+            self.timer.stop()
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
+        # todo implement
         self.logger.debug("force_flush")
         return False
