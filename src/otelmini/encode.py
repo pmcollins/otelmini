@@ -105,6 +105,7 @@ _SPAN_KIND_MAP = {
 
 
 def _encode_span(sdk_span: ReadableSpan) -> PB2SPan:
+    print(f"span name {sdk_span.name}")
     span_context = sdk_span.get_span_context()
     return PB2SPan(
         trace_id=_encode_trace_id(span_context.trace_id),

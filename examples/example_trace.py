@@ -3,39 +3,11 @@ import time
 from typing import Mapping, Optional, Sequence
 
 from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
 from oteltest import OtelTest, Telemetry
 
-from otelmini.trace import BatchSpanProcessor, OtlpGrpcExporter
+from lib import configure
 
 
-def configure_logging():
-    class AlignedFormatter(logging.Formatter):
-        def format(self, record):
-            record.levelname = record.levelname.ljust(8)
-            record.name = record.name.ljust(24)
-            return super().format(record)
-
-    logging.basicConfig(level=logging.DEBUG)
-    formatter = AlignedFormatter("%(levelname)s %(name)s %(message)s")
-    for handler in logging.getLogger().handlers:
-        handler.setFormatter(formatter)
-
-
-def configure():
-    configure_logging()
-
-    tp = TracerProvider()
-    exporter = OtlpGrpcExporter(logging.getLogger("OtlpGrpcExporter"))
-    proc = BatchSpanProcessor(
-        exporter,
-        batch_size=12,
-        interval_seconds=4,
-        logger=logging.getLogger("BatchSpanProcessor")
-    )
-    tp.add_span_processor(proc)
-    trace.set_tracer_provider(tp)
-    return tp
 
 
 def run():

@@ -1,5 +1,4 @@
 import atexit
-import queue
 import threading
 import time
 import typing
@@ -16,27 +15,28 @@ from otelmini.encode import mk_trace_request
 
 class Timer:
 
-    def __init__(self, target_fcn, interval_seconds):
-        self.thread = threading.Thread(target=self._target, daemon=True)
+    def __init__(self, target_fcn, interval_seconds, logger, daemon=True):
+        self.thread = threading.Thread(target=self._target, daemon=daemon)
         self.target_fcn = target_fcn
         self.interval_seconds = interval_seconds
+        self.logger = logger
         self.sleeper = threading.Condition()
         self.stopper = threading.Event()
 
-        # in effect, at python shutdown, we run the target one more time
-        atexit.register(self._do_exit)
+        # at python shutdown, run the target one more time
+        atexit.register(self.stop)
 
     def start(self):
         self.thread.start()
 
     def _target(self):
         while not self.stopper.is_set():
-            self.target_fcn()
             with self.sleeper:
+                self.logger.debug("sleeper wait start")
                 self.sleeper.wait(self.interval_seconds)
-
-    def _do_exit(self):
-        self.stop()
+                self.logger.debug("sleeper wait done")
+            if not self.stopper.is_set():
+                self.target_fcn()
 
     def notify_sleeper(self):
         with self.sleeper:
@@ -83,12 +83,13 @@ class OtlpGrpcExporter(SpanExporter):
     def __init__(self, logger, addr="127.0.0.1:4317", max_retries=4, client=None, sleep=time.sleep):
         self.logger = logger
         self.client = client if client is not None else TraceServiceStub(insecure_channel(addr))
-        self.retrier = ExponentialBackoff(max_retries, logger, exceptions=(RpcError,), sleep=sleep)
+        self.eb = ExponentialBackoff(max_retries, logger, exceptions=(RpcError,), sleep=sleep)
 
     def export(self, spans: typing.Sequence[ReadableSpan]) -> SpanExportResult:
+        self.logger.debug("will export %d spans", len(spans))
         request = mk_trace_request(spans)
         try:
-            resp = self.retrier.retry(lambda: self.client.Export(request))
+            resp = self.eb.retry(lambda: self.client.Export(request))
             self.logger.debug("export response: %s", resp)
             return SpanExportResult.SUCCESS
         except ExponentialBackoff.MaxAttemptsException as e:
@@ -108,33 +109,35 @@ class Batcher:
         self.lock = threading.RLock()
         self.batch_size = batch_size
         self.items = []
+        self.batches = []
 
     def add(self, item):
         with self.lock:
             self.items.append(item)
             if len(self.items) == self.batch_size:
-                out = self.items
-                self.items = []
-                return out
-            return None
+                self._batch()
+                return True
+            return False
 
-    def batch(self):
+    def pop(self):
         with self.lock:
-            out = self.items
-            self.items = []
-            return out
+            self._batch()
+            return self.batches.pop(0) if len(self.batches) > 0 else None
+
+    def _batch(self):
+        self.batches.append(self.items)
+        self.items = []
 
 
-class BatchSpanProcessor(SpanProcessor):
+class MiniBSP(SpanProcessor):
 
-    def __init__(self, exporter: SpanExporter, batch_size, interval_seconds, logger):
+    def __init__(self, exporter: SpanExporter, batch_size, interval_seconds, logger, daemon=True):
         self.exporter = exporter
         self.logger = logger
         self.batcher = Batcher(batch_size)
-        self.batches = queue.Queue()
         self.stopper = threading.Event()
 
-        self.timer = Timer(self._export, interval_seconds)
+        self.timer = Timer(self._export, interval_seconds, logger, daemon=daemon)
         self.timer.start()
 
     def on_start(self, span: Span, parent_context: Optional[context.Context] = None) -> None:
@@ -143,17 +146,16 @@ class BatchSpanProcessor(SpanProcessor):
     def on_end(self, span: ReadableSpan) -> None:
         self.logger.debug("on_end()")
         if not self.stopper.is_set():
-            batch = self.batcher.add(span)
-            if batch:
+            batched = self.batcher.add(span)
+            if batched:
                 self.logger.debug("enqueue batch and poke timer")
-                self.batches.put(batch)
                 self.timer.notify_sleeper()
 
     def _export(self):
         self.logger.debug("_export()")
-        batch = self.batches.get()
-        self.logger.debug("got batch from queue of len [%d]", len(batch))
+        batch = self.batcher.pop()
         if batch is not None and len(batch) > 0:
+            self.logger.debug("got batch from queue of len [%d]", len(batch))
             self.exporter.export(batch)
 
     def shutdown(self) -> None:
