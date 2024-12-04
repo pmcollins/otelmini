@@ -5,7 +5,7 @@ from opentelemetry.instrumentation.distro import BaseDistro
 from opentelemetry.sdk._configuration import _BaseConfigurator
 from opentelemetry.sdk.trace import TracerProvider
 
-from otelmini.trace import MiniBSP, OtlpGrpcExporter
+from otelmini.trace import BatchProcessor, GrpcExporter
 
 
 class OtelMiniDistro(BaseDistro):
@@ -21,10 +21,10 @@ class OtelMiniConfigurator(_BaseConfigurator):
         logger = logging.getLogger("OtelMiniConfigurator")
         logger.info("configure running")
         tracer_provider = TracerProvider()
-        tracer_provider.add_span_processor(MiniBSP(
-            OtlpGrpcExporter(logging.getLogger("OtlpGrpcExporter")),
+        tracer_provider.add_span_processor(BatchProcessor(
+            GrpcExporter(logging.getLogger("GrpcExporter")),
             batch_size=144,
             interval_seconds=12,
-            logger=logging.getLogger("BatchSpanProcessor")
+            logger=logging.getLogger("BatchProcessor")
         ))
         trace.set_tracer_provider(tracer_provider)

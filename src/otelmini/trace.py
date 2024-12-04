@@ -10,6 +10,7 @@ from opentelemetry.context import context
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2_grpc import TraceServiceStub
 from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
+from opentelemetry.trace import Tracer
 
 from otelmini.encode import mk_trace_request
 
@@ -89,7 +90,7 @@ class ExponentialBackoff:
             self.last_exception = last_exception
 
 
-class OtlpGrpcExporter(SpanExporter):
+class GrpcExporter(SpanExporter):
 
     def __init__(self, logger, addr="127.0.0.1:4317", max_retries=4, client=None, sleep=time.sleep):
         self.logger = logger
@@ -115,6 +116,10 @@ class OtlpGrpcExporter(SpanExporter):
         return False
 
 
+def check_start_span(tr: Tracer, name):
+    yield tr.start_as_current_span("check_start_span", name=name)
+
+
 class Batcher:
 
     def __init__(self, batch_size):
@@ -124,27 +129,24 @@ class Batcher:
         self.batches = []
 
     def add(self, item):
-        with tracer.start_as_current_span("add"):
-            with self.lock:
-                self.items.append(item)
-                if len(self.items) == self.batch_size:
-                    self._batch()
-                    return True
-                return False
+        with self.lock:
+            self.items.append(item)
+            if len(self.items) == self.batch_size:
+                self._batch()
+                return True
+            return False
 
     def pop(self):
-        with tracer.start_as_current_span("pop"):
-            with self.lock:
-                self._batch()
-                return self.batches.pop(0) if len(self.batches) > 0 else None
+        with self.lock:
+            self._batch()
+            return self.batches.pop(0) if len(self.batches) > 0 else None
 
     def _batch(self):
-        with tracer.start_as_current_span("_export"):
-            self.batches.append(self.items)
-            self.items = []
+        self.batches.append(self.items)
+        self.items = []
 
 
-class MiniBSP(SpanProcessor):
+class BatchProcessor(SpanProcessor):
 
     def __init__(self, exporter: SpanExporter, batch_size, interval_seconds, logger, daemon=True):
         self.exporter = exporter

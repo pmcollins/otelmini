@@ -11,7 +11,7 @@ from oteltest import sink
 from oteltest.private import AccumulatingHandler
 from oteltest.telemetry import num_spans
 
-from otelmini.trace import ExponentialBackoff, OtlpGrpcExporter, Timer
+from otelmini.trace import ExponentialBackoff, GrpcExporter, Timer
 
 
 @pytest.fixture
@@ -26,7 +26,7 @@ def test_single_grpc_request(logger):
     s = sink.GrpcSink(handler)
     s.start()
 
-    exporter = OtlpGrpcExporter(logger)
+    exporter = GrpcExporter(logger)
     spans = [mk_span("my-span")]
     exporter.export(spans)
 
@@ -59,7 +59,7 @@ def test_retrier_eventual_failure(logger):
 
 def test_faked_exporter_with_retry_then_success(logger):
     sleeper = FakeSleeper()
-    exporter = OtlpGrpcExporter(logger, client=FakeGrpcClient(3), sleep=sleeper.sleep)
+    exporter = GrpcExporter(logger, client=FakeGrpcClient(3), sleep=sleeper.sleep)
     spans = [mk_span("my-span")]
     resp = exporter.export(spans)
     assert resp == SpanExportResult.SUCCESS
@@ -67,7 +67,7 @@ def test_faked_exporter_with_retry_then_success(logger):
 
 def test_faked_exporter_with_retry_failure(logger):
     sleeper = FakeSleeper()
-    exporter = OtlpGrpcExporter(logger, client=FakeGrpcClient(4), sleep=sleeper.sleep)
+    exporter = GrpcExporter(logger, client=FakeGrpcClient(4), sleep=sleeper.sleep)
     spans = [mk_span("my-span")]
     resp = exporter.export(spans)
     assert resp == SpanExportResult.FAILURE
