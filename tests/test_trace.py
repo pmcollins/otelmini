@@ -9,7 +9,7 @@ from opentelemetry.sdk.trace.export import SpanExportResult
 from opentelemetry.trace import SpanContext
 from oteltest import sink
 from oteltest.private import AccumulatingHandler
-from oteltest.telemetry import num_spans
+from oteltest.telemetry import count_spans
 
 from otelmini.trace import ExponentialBackoff, GrpcExporter, Timer
 
@@ -23,7 +23,7 @@ def logger():
 def test_single_grpc_request(logger):
     # this test starts a grpc server and makes a request
     handler = AccumulatingHandler()
-    s = sink.GrpcSink(handler)
+    s = sink.GrpcSink(handler, logger)
     s.start()
 
     exporter = GrpcExporter(logger)
@@ -32,7 +32,7 @@ def test_single_grpc_request(logger):
 
     s.stop()
 
-    assert num_spans(handler.telemetry) == 1
+    assert count_spans(handler.telemetry) == 1
 
 
 def test_eventual_runner(logger):
@@ -73,9 +73,9 @@ def test_faked_exporter_with_retry_failure(logger):
     assert resp == SpanExportResult.FAILURE
 
 
-def test_timer():
+def test_timer(logger):
     mylist = []
-    t = Timer(lambda: mylist.append("x"), 144)
+    t = Timer(lambda: mylist.append("x"), 144, logger)
     t.start()
     for i in range(6):
         t.notify_sleeper()
