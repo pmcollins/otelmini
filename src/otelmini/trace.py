@@ -53,8 +53,11 @@ class Timer:
             self.sleeper.notify()
 
     def stop(self):
-        self.stopper.set()
-        self.notify_sleeper()
+        with tracer.start_as_current_span("stop"):
+            self.stopper.set()
+            self.notify_sleeper()
+            with tracer.start_as_current_span("target_fcn"):
+                self.target_fcn()
 
     def join(self):
         self.thread.join()
