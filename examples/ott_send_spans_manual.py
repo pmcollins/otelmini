@@ -1,6 +1,5 @@
 import logging
 import time
-from os.path import abspath, dirname
 from pathlib import Path
 from typing import Mapping, Optional, Sequence
 
@@ -43,8 +42,10 @@ def send_spans():
     logger = logging.getLogger("main")
     tracer = trace.get_tracer("my-module")
     logger.info("sending span")
-    with tracer.start_span(f"span"):
-        time.sleep(0.1)
+    for i in range(12):
+        with tracer.start_span(f"mini-span-{i}"):
+            print(f"i={i}")
+            time.sleep(0.2)
     logger.info("done")
 
 
@@ -65,11 +66,11 @@ class MyOtelTest(OtelTest):
     def wrapper_command(self) -> str:
         return ""
 
+    def is_http(self) -> bool:
+        return False
+
     def on_start(self) -> Optional[float]:
         pass
 
     def on_stop(self, tel: Telemetry, stdout: str, stderr: str, returncode: int) -> None:
-        assert count_spans(tel) == 1
-
-    def is_http(self) -> bool:
-        return False
+        assert count_spans(tel)

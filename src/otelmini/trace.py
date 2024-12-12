@@ -10,7 +10,6 @@ from opentelemetry.context import context
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2_grpc import TraceServiceStub
 from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
-from opentelemetry.trace import Tracer
 
 from otelmini.encode import mk_trace_request
 
@@ -34,30 +33,25 @@ class Timer:
         self.thread.start()
 
     def _target(self):
-        with tracer.start_as_current_span("_target"):
-            while not self.stopper.is_set():
-                self._sleep()
-                if not self.stopper.is_set():
-                    with tracer.start_as_current_span("target_fcn"):
-                        self.target_fcn()
+        while not self.stopper.is_set():
+            self._sleep()
+            if not self.stopper.is_set():
+                self.target_fcn()
 
     def _sleep(self):
-        with tracer.start_as_current_span("Timer._sleep"):
-            with self.sleeper:
-                self.logger.debug("sleeper wait start")
-                self.sleeper.wait(self.interval_seconds)
-                self.logger.debug("sleeper wait done")
+        with self.sleeper:
+            self.logger.debug("sleeper wait start")
+            self.sleeper.wait(self.interval_seconds)
+            self.logger.debug("sleeper wait done")
 
     def notify_sleeper(self):
         with self.sleeper:
             self.sleeper.notify()
 
     def stop(self):
-        with tracer.start_as_current_span("stop"):
-            self.stopper.set()
-            self.notify_sleeper()
-            with tracer.start_as_current_span("target_fcn"):
-                self.target_fcn()
+        self.stopper.set()
+        self.notify_sleeper()
+        self.target_fcn()
 
     def join(self):
         self.thread.join()
@@ -73,18 +67,16 @@ class ExponentialBackoff:
         self.exceptions = exceptions
 
     def retry(self, func):
-        with tracer.start_as_current_span("retry"):
-            for attempt in range(self.max_attempts):
-                with tracer.start_as_current_span("attempt"):
-                    try:
-                        return func()
-                    except self.exceptions as e:
-                        if attempt < self.max_attempts - 1:
-                            seconds = (2 ** attempt) * self.base_seconds
-                            self.logger.debug("backing off for %d seconds", seconds)
-                            self.sleep(seconds)
-                        else:
-                            raise ExponentialBackoff.MaxAttemptsException(e)
+        for attempt in range(self.max_attempts):
+            try:
+                return func()
+            except self.exceptions as e:
+                if attempt < self.max_attempts - 1:
+                    seconds = (2 ** attempt) * self.base_seconds
+                    self.logger.debug("backing off for %d seconds", seconds)
+                    self.sleep(seconds)
+                else:
+                    raise ExponentialBackoff.MaxAttemptsException(e)
 
     class MaxAttemptsException(Exception):
 
@@ -102,25 +94,20 @@ class GrpcExporter(SpanExporter):
 
     def export(self, spans: typing.Sequence[ReadableSpan]) -> SpanExportResult:
         self.logger.debug("will export %d spans", len(spans))
-        with tracer.start_as_current_span("export"):
-            request = mk_trace_request(spans)
-            try:
-                resp = self.eb.retry(lambda: self.client.Export(request))
-                self.logger.debug("export response: %s", resp)
-                return SpanExportResult.SUCCESS
-            except ExponentialBackoff.MaxAttemptsException as e:
-                self.logger.warning("max retries reached: %s", e)
-                return SpanExportResult.FAILURE
+        request = mk_trace_request(spans)
+        try:
+            resp = self.eb.retry(lambda: self.client.Export(request))
+            self.logger.debug("export response: %s", resp)
+            return SpanExportResult.SUCCESS
+        except ExponentialBackoff.MaxAttemptsException as e:
+            self.logger.warning("max retries reached: %s", e)
+            return SpanExportResult.FAILURE
 
     def shutdown(self) -> None:
         pass
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
         return False
-
-
-def check_start_span(tr: Tracer, name):
-    yield tr.start_as_current_span("check_start_span", name=name)
 
 
 class Batcher:
@@ -173,17 +160,15 @@ class BatchProcessor(SpanProcessor):
 
     def _export(self):
         self.logger.debug("_export()")
-        with tracer.start_as_current_span("_export"):
-            batch = self.batcher.pop()
-            if batch is not None and len(batch) > 0:
-                self.logger.debug("got batch from queue of len [%d]", len(batch))
-                self.exporter.export(batch)
+        batch = self.batcher.pop()
+        if batch is not None and len(batch) > 0:
+            self.logger.debug("got batch from queue of len [%d]", len(batch))
+            self.exporter.export(batch)
 
     def shutdown(self) -> None:
         self.logger.debug("shutdown")
-        with tracer.start_as_current_span("shutdown"):
-            self.stopper.set()
-            self.timer.stop()
+        self.stopper.set()
+        self.timer.stop()
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
         # todo implement
