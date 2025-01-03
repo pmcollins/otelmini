@@ -1,4 +1,7 @@
+import atexit
 import logging
+import threading
+import time
 from collections import defaultdict
 from typing import (
     Any,
@@ -11,19 +14,13 @@ from typing import (
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest as PB2ExportTraceServiceRequest,
 )
-from opentelemetry.proto.common.v1.common_pb2 import AnyValue as PB2AnyValue
-from opentelemetry.proto.common.v1.common_pb2 import ArrayValue as PB2ArrayValue
-from opentelemetry.proto.common.v1.common_pb2 import InstrumentationScope as PB2InstrumentationScope
-from opentelemetry.proto.common.v1.common_pb2 import KeyValue as PB2KeyValue
-from opentelemetry.proto.common.v1.common_pb2 import KeyValueList as PB2KeyValueList
+from opentelemetry.proto.common.v1.common_pb2 import AnyValue as PB2AnyValue, ArrayValue as PB2ArrayValue, \
+    InstrumentationScope as PB2InstrumentationScope, KeyValue as PB2KeyValue, KeyValueList as PB2KeyValueList
 from opentelemetry.proto.resource.v1.resource_pb2 import (
     Resource as PB2Resource,
 )
-from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans as PB2ResourceSpans
-from opentelemetry.proto.trace.v1.trace_pb2 import ScopeSpans as PB2ScopeSpans
-from opentelemetry.proto.trace.v1.trace_pb2 import Span as PB2SPan
-from opentelemetry.proto.trace.v1.trace_pb2 import SpanFlags as PB2SpanFlags
-from opentelemetry.proto.trace.v1.trace_pb2 import Status as PB2Status
+from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans as PB2ResourceSpans, ScopeSpans as PB2ScopeSpans, \
+    Span as PB2SPan, SpanFlags as PB2SpanFlags, Status as PB2Status
 from opentelemetry.sdk.trace import Event, ReadableSpan, Resource
 from opentelemetry.sdk.util.instrumentation import InstrumentationScope
 from opentelemetry.trace import Link, SpanKind
@@ -31,6 +28,95 @@ from opentelemetry.trace.span import SpanContext, Status, TraceState
 from opentelemetry.util.types import Attributes
 
 _logger = logging.getLogger(__name__)
+
+
+class Timer:
+
+    def __init__(self, target_fcn, interval_seconds, daemon=True):
+        self.thread = threading.Thread(target=self._target, daemon=daemon)
+        self.target_fcn = target_fcn
+        self.interval_seconds = interval_seconds
+        self.sleeper = threading.Condition()
+        self.stopper = threading.Event()
+
+        atexit.register(self.stop)
+
+    def start(self):
+        self.thread.start()
+
+    def _target(self):
+        while not self.stopper.is_set():
+            self._sleep()
+            if not self.stopper.is_set():
+                self.target_fcn()
+
+    def _sleep(self):
+        with self.sleeper:
+            self.sleeper.wait(self.interval_seconds)
+
+    def notify_sleeper(self):
+        with self.sleeper:
+            self.sleeper.notify()
+
+    def stop(self):
+        self.stopper.set()
+        self.notify_sleeper()
+        self.target_fcn()
+
+    def join(self):
+        self.thread.join()
+
+
+class ExponentialBackoff:
+
+    def __init__(self, max_attempts, base_seconds=1, sleep=time.sleep, exceptions=(Exception,)):
+        self.max_attempts = max_attempts
+        self.base_seconds = base_seconds
+        self.sleep = sleep
+        self.exceptions = exceptions
+
+    def retry(self, func):
+        for attempt in range(self.max_attempts):
+            try:
+                return func()
+            except self.exceptions as e:
+                if attempt < self.max_attempts - 1:
+                    seconds = (2 ** attempt) * self.base_seconds
+                    self.sleep(seconds)
+                else:
+                    raise ExponentialBackoff.MaxAttemptsException(e)
+
+    class MaxAttemptsException(Exception):
+
+        def __init__(self, last_exception):
+            super().__init__("Maximum retries reached")
+            self.last_exception = last_exception
+
+
+class Batcher:
+
+    def __init__(self, batch_size):
+        self.lock = threading.RLock()
+        self.batch_size = batch_size
+        self.items = []
+        self.batches = []
+
+    def add(self, item):
+        with self.lock:
+            self.items.append(item)
+            if len(self.items) == self.batch_size:
+                self._batch()
+                return True
+            return False
+
+    def pop(self):
+        with self.lock:
+            self._batch()
+            return self.batches.pop(0) if len(self.batches) > 0 else None
+
+    def _batch(self):
+        self.batches.append(self.items)
+        self.items = []
 
 
 def mk_trace_request(spans: Sequence[ReadableSpan]) -> PB2ExportTraceServiceRequest:

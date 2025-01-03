@@ -25,6 +25,5 @@ class OtelMiniConfigurator(_BaseConfigurator):
             GrpcExporter(logging.getLogger("GrpcExporter")),
             batch_size=144,
             interval_seconds=12,
-            logger=logging.getLogger("BatchProcessor")
         ))
         trace.set_tracer_provider(tracer_provider)

@@ -24,11 +24,12 @@ if __name__ == '__main__':
     tp.add_span_processor(proc)
     trace.set_tracer_provider(tp)
 
-    tracer = tp.get_tracer("my-module")
-    for i in range(12):
-        with tracer.start_span(f"span-{i}"):
-            print(f"main: i={i}")
-            time.sleep(0.2)
+    tracer = tp.get_tracer(__name__)
+    with tracer.start_as_current_span("ott-manual-spans"):
+        for i in range(12):
+            with tracer.start_span(f"span-{i}"):
+                print(f"main: i={i}")
+                time.sleep(0.2)
     tp.shutdown()
 
 
@@ -50,4 +51,4 @@ class MyOtelTest(OtelTest):
         pass
 
     def on_stop(self, tel: Telemetry, stdout: str, stderr: str, returncode: int) -> None:
-        assert count_spans(tel)
+        assert count_spans(tel) == 13

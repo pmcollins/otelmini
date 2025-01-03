@@ -11,7 +11,8 @@ from oteltest import sink
 from oteltest.private import AccumulatingHandler
 from oteltest.telemetry import count_spans
 
-from otelmini.trace import ExponentialBackoff, GrpcExporter, Timer
+from otelmini.trace import GrpcExporter
+from otelmini._tracelib import ExponentialBackoff, Timer
 
 
 @pytest.fixture
@@ -26,7 +27,7 @@ def test_single_grpc_request(logger):
     s = sink.GrpcSink(handler, logger)
     s.start()
 
-    exporter = GrpcExporter(logger)
+    exporter = GrpcExporter()
     spans = [mk_span("my-span")]
     exporter.export(spans)
 
@@ -35,47 +36,47 @@ def test_single_grpc_request(logger):
     assert count_spans(handler.telemetry) == 1
 
 
-def test_eventual_runner(logger):
+def test_eventual_runner():
     runner = EventualRunner(1, lambda: "hello")
     with pytest.raises(Exception):
         runner.attempt()
     assert runner.attempt() == "hello"
 
 
-def test_retrier_eventual_success(logger):
+def test_retrier_eventual_success():
     greeter = EventualRunner(2, lambda: "hello")
     f = FakeSleeper()
-    retrier = ExponentialBackoff(max_attempts=3, logger=logger, sleep=f.sleep)
+    retrier = ExponentialBackoff(max_attempts=3, sleep=f.sleep)
     assert retrier.retry(lambda: greeter.attempt()) == "hello"
     assert f.sleeps == [1, 2]
 
 
-def test_retrier_eventual_failure(logger):
-    retrier = ExponentialBackoff(max_attempts=2, logger=logger, sleep=FakeSleeper().sleep)
+def test_retrier_eventual_failure():
+    retrier = ExponentialBackoff(max_attempts=2, sleep=FakeSleeper().sleep)
     with pytest.raises(ExponentialBackoff.MaxAttemptsException):
         greeter = EventualRunner(2, lambda: "hello")
         retrier.retry(lambda: greeter.attempt())
 
 
-def test_faked_exporter_with_retry_then_success(logger):
+def test_faked_exporter_with_retry_then_success():
     sleeper = FakeSleeper()
-    exporter = GrpcExporter(logger, client=FakeGrpcClient(3), sleep=sleeper.sleep)
+    exporter = GrpcExporter(client=FakeGrpcClient(3), sleep=sleeper.sleep)
     spans = [mk_span("my-span")]
     resp = exporter.export(spans)
     assert resp == SpanExportResult.SUCCESS
 
 
-def test_faked_exporter_with_retry_failure(logger):
+def test_faked_exporter_with_retry_failure():
     sleeper = FakeSleeper()
-    exporter = GrpcExporter(logger, client=FakeGrpcClient(4), sleep=sleeper.sleep)
+    exporter = GrpcExporter(client=FakeGrpcClient(4), sleep=sleeper.sleep)
     spans = [mk_span("my-span")]
     resp = exporter.export(spans)
     assert resp == SpanExportResult.FAILURE
 
 
-def test_timer(logger):
+def test_timer():
     mylist = []
-    t = Timer(lambda: mylist.append("x"), 144, logger)
+    t = Timer(lambda: mylist.append("x"), 144)
     t.start()
     for i in range(6):
         t.notify_sleeper()
