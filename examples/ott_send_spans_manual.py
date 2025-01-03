@@ -1,4 +1,4 @@
-import logging
+import os
 import time
 from pathlib import Path
 from typing import Mapping, Optional, Sequence
@@ -10,49 +10,26 @@ from oteltest.telemetry import count_spans
 
 from otelmini.trace import BatchProcessor, GrpcExporter
 
-
-def configure_py_logging():
-    class AlignedFormatter(logging.Formatter):
-        def format(self, record):
-            record.levelname = record.levelname.ljust(8)
-            record.name = record.name.ljust(24)
-            return super().format(record)
-
-    logging.basicConfig(level=logging.DEBUG)
-    formatter = AlignedFormatter("%(levelname)s %(name)s %(message)s")
-    for handler in logging.getLogger().handlers:
-        handler.setFormatter(formatter)
-
-
-def configure_otel():
+if __name__ == '__main__':
+    os.environ["OTEL_SERVICE_NAME"] = "manual"
     tp = TracerProvider()
-    exporter = GrpcExporter(logging.getLogger("OtlpGrpcExporter"))
+    exporter = GrpcExporter()
     proc = BatchProcessor(
         exporter,
         batch_size=24,
         interval_seconds=6,
-        logger=logging.getLogger("BatchSpanProcessor"),
         daemon=True,
     )
+
     tp.add_span_processor(proc)
     trace.set_tracer_provider(tp)
 
-
-def send_spans():
-    logger = logging.getLogger("main")
-    tracer = trace.get_tracer("my-module")
-    logger.info("sending span")
+    tracer = tp.get_tracer("my-module")
     for i in range(12):
-        with tracer.start_span(f"mini-span-{i}"):
-            print(f"i={i}")
+        with tracer.start_span(f"span-{i}"):
+            print(f"main: i={i}")
             time.sleep(0.2)
-    logger.info("done")
-
-
-if __name__ == '__main__':
-    configure_py_logging()
-    configure_otel()
-    send_spans()
+    tp.shutdown()
 
 
 class MyOtelTest(OtelTest):

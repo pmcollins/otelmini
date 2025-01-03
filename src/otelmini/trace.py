@@ -13,20 +13,22 @@ from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 
 from otelmini.encode import mk_trace_request
 
-tracer = trace.get_tracer(__name__)
+RETRY_BACKOFF_SECONDS = "retry.backoff_seconds"
+RETRY_ATTEMPT = "retry.attempt"
+RETRY_SUCCESS = "retry.success"
+
+_tracer = trace.get_tracer(__name__)
 
 
 class Timer:
 
-    def __init__(self, target_fcn, interval_seconds, logger, daemon=True):
+    def __init__(self, target_fcn, interval_seconds, daemon=True):
         self.thread = threading.Thread(target=self._target, daemon=daemon)
         self.target_fcn = target_fcn
         self.interval_seconds = interval_seconds
-        self.logger = logger
         self.sleeper = threading.Condition()
         self.stopper = threading.Event()
 
-        # TODO at python shutdown, run the target one more time
         atexit.register(self.stop)
 
     def start(self):
@@ -40,9 +42,7 @@ class Timer:
 
     def _sleep(self):
         with self.sleeper:
-            self.logger.debug("sleeper wait start")
             self.sleeper.wait(self.interval_seconds)
-            self.logger.debug("sleeper wait done")
 
     def notify_sleeper(self):
         with self.sleeper:
@@ -59,9 +59,8 @@ class Timer:
 
 class ExponentialBackoff:
 
-    def __init__(self, max_attempts, logger, base_seconds=1, sleep=time.sleep, exceptions=(Exception,)):
+    def __init__(self, max_attempts, base_seconds=1, sleep=time.sleep, exceptions=(Exception,)):
         self.max_attempts = max_attempts
-        self.logger = logger
         self.base_seconds = base_seconds
         self.sleep = sleep
         self.exceptions = exceptions
@@ -73,7 +72,6 @@ class ExponentialBackoff:
             except self.exceptions as e:
                 if attempt < self.max_attempts - 1:
                     seconds = (2 ** attempt) * self.base_seconds
-                    self.logger.debug("backing off for %d seconds", seconds)
                     self.sleep(seconds)
                 else:
                     raise ExponentialBackoff.MaxAttemptsException(e)
@@ -87,20 +85,19 @@ class ExponentialBackoff:
 
 class GrpcExporter(SpanExporter):
 
-    def __init__(self, logger, addr="127.0.0.1:4317", max_retries=4, client=None, sleep=time.sleep):
-        self.logger = logger
+    def __init__(self, addr="127.0.0.1:4317", max_retries=4, client=None, sleep=time.sleep):
         self.client = client if client is not None else TraceServiceStub(insecure_channel(addr))
-        self.eb = ExponentialBackoff(max_retries, logger, exceptions=(RpcError,), sleep=sleep)
+        self.backoff = ExponentialBackoff(max_retries, exceptions=(RpcError,), sleep=sleep)
 
     def export(self, spans: typing.Sequence[ReadableSpan]) -> SpanExportResult:
-        self.logger.debug("will export %d spans", len(spans))
         request = mk_trace_request(spans)
         try:
-            resp = self.eb.retry(lambda: self.client.Export(request))
-            self.logger.debug("export response: %s", resp)
+            resp = self.backoff.retry(lambda: self.client.Export(request))
+            if resp.HasField("partial_success"):
+                ps = resp.partial_success
+                print(f"partial success: rejected_spans: [{ps.rejected_spans}], error_message: [{ps.error_message}]")
             return SpanExportResult.SUCCESS
         except ExponentialBackoff.MaxAttemptsException as e:
-            self.logger.warning("max retries reached: %s", e)
             return SpanExportResult.FAILURE
 
     def shutdown(self) -> None:
@@ -138,39 +135,32 @@ class Batcher:
 
 class BatchProcessor(SpanProcessor):
 
-    def __init__(self, exporter: SpanExporter, batch_size, interval_seconds, logger, daemon=True):
+    def __init__(self, exporter: SpanExporter, batch_size, interval_seconds, daemon=True):
         self.exporter = exporter
-        self.logger = logger
         self.batcher = Batcher(batch_size)
         self.stopper = threading.Event()
 
-        self.timer = Timer(self._export, interval_seconds, logger, daemon=daemon)
+        self.timer = Timer(self._export, interval_seconds, daemon=daemon)
         self.timer.start()
 
     def on_start(self, span: Span, parent_context: Optional[context.Context] = None) -> None:
-        self.logger.debug("on_start()")
+        pass
 
     def on_end(self, span: ReadableSpan) -> None:
-        self.logger.debug("on_end()")
         if not self.stopper.is_set():
             batched = self.batcher.add(span)
             if batched:
-                self.logger.debug("enqueue batch and poke timer")
                 self.timer.notify_sleeper()
 
     def _export(self):
-        self.logger.debug("_export()")
         batch = self.batcher.pop()
         if batch is not None and len(batch) > 0:
-            self.logger.debug("got batch from queue of len [%d]", len(batch))
             self.exporter.export(batch)
 
     def shutdown(self) -> None:
-        self.logger.debug("shutdown")
         self.stopper.set()
         self.timer.stop()
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
         # todo implement
-        self.logger.debug("force_flush")
         return False
