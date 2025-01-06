@@ -1,39 +1,14 @@
-import logging
 import time
 
 import pytest
 from grpc import RpcError
-from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceResponse
-from opentelemetry.sdk.trace import ReadableSpan
+from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest, \
+    ExportTraceServiceResponse
 from opentelemetry.sdk.trace.export import SpanExportResult
-from opentelemetry.trace import SpanContext
-from oteltest import sink
-from oteltest.private import AccumulatingHandler
-from oteltest.telemetry import count_spans
 
-from otelmini.trace import GrpcExporter
+from _lib import mk_span
 from otelmini._tracelib import ExponentialBackoff, Timer
-
-
-@pytest.fixture
-def logger():
-    logging.basicConfig(level=logging.DEBUG)
-    return logging.getLogger()
-
-
-def test_single_grpc_request(logger):
-    # this test starts a grpc server and makes a request
-    handler = AccumulatingHandler()
-    s = sink.GrpcSink(handler, logger)
-    s.start()
-
-    exporter = GrpcExporter()
-    spans = [mk_span("my-span")]
-    exporter.export(spans)
-
-    s.stop()
-
-    assert count_spans(handler.telemetry) == 1
+from otelmini.trace import GrpcSpanExporter
 
 
 def test_eventual_runner():
@@ -60,18 +35,22 @@ def test_retrier_eventual_failure():
 
 def test_faked_exporter_with_retry_then_success():
     sleeper = FakeSleeper()
-    exporter = GrpcExporter(client=FakeGrpcClient(3), sleep=sleeper.sleep)
+    channel = FakeChannel(3)
+    exporter = GrpcSpanExporter(channel=channel, sleep=sleeper.sleep)
     spans = [mk_span("my-span")]
     resp = exporter.export(spans)
     assert resp == SpanExportResult.SUCCESS
+    assert len(channel.export_requests) == 4
 
 
 def test_faked_exporter_with_retry_failure():
     sleeper = FakeSleeper()
-    exporter = GrpcExporter(client=FakeGrpcClient(4), sleep=sleeper.sleep)
+    channel = FakeChannel(4)
+    exporter = GrpcSpanExporter(channel=channel, sleep=sleeper.sleep)
     spans = [mk_span("my-span")]
     resp = exporter.export(spans)
     assert resp == SpanExportResult.FAILURE
+    assert len(channel.export_requests) == 4
 
 
 def test_timer():
@@ -84,21 +63,22 @@ def test_timer():
     assert len(mylist) == 6
 
 
-def mk_span(name):
-    return ReadableSpan(name, context=SpanContext(0, 0, False))
-
-
-class FakeGrpcClient:
+class FakeChannel:
 
     def __init__(self, failed_attempts_before_success):
         self.failed_attempts_before_success = failed_attempts_before_success
         self.attempts = 0
+        self.export_requests = []
 
-    def Export(self, request):
-        self.attempts += 1
-        if self.attempts <= self.failed_attempts_before_success:
-            raise RpcError()
-        return ExportTraceServiceResponse()
+    def unary_unary(self, *args, **kwargs):
+        def export_func(req: ExportTraceServiceRequest):
+            self.export_requests.append(req)
+            self.attempts += 1
+            if self.attempts <= self.failed_attempts_before_success:
+                raise RpcError()
+            return ExportTraceServiceResponse()
+
+        return export_func
 
 
 class FakeSleeper:

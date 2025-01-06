@@ -15,17 +15,18 @@ from otelmini._tracelib import Batcher, ExponentialBackoff, Timer, mk_trace_requ
 _tracer = trace.get_tracer(__name__)
 
 
-class GrpcExporter(SpanExporter):
+class GrpcSpanExporter(SpanExporter):
 
-    def __init__(self, addr="127.0.0.1:4317", max_retries=4, client=None, sleep=time.sleep):
-        self.client = client if client is not None else TraceServiceStub(insecure_channel(addr))
+    def __init__(self, addr="127.0.0.1:4317", max_retries=4, channel=None, sleep=time.sleep):
+        self.channel = channel if channel else insecure_channel(addr)
+        self.client = TraceServiceStub(self.channel)
         self.backoff = ExponentialBackoff(max_retries, exceptions=(RpcError,), sleep=sleep)
 
     def export(self, spans: typing.Sequence[ReadableSpan]) -> SpanExportResult:
         request = mk_trace_request(spans)
         try:
             resp = self.backoff.retry(lambda: self.client.Export(request))
-            if resp.HasField("partial_success"):
+            if resp.HasField("partial_success") and resp.partial_success:
                 ps = resp.partial_success
                 print(f"partial success: rejected_spans: [{ps.rejected_spans}], error_message: [{ps.error_message}]")
             return SpanExportResult.SUCCESS
@@ -33,7 +34,7 @@ class GrpcExporter(SpanExporter):
             return SpanExportResult.FAILURE
 
     def shutdown(self) -> None:
-        pass
+        self.channel.close()
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
         return False
