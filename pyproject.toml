@@ -93,3 +93,6 @@ exclude_lines = [
   "if __name__ == .__main__.:",
   "if TYPE_CHECKING:",
 ]
+
+[tool.pytest.ini_options]
+markers = ["slow: slow running tests (any test that doesn't feel instantaneous)"]
