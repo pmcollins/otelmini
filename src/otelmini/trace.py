@@ -21,8 +21,7 @@ class GrpcSpanExporter(SpanExporter):
 
     def __init__(self, addr="127.0.0.1:4317", max_retries=3, channel_provider=None, sleep=time.sleep):
         self.channel_provider = channel_provider if channel_provider else lambda: insecure_channel(addr)
-        self.channel = self.channel_provider()
-        self.client = TraceServiceStub(self.channel)
+        self.channel, self.client = self._connect()
         self.backoff = ExponentialBackoff(max_retries, exceptions=(RpcError,), sleep=sleep)
 
     def export(self, spans: typing.Sequence[ReadableSpan]) -> SpanExportResult:
@@ -31,7 +30,8 @@ class GrpcSpanExporter(SpanExporter):
             resp = self.backoff.retry(self._mk_export_fcn(req))
             if resp.HasField("partial_success") and resp.partial_success:
                 ps = resp.partial_success
-                print(f"partial success: rejected_spans: [{ps.rejected_spans}], error_message: [{ps.error_message}]")
+                msg = f"partial success: rejected_spans: [{ps.rejected_spans}], error_message: [{ps.error_message}]"
+                _logger.warning(msg)
             return SpanExportResult.SUCCESS
         except ExponentialBackoff.MaxAttemptsException:
             return SpanExportResult.FAILURE
@@ -43,11 +43,14 @@ class GrpcSpanExporter(SpanExporter):
             except RpcError as e:
                 _logger.warning("Rpc error: %s", e)
                 self.channel.close()
-                self.channel = self.channel_provider()
-                self.client = TraceServiceStub(self.channel)
+                self.channel, self.client = self._connect()
                 raise
 
         return try_exporting
+
+    def _connect(self):
+        channel = self.channel_provider()
+        return channel, TraceServiceStub(channel)
 
     def shutdown(self) -> None:
         self.channel.close()
