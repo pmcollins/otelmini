@@ -21,13 +21,13 @@ def test_eventual_runner():
 def test_retrier_eventual_success():
     greeter = EventualRunner(2, lambda: "hello")
     f = FakeSleeper()
-    retrier = ExponentialBackoff(max_attempts=3, sleep=f.sleep)
+    retrier = ExponentialBackoff(max_retries=2, sleep=f.sleep)
     assert retrier.retry(lambda: greeter.attempt()) == "hello"
     assert f.sleeps == [1, 2]
 
 
 def test_retrier_eventual_failure():
-    retrier = ExponentialBackoff(max_attempts=2, sleep=FakeSleeper().sleep)
+    retrier = ExponentialBackoff(max_retries=1, sleep=FakeSleeper().sleep)
     with pytest.raises(ExponentialBackoff.MaxAttemptsException):
         greeter = EventualRunner(2, lambda: "hello")
         retrier.retry(lambda: greeter.attempt())
@@ -36,7 +36,7 @@ def test_retrier_eventual_failure():
 def test_faked_exporter_with_retry_then_success():
     sleeper = FakeSleeper()
     channel = FakeChannel(3)
-    exporter = GrpcSpanExporter(channel=channel, sleep=sleeper.sleep)
+    exporter = GrpcSpanExporter(channel_provider=lambda: channel, sleep=sleeper.sleep)
     spans = [mk_span("my-span")]
     resp = exporter.export(spans)
     assert resp == SpanExportResult.SUCCESS
@@ -46,7 +46,7 @@ def test_faked_exporter_with_retry_then_success():
 def test_faked_exporter_with_retry_failure():
     sleeper = FakeSleeper()
     channel = FakeChannel(4)
-    exporter = GrpcSpanExporter(channel=channel, sleep=sleeper.sleep)
+    exporter = GrpcSpanExporter(channel_provider=lambda: channel, sleep=sleeper.sleep)
     spans = [mk_span("my-span")]
     resp = exporter.export(spans)
     assert resp == SpanExportResult.FAILURE
@@ -80,6 +80,8 @@ class FakeChannel:
 
         return export_func
 
+    def close(self):
+        pass
 
 class FakeSleeper:
 

@@ -72,19 +72,19 @@ _pylogger = logging.getLogger(__name__)
 
 class ExponentialBackoff:
 
-    def __init__(self, max_attempts, base_seconds=1, sleep=time.sleep, exceptions=(Exception,)):
-        self.max_attempts = max_attempts
+    def __init__(self, max_retries, base_seconds=1, sleep=time.sleep, exceptions=(Exception,)):
+        self.max_retries = max_retries
         self.base_seconds = base_seconds
         self.sleep = sleep
         self.exceptions = exceptions
 
     def retry(self, func):
-        for attempt in range(self.max_attempts):
+        for attempt in range(self.max_retries + 1):
             _pylogger.debug("Retry attempt %d", attempt)
             try:
                 return func()
             except self.exceptions as e:
-                if attempt < self.max_attempts - 1:
+                if attempt < self.max_retries:
                     seconds = (2 ** attempt) * self.base_seconds
                     _pylogger.warning("Retry will sleep %d seconds", seconds)
                     self.sleep(seconds)

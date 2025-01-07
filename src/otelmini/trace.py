@@ -1,3 +1,4 @@
+import logging
 import threading
 import time
 import typing
@@ -13,25 +14,40 @@ from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 from otelmini._tracelib import Batcher, ExponentialBackoff, Timer, mk_trace_request
 
 _tracer = trace.get_tracer(__name__)
+_logger = logging.getLogger(__name__)
 
 
 class GrpcSpanExporter(SpanExporter):
 
-    def __init__(self, addr="127.0.0.1:4317", max_retries=4, channel=None, sleep=time.sleep):
-        self.channel = channel if channel else insecure_channel(addr)
+    def __init__(self, addr="127.0.0.1:4317", max_retries=3, channel_provider=None, sleep=time.sleep):
+        self.channel_provider = channel_provider if channel_provider else lambda: insecure_channel(addr)
+        self.channel = self.channel_provider()
         self.client = TraceServiceStub(self.channel)
         self.backoff = ExponentialBackoff(max_retries, exceptions=(RpcError,), sleep=sleep)
 
     def export(self, spans: typing.Sequence[ReadableSpan]) -> SpanExportResult:
-        request = mk_trace_request(spans)
+        req = mk_trace_request(spans)
         try:
-            resp = self.backoff.retry(lambda: self.client.Export(request))
+            resp = self.backoff.retry(self._mk_export_fcn(req))
             if resp.HasField("partial_success") and resp.partial_success:
                 ps = resp.partial_success
                 print(f"partial success: rejected_spans: [{ps.rejected_spans}], error_message: [{ps.error_message}]")
             return SpanExportResult.SUCCESS
         except ExponentialBackoff.MaxAttemptsException:
             return SpanExportResult.FAILURE
+
+    def _mk_export_fcn(self, req):
+        def try_exporting():
+            try:
+                return self.client.Export(req)
+            except RpcError as e:
+                _logger.warning("Rpc error: %s", e)
+                self.channel.close()
+                self.channel = self.channel_provider()
+                self.client = TraceServiceStub(self.channel)
+                raise
+
+        return try_exporting
 
     def shutdown(self) -> None:
         self.channel.close()
