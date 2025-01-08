@@ -42,11 +42,18 @@ class GrpcSpanExporter(SpanExporter):
                 return self.client.Export(req)
             except RpcError as e:
                 if hasattr(e, "code") and e.code:
-                    _logger.warning("Rpc error during export: %s", e.code().name)
+                    status = e.code().name  # e.g. "UNAVAILABLE"
+                    _logger.warning("Rpc error during export: %s", status)
                 else:
                     _logger.warning("Rpc error during export: %s", e)
+
+                # close the channel, even if not strictly necessary (causes no network transmission)
                 self.channel.close()
+
+                # if the export failed (e.g. because the server is unavailable)
+                # must reconnect, else later attempts will continue to fail even when the server comes back up
                 self.channel, self.client = self._connect()
+
                 raise
 
         return try_exporting
