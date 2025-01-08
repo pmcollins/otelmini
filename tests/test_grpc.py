@@ -11,6 +11,8 @@ from oteltest.telemetry import count_spans
 from _lib import mk_span
 from otelmini.trace import GrpcSpanExporter
 
+# run e.g. `pytest --log-cli-level=INFO`
+# to see log statements during tests
 _logger = logging.getLogger(__name__)
 
 
@@ -57,34 +59,46 @@ def test_exporter_w_server_initially_unavailable():
 
 @pytest.mark.slow
 def test_exporter_w_alternating_server_availability():
+    _logger.info("Sink ON")
     sink = AsyncSink()
     sink.start()
 
     time.sleep(1)
 
+    _logger.info("Export")
     export = AsyncExport()
     export.start()
-    assert export.wait_for_result() == SpanExportResult.SUCCESS
+    result = export.wait_for_result()
+    _logger.info(f"Expect success: {result}")
+    assert result == SpanExportResult.SUCCESS
 
     sink.stop()
-
+    _logger.info("Sink OFF")
     time.sleep(1)
 
+    _logger.info("Export")
     export = AsyncExport()
     export.start()
-    assert export.wait_for_result() == SpanExportResult.FAILURE
+    result = export.wait_for_result()
+    _logger.info(f"Expect failure: {result}")
+    assert result == SpanExportResult.FAILURE
 
+    _logger.info("Export")
     export = AsyncExport()
     export.start()
 
     time.sleep(3)
 
+    _logger.info("Sink ON")
     sink = AsyncSink()
     sink.start()
 
-    assert export.wait_for_result() == SpanExportResult.SUCCESS
+    result = export.wait_for_result()
+    _logger.info(f"Expect success: {result}")
+    assert result == SpanExportResult.SUCCESS
 
     sink.stop()
+    _logger.info("Sink OFF")
 
 
 class AsyncExport:

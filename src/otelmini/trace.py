@@ -41,7 +41,10 @@ class GrpcSpanExporter(SpanExporter):
             try:
                 return self.client.Export(req)
             except RpcError as e:
-                _logger.warning("Rpc error: %s", e)
+                if hasattr(e, "code") and e.code:
+                    _logger.warning("Rpc error during export: %s", e.code().name)
+                else:
+                    _logger.warning("Rpc error during export: %s", e)
                 self.channel.close()
                 self.channel, self.client = self._connect()
                 raise
