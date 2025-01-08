@@ -4,7 +4,7 @@ import time
 
 import pytest
 from opentelemetry.sdk.trace.export import SpanExportResult
-from oteltest import sink
+from oteltest import sink as sink_lib
 from oteltest.sink.handler import AccumulatingHandler
 from oteltest.telemetry import count_spans
 
@@ -18,16 +18,16 @@ _logger = logging.getLogger(__name__)
 def test_exporter_single_grpc_request():
     # this test starts a grpc server and makes a request
     handler = AccumulatingHandler()
-    s = sink.GrpcSink(handler, _logger)
+    s = sink_lib.GrpcSink(handler, _logger)
     s.start()
 
     exporter = GrpcSpanExporter()
     exporter.export([mk_span("my-span")])
     exporter.shutdown()
 
-    s.stop()
-
     assert count_spans(handler.telemetry) == 1
+
+    s.stop()
 
 
 @pytest.mark.slow
@@ -41,42 +41,76 @@ def test_exporter_w_server_unavailable():
 
 @pytest.mark.slow
 def test_exporter_w_server_initially_unavailable():
-    client = ClientRunner()
-    client.start()
+    exporter = AsyncExporter()
+    exporter.start()
 
     time.sleep(3)
 
-    sink_runner = SinkRunner()
-    sink_runner.start()
+    sink = AsyncSink()
+    sink.start()
 
-    result = client.stop()
+    result = exporter.stop()
     assert result == SpanExportResult.SUCCESS
 
+    sink.stop()
 
-class ClientRunner:
+
+@pytest.mark.slow
+def test_exporter_w_alternating_server_availability():
+    sink = AsyncSink()
+    sink.start()
+
+    time.sleep(1)
+
+    exporter = AsyncExporter()
+    exporter.start()
+    assert exporter.stop() == SpanExportResult.SUCCESS
+
+    sink.stop()
+
+    time.sleep(1)
+
+    exporter = AsyncExporter()
+    exporter.start()
+    assert exporter.stop() == SpanExportResult.FAILURE
+
+    exporter = AsyncExporter()
+    exporter.start()
+
+    time.sleep(3)
+
+    sink = AsyncSink()
+    sink.start()
+
+    assert exporter.stop() == SpanExportResult.SUCCESS
+
+    sink.stop()
+
+
+class AsyncExporter:
 
     def __init__(self):
         self.result = None
-        self.client_thread = threading.Thread(target=self.run)
+        self.thread = threading.Thread(target=self._run)
 
     def start(self):
-        self.client_thread.start()
+        self.thread.start()
 
-    def run(self):
+    def _run(self):
         exporter = GrpcSpanExporter(max_retries=4)
         self.result = exporter.export([mk_span("my-span")])
 
     def stop(self):
-        self.client_thread.join()
+        self.thread.join()
         return self.result
 
 
-class SinkRunner:
+class AsyncSink:
 
     def __init__(self):
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.handler = AccumulatingHandler()
-        self.sink = sink.GrpcSink(self.handler, _logger)
+        self.sink = sink_lib.GrpcSink(self.handler, _logger)
 
     def start(self):
         self.thread.start()
@@ -87,3 +121,7 @@ class SinkRunner:
 
     def get_telemetry(self):
         return self.handler.telemetry
+
+    def stop(self):
+        self.sink.stop()
+        self.thread.join()
