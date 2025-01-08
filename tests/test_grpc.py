@@ -41,15 +41,15 @@ def test_exporter_w_server_unavailable():
 
 @pytest.mark.slow
 def test_exporter_w_server_initially_unavailable():
-    exporter = AsyncExporter()
-    exporter.start()
+    export = AsyncExport()
+    export.start()
 
     time.sleep(3)
 
     sink = AsyncSink()
     sink.start()
 
-    result = exporter.stop()
+    result = export.stop()
     assert result == SpanExportResult.SUCCESS
 
     sink.stop()
@@ -62,32 +62,32 @@ def test_exporter_w_alternating_server_availability():
 
     time.sleep(1)
 
-    exporter = AsyncExporter()
-    exporter.start()
-    assert exporter.stop() == SpanExportResult.SUCCESS
+    export = AsyncExport()
+    export.start()
+    assert export.stop() == SpanExportResult.SUCCESS
 
     sink.stop()
 
     time.sleep(1)
 
-    exporter = AsyncExporter()
-    exporter.start()
-    assert exporter.stop() == SpanExportResult.FAILURE
+    export = AsyncExport()
+    export.start()
+    assert export.stop() == SpanExportResult.FAILURE
 
-    exporter = AsyncExporter()
-    exporter.start()
+    export = AsyncExport()
+    export.start()
 
     time.sleep(3)
 
     sink = AsyncSink()
     sink.start()
 
-    assert exporter.stop() == SpanExportResult.SUCCESS
+    assert export.stop() == SpanExportResult.SUCCESS
 
     sink.stop()
 
 
-class AsyncExporter:
+class AsyncExport:
 
     def __init__(self):
         self.result = None
