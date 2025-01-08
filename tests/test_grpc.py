@@ -49,7 +49,7 @@ def test_exporter_w_server_initially_unavailable():
     sink = AsyncSink()
     sink.start()
 
-    result = export.stop()
+    result = export.wait_for_result()
     assert result == SpanExportResult.SUCCESS
 
     sink.stop()
@@ -64,7 +64,7 @@ def test_exporter_w_alternating_server_availability():
 
     export = AsyncExport()
     export.start()
-    assert export.stop() == SpanExportResult.SUCCESS
+    assert export.wait_for_result() == SpanExportResult.SUCCESS
 
     sink.stop()
 
@@ -72,7 +72,7 @@ def test_exporter_w_alternating_server_availability():
 
     export = AsyncExport()
     export.start()
-    assert export.stop() == SpanExportResult.FAILURE
+    assert export.wait_for_result() == SpanExportResult.FAILURE
 
     export = AsyncExport()
     export.start()
@@ -82,7 +82,7 @@ def test_exporter_w_alternating_server_availability():
     sink = AsyncSink()
     sink.start()
 
-    assert export.stop() == SpanExportResult.SUCCESS
+    assert export.wait_for_result() == SpanExportResult.SUCCESS
 
     sink.stop()
 
@@ -100,7 +100,7 @@ class AsyncExport:
         exporter = GrpcSpanExporter(max_retries=4)
         self.result = exporter.export([mk_span("my-span")])
 
-    def stop(self):
+    def wait_for_result(self):
         self.thread.join()
         return self.result
 
