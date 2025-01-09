@@ -27,7 +27,7 @@ from opentelemetry.trace import Link, SpanKind
 from opentelemetry.trace.span import SpanContext, Status, TraceState
 from opentelemetry.util.types import Attributes
 
-_logger = logging.getLogger(__name__)
+_pylogger = logging.getLogger(__name__)
 
 
 class Timer:
@@ -65,9 +65,6 @@ class Timer:
 
     def join(self):
         self.thread.join()
-
-
-_pylogger = logging.getLogger(__name__)
 
 
 class ExponentialBackoff:
@@ -228,7 +225,7 @@ def _encode_attributes(
             try:
                 pb2_attributes.append(_encode_key_value(key, value))
             except Exception as error:
-                _logger.exception("Failed to encode key %s: %s", key, error)
+                _pylogger.exception("Failed to encode key %s: %s", key, error)
     else:
         pb2_attributes = None
     return pb2_attributes
