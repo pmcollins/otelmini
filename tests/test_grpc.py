@@ -83,13 +83,13 @@ def test_exporter_w_alternating_server_availability():
     _logger.info(f"Expect failure: {result}")
     assert result == SpanExportResult.FAILURE
 
-    _logger.info("Export")
+    _logger.info("Start export with sink OFF")
     export = AsyncExport()
     export.start()
 
-    time.sleep(3)
+    time.sleep(5)
 
-    _logger.info("Sink ON")
+    _logger.info("Sink ON after sleep")
     sink = AsyncSink()
     sink.start()
 
