@@ -4,7 +4,7 @@ import time
 import typing
 from typing import Optional
 
-from grpc import insecure_channel, RpcError
+from grpc import RpcError, insecure_channel
 from opentelemetry import trace
 from opentelemetry.context import context
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2_grpc import TraceServiceStub
@@ -98,5 +98,5 @@ class BatchProcessor(SpanProcessor):
         self.timer.stop()
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
-        # todo implement
+        # TODO implement
         return False

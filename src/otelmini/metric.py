@@ -1,11 +1,18 @@
 from typing import Optional, Sequence
 
-from opentelemetry.sdk.metrics._internal.export import MetricReader
-from opentelemetry.sdk.metrics.export import (Metric, MetricExporter, MetricExportResult, MetricsData)
-from opentelemetry.metrics import CallbackT, Counter, Histogram, MeterProvider as ApiMeterProvider, ObservableCounter, \
-    ObservableGauge, \
-    ObservableUpDownCounter, UpDownCounter
+from opentelemetry.metrics import (
+    CallbackT,
+    Counter,
+    Histogram,
+    ObservableCounter,
+    ObservableGauge,
+    ObservableUpDownCounter,
+    UpDownCounter,
+)
+from opentelemetry.metrics import MeterProvider as ApiMeterProvider
 from opentelemetry.metrics._internal import Meter as ApiMeter
+from opentelemetry.sdk.metrics._internal.export import MetricReader
+from opentelemetry.sdk.metrics.export import Metric, MetricExporter, MetricExportResult, MetricsData
 from opentelemetry.util.types import Attributes
 
 

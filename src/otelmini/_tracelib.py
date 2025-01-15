@@ -14,13 +14,19 @@ from typing import (
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest as PB2ExportTraceServiceRequest,
 )
-from opentelemetry.proto.common.v1.common_pb2 import AnyValue as PB2AnyValue, ArrayValue as PB2ArrayValue, \
-    InstrumentationScope as PB2InstrumentationScope, KeyValue as PB2KeyValue, KeyValueList as PB2KeyValueList
+from opentelemetry.proto.common.v1.common_pb2 import AnyValue as PB2AnyValue
+from opentelemetry.proto.common.v1.common_pb2 import ArrayValue as PB2ArrayValue
+from opentelemetry.proto.common.v1.common_pb2 import InstrumentationScope as PB2InstrumentationScope
+from opentelemetry.proto.common.v1.common_pb2 import KeyValue as PB2KeyValue
+from opentelemetry.proto.common.v1.common_pb2 import KeyValueList as PB2KeyValueList
 from opentelemetry.proto.resource.v1.resource_pb2 import (
     Resource as PB2Resource,
 )
-from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans as PB2ResourceSpans, ScopeSpans as PB2ScopeSpans, \
-    Span as PB2SPan, SpanFlags as PB2SpanFlags, Status as PB2Status
+from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans as PB2ResourceSpans
+from opentelemetry.proto.trace.v1.trace_pb2 import ScopeSpans as PB2ScopeSpans
+from opentelemetry.proto.trace.v1.trace_pb2 import Span as PB2SPan
+from opentelemetry.proto.trace.v1.trace_pb2 import SpanFlags as PB2SpanFlags
+from opentelemetry.proto.trace.v1.trace_pb2 import Status as PB2Status
 from opentelemetry.sdk.trace import Event, ReadableSpan, Resource
 from opentelemetry.sdk.util.instrumentation import InstrumentationScope
 from opentelemetry.trace import Link, SpanKind

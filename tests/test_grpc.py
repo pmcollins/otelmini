@@ -3,12 +3,12 @@ import threading
 import time
 
 import pytest
+from _lib import mk_span
 from opentelemetry.sdk.trace.export import SpanExportResult
 from oteltest import sink as sink_lib
 from oteltest.sink.handler import AccumulatingHandler
 from oteltest.telemetry import count_spans
 
-from _lib import mk_span
 from otelmini.trace import GrpcSpanExporter
 
 # run e.g. `pytest --log-cli-level=INFO`

@@ -1,12 +1,14 @@
 import time
 
 import pytest
+from _lib import mk_span
 from grpc import RpcError
-from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest, \
-    ExportTraceServiceResponse
+from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
+    ExportTraceServiceRequest,
+    ExportTraceServiceResponse,
+)
 from opentelemetry.sdk.trace.export import SpanExportResult
 
-from _lib import mk_span
 from otelmini._tracelib import ExponentialBackoff, Timer
 from otelmini.trace import GrpcSpanExporter
 
