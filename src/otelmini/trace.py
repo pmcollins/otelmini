@@ -21,7 +21,7 @@ class GrpcSpanExporter(SpanExporter):
 
     def __init__(self, addr="127.0.0.1:4317", max_retries=3, channel_provider=None, sleep=time.sleep):
         self.channel_provider = channel_provider if channel_provider else lambda: insecure_channel(addr)
-        self.channel, self.client = self._connect()
+        self._connect()
         self.backoff = ExponentialBackoff(max_retries, exceptions=(RpcError,), sleep=sleep)
 
     def export(self, spans: typing.Sequence[ReadableSpan]) -> SpanExportResult:
@@ -47,22 +47,23 @@ class GrpcSpanExporter(SpanExporter):
                 else:
                     _logger.warning("Rpc error during export: %s", e)
 
-                # close the channel, even if not strictly necessary (causes no network transmission)
-                self.channel.close()
+                # close the channel, even if not strictly necessary
+                self.shutdown()
 
                 # if the export failed (e.g. because the server is unavailable) reconnect
                 # otherwise later attempts will continue to fail even when the server comes back up
-                self.channel, self.client = self._connect()
+                self._connect()
 
                 raise
 
         return try_exporting
 
     def _connect(self):
-        channel = self.channel_provider()
-        return channel, TraceServiceStub(channel)
+        self.channel = self.channel_provider()
+        self.client = TraceServiceStub(self.channel)
 
     def shutdown(self) -> None:
+        # causes no network transmission
         self.channel.close()
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
