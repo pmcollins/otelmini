@@ -50,8 +50,8 @@ class GrpcSpanExporter(SpanExporter):
                 # close the channel, even if not strictly necessary (causes no network transmission)
                 self.channel.close()
 
-                # if the export failed (e.g. because the server is unavailable)
-                # must reconnect, else later attempts will continue to fail even when the server comes back up
+                # if the export failed (e.g. because the server is unavailable) reconnect
+                # otherwise later attempts will continue to fail even when the server comes back up
                 self.channel, self.client = self._connect()
 
                 raise

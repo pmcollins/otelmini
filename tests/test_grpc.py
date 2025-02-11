@@ -16,12 +16,12 @@ from otelmini.trace import GrpcSpanExporter
 _logger = logging.getLogger(__name__)
 
 
+# `pytest -m "not slow"` to skip these
 @pytest.mark.slow
 def test_exporter_single_grpc_request():
-    # this test starts a grpc server and makes a request
     handler = AccumulatingHandler()
-    s = sink_lib.GrpcSink(handler, _logger)
-    s.start()
+    sink = sink_lib.GrpcSink(handler, _logger)
+    sink.start()
 
     exporter = GrpcSpanExporter()
     exporter.export([mk_span("my-span")])
@@ -29,7 +29,7 @@ def test_exporter_single_grpc_request():
 
     assert count_spans(handler.telemetry) == 1
 
-    s.stop()
+    sink.stop()
 
 
 @pytest.mark.slow
