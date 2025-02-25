@@ -80,12 +80,12 @@ class SingleReqExporter:
 
 class BatchProcessor(SpanProcessor):
 
-    def __init__(self, exporter: SpanExporter, batch_size, interval_seconds, daemon=True):
+    def __init__(self, exporter: SpanExporter, batch_size, interval_seconds):
         self.exporter = exporter
         self.batcher = Batcher(batch_size)
         self.stopper = threading.Event()
 
-        self.timer = Timer(self._export, interval_seconds, daemon=daemon)
+        self.timer = Timer(self._export, interval_seconds)
         self.timer.start()
 
     def on_start(self, span: Span, parent_context: Optional[context.Context] = None) -> None:

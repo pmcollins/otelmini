@@ -18,7 +18,6 @@ if __name__ == '__main__':
         exporter,
         batch_size=24,
         interval_seconds=6,
-        daemon=True,
     )
 
     tp.add_span_processor(proc)
