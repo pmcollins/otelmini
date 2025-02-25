@@ -4,14 +4,14 @@ import time
 import typing
 from typing import Optional
 
-from grpc import insecure_channel, RpcError
+from grpc import RpcError, insecure_channel
 from opentelemetry import trace
 from opentelemetry.context import context
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2_grpc import TraceServiceStub
 from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 
-from otelmini._tracelib import Batcher, ExponentialBackoff, mk_trace_request, Timer
+from otelmini._tracelib import Batcher, ExponentialBackoff, Timer, mk_trace_request
 
 _tracer = trace.get_tracer(__name__)
 _logger = logging.getLogger(__name__)
