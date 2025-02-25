@@ -33,7 +33,7 @@ class GrpcSpanExporter(SpanExporter):
                 msg = f"partial success: rejected_spans: [{ps.rejected_spans}], error_message: [{ps.error_message}]"
                 _logger.warning(msg)
             return SpanExportResult.SUCCESS
-        except ExponentialBackoff.MaxAttemptsException:
+        except ExponentialBackoff.MaxAttemptsError:
             return SpanExportResult.FAILURE
 
     def _export_single_request(self, req):

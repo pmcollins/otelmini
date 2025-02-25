@@ -30,7 +30,7 @@ def test_retrier_eventual_success():
 
 def test_retrier_eventual_failure():
     retrier = ExponentialBackoff(max_retries=1, sleep=FakeSleeper().sleep)
-    with pytest.raises(ExponentialBackoff.MaxAttemptsException):
+    with pytest.raises(ExponentialBackoff.MaxAttemptsError):
         greeter = EventualRunner(2, lambda: "hello")
         retrier.retry(lambda: greeter.attempt())
 

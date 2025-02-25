@@ -38,8 +38,8 @@ _pylogger = logging.getLogger(__name__)
 
 class Timer:
 
-    def __init__(self, target_fcn, interval_seconds, daemon=True):
-        self.thread = threading.Thread(target=self._target, daemon=daemon)
+    def __init__(self, target_fcn, interval_seconds):
+        self.thread = threading.Thread(target=self._target, daemon=True)
         self.target_fcn = target_fcn
         self.interval_seconds = interval_seconds
         self.sleeper = threading.Condition()
@@ -92,9 +92,10 @@ class ExponentialBackoff:
                     _pylogger.warning("Retry will sleep %d seconds", seconds)
                     self.sleep(seconds)
                 else:
-                    raise ExponentialBackoff.MaxAttemptsException(e)
+                    raise ExponentialBackoff.MaxAttemptsError(e) from e
+        return None
 
-    class MaxAttemptsException(Exception):
+    class MaxAttemptsError(Exception):
 
         def __init__(self, last_exception):
             super().__init__("Maximum retries reached")
