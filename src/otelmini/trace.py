@@ -4,14 +4,14 @@ import time
 import typing
 from typing import Optional
 
-from grpc import RpcError, insecure_channel
+from grpc import insecure_channel, RpcError
 from opentelemetry import trace
 from opentelemetry.context import context
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2_grpc import TraceServiceStub
 from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 
-from otelmini._tracelib import Batcher, ExponentialBackoff, Timer, mk_trace_request
+from otelmini._tracelib import Batcher, ExponentialBackoff, mk_trace_request, Timer
 
 _tracer = trace.get_tracer(__name__)
 _logger = logging.getLogger(__name__)
@@ -27,7 +27,7 @@ class GrpcSpanExporter(SpanExporter):
     def export(self, spans: typing.Sequence[ReadableSpan]) -> SpanExportResult:
         req = mk_trace_request(spans)
         try:
-            resp = self.backoff.retry(self._mk_export_fcn(req))
+            resp = self.backoff.retry(SingleReqExporter(self, req).export)
             if resp.HasField("partial_success") and resp.partial_success:
                 ps = resp.partial_success
                 msg = f"partial success: rejected_spans: [{ps.rejected_spans}], error_message: [{ps.error_message}]"
@@ -36,27 +36,25 @@ class GrpcSpanExporter(SpanExporter):
         except ExponentialBackoff.MaxAttemptsException:
             return SpanExportResult.FAILURE
 
-    def _mk_export_fcn(self, req):
-        def try_exporting():
-            try:
-                return self.client.Export(req)
-            except RpcError as e:
-                if hasattr(e, "code") and e.code:
-                    status = e.code().name  # e.g. "UNAVAILABLE"
-                    _logger.warning("Rpc error during export: %s", status)
-                else:
-                    _logger.warning("Rpc error during export: %s", e)
+    def _export_single_request(self, req):
+        try:
+            return self.client.Export(req)
+        except RpcError as e:
+            # noinspection PyTypeChecker
+            self._handle_export_failure(e)
+            raise
 
-                # close the channel, even if not strictly necessary
-                self.shutdown()
-
-                # if the export failed (e.g. because the server is unavailable) reconnect
-                # otherwise later attempts will continue to fail even when the server comes back up
-                self._connect()
-
-                raise
-
-        return try_exporting
+    def _handle_export_failure(self, e):
+        if hasattr(e, "code") and e.code:
+            status = e.code().name  # e.g. "UNAVAILABLE"
+            _logger.warning("Rpc error during export: %s", status)
+        else:
+            _logger.warning("Rpc error during export: %s", e)
+        # close the channel, even if not strictly necessary
+        self.shutdown()
+        # if the export failed (e.g. because the server is unavailable) reconnect
+        # otherwise later attempts will continue to fail even when the server comes back up
+        self._connect()
 
     def _connect(self):
         self.channel = self.channel_provider()
@@ -68,6 +66,16 @@ class GrpcSpanExporter(SpanExporter):
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
         return False
+
+
+class SingleReqExporter:
+
+    def __init__(self, exporter, req):
+        self.exporter = exporter
+        self.req = req
+
+    def export(self):
+        return self.exporter._export_single_request(self.req)
 
 
 class BatchProcessor(SpanProcessor):

@@ -43,12 +43,12 @@ def test_exporter_w_server_unavailable():
 
 @pytest.mark.slow
 def test_exporter_w_server_initially_unavailable():
-    export = AsyncExport()
+    export = ExportAsyncRunner()
     export.start()
 
     time.sleep(3)
 
-    sink = AsyncSink()
+    sink = SinkAsyncRunner()
     sink.start()
 
     result = export.wait_for_result()
@@ -60,48 +60,48 @@ def test_exporter_w_server_initially_unavailable():
 @pytest.mark.slow
 def test_exporter_w_alternating_server_availability():
     _logger.info("Sink ON")
-    sink = AsyncSink()
-    sink.start()
+    sink_runner = SinkAsyncRunner()
+    sink_runner.start()
 
     time.sleep(1)
 
     _logger.info("Export")
-    export = AsyncExport()
-    export.start()
-    result = export.wait_for_result()
+    export_runner = ExportAsyncRunner()
+    export_runner.start()
+    result = export_runner.wait_for_result()
     _logger.info(f"Expect success: {result}")
     assert result == SpanExportResult.SUCCESS
 
-    sink.stop()
+    sink_runner.stop()
     _logger.info("Sink OFF")
     time.sleep(1)
 
     _logger.info("Export")
-    export = AsyncExport()
-    export.start()
-    result = export.wait_for_result()
+    export_runner = ExportAsyncRunner()
+    export_runner.start()
+    result = export_runner.wait_for_result()
     _logger.info(f"Expect failure: {result}")
     assert result == SpanExportResult.FAILURE
 
     _logger.info("Start export with sink OFF")
-    export = AsyncExport()
-    export.start()
+    export_runner = ExportAsyncRunner()
+    export_runner.start()
 
     time.sleep(5)
 
     _logger.info("Sink ON after sleep")
-    sink = AsyncSink()
-    sink.start()
+    sink_runner = SinkAsyncRunner()
+    sink_runner.start()
 
-    result = export.wait_for_result()
+    result = export_runner.wait_for_result()
     _logger.info(f"Expect success: {result}")
     assert result == SpanExportResult.SUCCESS
 
-    sink.stop()
+    sink_runner.stop()
     _logger.info("Sink OFF")
 
 
-class AsyncExport:
+class ExportAsyncRunner:
 
     def __init__(self):
         self.result = None
@@ -119,7 +119,7 @@ class AsyncExport:
         return self.result
 
 
-class AsyncSink:
+class SinkAsyncRunner:
 
     def __init__(self):
         self.thread = threading.Thread(target=self._run, daemon=True)
