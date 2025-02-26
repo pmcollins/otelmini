@@ -98,3 +98,4 @@ markers = ["slow: slow running tests (any test that doesn't feel instantaneous)"
 
 [tool.ruff]
 exclude = ["examples/", "tests/"]
+lint.ignore = ["UP007"]

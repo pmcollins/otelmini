@@ -1,15 +1,11 @@
+from __future__ import annotations
+
 import atexit
 import logging
 import threading
 import time
 from collections import defaultdict
-from typing import (
-    Any,
-    List,
-    Mapping,
-    Optional,
-    Sequence,
-)
+from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence
 
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest as PB2ExportTraceServiceRequest,
@@ -27,11 +23,13 @@ from opentelemetry.proto.trace.v1.trace_pb2 import ScopeSpans as PB2ScopeSpans
 from opentelemetry.proto.trace.v1.trace_pb2 import Span as PB2SPan
 from opentelemetry.proto.trace.v1.trace_pb2 import SpanFlags as PB2SpanFlags
 from opentelemetry.proto.trace.v1.trace_pb2 import Status as PB2Status
-from opentelemetry.sdk.trace import Event, ReadableSpan, Resource
-from opentelemetry.sdk.util.instrumentation import InstrumentationScope
 from opentelemetry.trace import Link, SpanKind
-from opentelemetry.trace.span import SpanContext, Status, TraceState
-from opentelemetry.util.types import Attributes
+
+if TYPE_CHECKING:
+    from opentelemetry.sdk.trace import Event, ReadableSpan, Resource
+    from opentelemetry.sdk.util.instrumentation import InstrumentationScope
+    from opentelemetry.trace.span import SpanContext, Status, TraceState
+    from opentelemetry.util.types import Attributes
 
 _pylogger = logging.getLogger(__name__)
 
@@ -136,7 +134,7 @@ def mk_trace_request(spans: Sequence[ReadableSpan]) -> PB2ExportTraceServiceRequ
 
 def _encode_resource_spans(
     sdk_spans: Sequence[ReadableSpan],
-) -> List[PB2ResourceSpans]:
+) -> list[PB2ResourceSpans]:
     sdk_resource_spans = defaultdict(lambda: defaultdict(list))
 
     for sdk_span in sdk_spans:
@@ -200,7 +198,6 @@ _SPAN_KIND_MAP = {
 
 
 def _encode_span(sdk_span: ReadableSpan) -> PB2SPan:
-    print(f"encode span: name [{sdk_span.name}]")
     span_context = sdk_span.get_span_context()
     return PB2SPan(
         trace_id=_encode_trace_id(span_context.trace_id),
@@ -224,15 +221,15 @@ def _encode_span(sdk_span: ReadableSpan) -> PB2SPan:
 
 def _encode_attributes(
     attributes: Attributes,
-) -> Optional[List[PB2KeyValue]]:
+) -> Optional[list[PB2KeyValue]]:
     if attributes:
         pb2_attributes = []
         for key, value in attributes.items():
             # pylint: disable=broad-exception-caught
             try:
                 pb2_attributes.append(_encode_key_value(key, value))
-            except Exception as error:
-                _pylogger.exception("Failed to encode key %s: %s", key, error)
+            except Exception:
+                _pylogger.exception("Failed to encode key %s", key)
     else:
         pb2_attributes = None
     return pb2_attributes
@@ -240,7 +237,7 @@ def _encode_attributes(
 
 def _encode_events(
     events: Sequence[Event],
-) -> Optional[List[PB2SPan.Event]]:
+) -> Optional[list[PB2SPan.Event]]:
     pb2_events = None
     if events:
         pb2_events = []
@@ -323,10 +320,13 @@ def _encode_value(value: Any) -> PB2AnyValue:
         return PB2AnyValue(
             array_value=PB2ArrayValue(values=[_encode_value(v) for v in value])
         )
-    elif isinstance(value, Mapping):
+    if isinstance(value, Mapping):
         return PB2AnyValue(
             kvlist_value=PB2KeyValueList(
                 values=[_encode_key_value(str(k), v) for k, v in value.items()]
             )
         )
-    raise Exception(f"Invalid type {type(value)} of value {value}")
+    raise EncodingError(f"Invalid type {type(value)} of value {value}")
+
+class EncodingError(Exception):
+    pass
