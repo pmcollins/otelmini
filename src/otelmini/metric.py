@@ -1,23 +1,15 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, Sequence
-
-from opentelemetry.metrics import (
-    CallbackT,
-    Counter,
-    Histogram,
-    ObservableCounter,
-    ObservableGauge,
-    ObservableUpDownCounter,
-    UpDownCounter,
-)
-from opentelemetry.metrics import MeterProvider as ApiMeterProvider
-from opentelemetry.metrics._internal import Meter as ApiMeter
-from opentelemetry.sdk.metrics._internal.export import MetricReader
-from opentelemetry.sdk.metrics.export import Metric, MetricExporter, MetricExportResult, MetricsData
+from typing import Optional, Sequence, TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from opentelemetry.metrics import CallbackT, Counter as ApiCounter, Histogram, Meter as ApiMeter
+    from opentelemetry.metrics import MeterProvider as ApiMeterProvider
+    from opentelemetry.metrics import ObservableCounter, ObservableGauge, ObservableUpDownCounter
+    from opentelemetry.metrics import UpDownCounter as ApiUpDownCounter
     from opentelemetry.util.types import Attributes
+
+from opentelemetry.sdk.metrics.export import Metric, MetricExporter, MetricExportResult, MetricReader, MetricsData
 
 
 class SimpleMetricExporter(MetricExporter):
@@ -58,10 +50,10 @@ class MeterProvider(ApiMeterProvider):
 
 
 class Meter(ApiMeter):
-    def create_counter(self, name: str, unit: str = "", description: str = "") -> Counter:
+    def create_counter(self, name: str, unit: str = "", description: str = "") -> ApiCounter:
         pass
 
-    def create_up_down_counter(self, name: str, unit: str = "", description: str = "") -> UpDownCounter:
+    def create_up_down_counter(self, name: str, unit: str = "", description: str = "") -> ApiUpDownCounter:
         pass
 
     def create_observable_counter(
