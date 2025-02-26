@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, Sequence
+from typing import Optional, Sequence, TYPE_CHECKING
 
-from opentelemetry.metrics import Meter as ApiMeter
-from opentelemetry.metrics import MeterProvider as ApiMeterProvider
+from opentelemetry.metrics import Histogram as ApiHistogram, Meter as ApiMeter, MeterProvider as ApiMeterProvider, \
+    ObservableCounter as ApiObservableCounter, ObservableGauge as ApiObservableGauge, \
+    ObservableUpDownCounter as ApiObservableUpDownCounter
 
 if TYPE_CHECKING:
-    from opentelemetry.metrics import CallbackT, Histogram, ObservableCounter, ObservableGauge, ObservableUpDownCounter
+    from opentelemetry.metrics import CallbackT
     from opentelemetry.metrics import Counter as ApiCounter
     from opentelemetry.metrics import UpDownCounter as ApiUpDownCounter
     from opentelemetry.util.types import Attributes
@@ -60,7 +61,7 @@ class Meter(ApiMeter):
 
     def create_observable_counter(
         self, name: str, callbacks: Optional[Sequence[CallbackT]] = None, unit: str = "", description: str = ""
-    ) -> ObservableCounter:
+    ) -> ApiObservableCounter:
         pass
 
     def create_histogram(
@@ -70,17 +71,17 @@ class Meter(ApiMeter):
         description: str = "",
         *,
         explicit_bucket_boundaries_advisory: Optional[Sequence[float]] = None,
-    ) -> Histogram:
+    ) -> ApiHistogram:
         pass
 
     def create_observable_gauge(
         self, name: str, callbacks: Optional[Sequence[CallbackT]] = None, unit: str = "", description: str = ""
-    ) -> ObservableGauge:
+    ) -> ApiObservableGauge:
         pass
 
     def create_observable_up_down_counter(
         self, name: str, callbacks: Optional[Sequence[CallbackT]] = None, unit: str = "", description: str = ""
-    ) -> ObservableUpDownCounter:
+    ) -> ApiObservableUpDownCounter:
         pass
 
 
