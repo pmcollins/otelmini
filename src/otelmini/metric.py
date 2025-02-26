@@ -69,7 +69,14 @@ class Meter(ApiMeter):
     ) -> ObservableCounter:
         pass
 
-    def create_histogram(self, name: str, unit: str = "", description: str = "") -> Histogram:
+    def create_histogram(
+        self,
+        name: str,
+        unit: str = "",
+        description: str = "",
+        *,
+        explicit_bucket_boundaries_advisory: Optional[Sequence[float]] = None,
+    ) -> Histogram:
         pass
 
     def create_observable_gauge(
