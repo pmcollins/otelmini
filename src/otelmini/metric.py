@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from typing import Optional, Sequence, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional, Sequence
+
+from opentelemetry.metrics import MeterProvider as ApiMeterProvider
+from opentelemetry.metrics import Meter as ApiMeter
 
 if TYPE_CHECKING:
-    from opentelemetry.metrics import CallbackT, Counter as ApiCounter, Histogram, Meter as ApiMeter
-    from opentelemetry.metrics import MeterProvider as ApiMeterProvider
-    from opentelemetry.metrics import ObservableCounter, ObservableGauge, ObservableUpDownCounter
+    from opentelemetry.metrics import CallbackT, Histogram, ObservableCounter, ObservableGauge, ObservableUpDownCounter
+    from opentelemetry.metrics import Counter as ApiCounter
     from opentelemetry.metrics import UpDownCounter as ApiUpDownCounter
     from opentelemetry.util.types import Attributes
 
