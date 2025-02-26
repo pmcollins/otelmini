@@ -1,24 +1,27 @@
+from __future__ import annotations
+
 import logging
 import threading
 import time
 import typing
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from grpc import RpcError, insecure_channel
 from opentelemetry import trace
-from opentelemetry.context import context
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2_grpc import TraceServiceStub
 from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 
 from otelmini._tracelib import Batcher, ExponentialBackoff, Timer, mk_trace_request
 
+if TYPE_CHECKING:
+    from opentelemetry.context import context
+
 _tracer = trace.get_tracer(__name__)
 _logger = logging.getLogger(__name__)
 
 
 class GrpcSpanExporter(SpanExporter):
-
     def __init__(self, addr="127.0.0.1:4317", max_retries=3, channel_provider=None, sleep=time.sleep):
         self.channel_provider = channel_provider if channel_provider else lambda: insecure_channel(addr)
         self._connect()
@@ -32,11 +35,11 @@ class GrpcSpanExporter(SpanExporter):
                 ps = resp.partial_success
                 msg = f"partial success: rejected_spans: [{ps.rejected_spans}], error_message: [{ps.error_message}]"
                 _logger.warning(msg)
-            return SpanExportResult.SUCCESS
+            return SpanExportResult.SUCCESS  # noqa: TRY300
         except ExponentialBackoff.MaxAttemptsError:
             return SpanExportResult.FAILURE
 
-    def _export_single_request(self, req):
+    def export_single_request(self, req):
         try:
             return self.client.Export(req)
         except RpcError as e:
@@ -64,22 +67,20 @@ class GrpcSpanExporter(SpanExporter):
         # causes no network transmission
         self.channel.close()
 
-    def force_flush(self, timeout_millis: int = 30000) -> bool:
+    def force_flush(self, timeout_millis: int = 30000) -> bool:  # noqa: ARG002
         return False
 
 
 class SingleReqExporter:
-
     def __init__(self, exporter, req):
         self.exporter = exporter
         self.req = req
 
     def export(self):
-        return self.exporter._export_single_request(self.req)
+        return self.exporter.export_single_request(self.req)
 
 
 class BatchProcessor(SpanProcessor):
-
     def __init__(self, exporter: SpanExporter, batch_size, interval_seconds):
         self.exporter = exporter
         self.batcher = Batcher(batch_size)
@@ -106,6 +107,5 @@ class BatchProcessor(SpanProcessor):
         self.stopper.set()
         self.timer.stop()
 
-    def force_flush(self, timeout_millis: int = 30000) -> bool:
-        # TODO implement
+    def force_flush(self, timeout_millis: int = 30000) -> bool:  # noqa: ARG002
         return False

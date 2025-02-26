@@ -35,7 +35,6 @@ _pylogger = logging.getLogger(__name__)
 
 
 class Timer:
-
     def __init__(self, target_fcn, interval_seconds):
         self.thread = threading.Thread(target=self._target, daemon=True)
         self.target_fcn = target_fcn
@@ -72,7 +71,6 @@ class Timer:
 
 
 class ExponentialBackoff:
-
     def __init__(self, max_retries, base_seconds=1, sleep=time.sleep, exceptions=(Exception,)):
         self.max_retries = max_retries
         self.base_seconds = base_seconds
@@ -86,7 +84,7 @@ class ExponentialBackoff:
                 return func()
             except self.exceptions as e:
                 if attempt < self.max_retries:
-                    seconds = (2 ** attempt) * self.base_seconds
+                    seconds = (2**attempt) * self.base_seconds
                     _pylogger.warning("Retry will sleep %d seconds", seconds)
                     self.sleep(seconds)
                 else:
@@ -94,14 +92,12 @@ class ExponentialBackoff:
         return None
 
     class MaxAttemptsError(Exception):
-
         def __init__(self, last_exception):
             super().__init__("Maximum retries reached")
             self.last_exception = last_exception
 
 
 class Batcher:
-
     def __init__(self, batch_size):
         self.lock = threading.RLock()
         self.batch_size = batch_size
@@ -127,9 +123,7 @@ class Batcher:
 
 
 def mk_trace_request(spans: Sequence[ReadableSpan]) -> PB2ExportTraceServiceRequest:
-    return PB2ExportTraceServiceRequest(
-        resource_spans=_encode_resource_spans(spans)
-    )
+    return PB2ExportTraceServiceRequest(resource_spans=_encode_resource_spans(spans))
 
 
 def _encode_resource_spans(
@@ -281,9 +275,7 @@ def _encode_status(status: Status) -> Optional[PB2Status]:
 def _encode_trace_state(trace_state: TraceState) -> Optional[str]:
     pb2_trace_state = None
     if trace_state is not None:
-        pb2_trace_state = ",".join(
-            [f"{key}={value}" for key, value in (trace_state.items())]
-        )
+        pb2_trace_state = ",".join([f"{key}={value}" for key, value in (trace_state.items())])
     return pb2_trace_state
 
 
@@ -317,16 +309,14 @@ def _encode_value(value: Any) -> PB2AnyValue:
     if isinstance(value, bytes):
         return PB2AnyValue(bytes_value=value)
     if isinstance(value, Sequence):
-        return PB2AnyValue(
-            array_value=PB2ArrayValue(values=[_encode_value(v) for v in value])
-        )
+        return PB2AnyValue(array_value=PB2ArrayValue(values=[_encode_value(v) for v in value]))
     if isinstance(value, Mapping):
         return PB2AnyValue(
-            kvlist_value=PB2KeyValueList(
-                values=[_encode_key_value(str(k), v) for k, v in value.items()]
-            )
+            kvlist_value=PB2KeyValueList(values=[_encode_key_value(str(k), v) for k, v in value.items()])
         )
-    raise EncodingError(f"Invalid type {type(value)} of value {value}")
+    raise EncodingError(value)
+
 
 class EncodingError(Exception):
-    pass
+    def __init__(self, value):
+        super().__init__(f"Invalid type {type(value)} of value {value}")
