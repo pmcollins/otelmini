@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from enum import Enum
 from typing import TYPE_CHECKING, Optional, Sequence
+import time
 
 from opentelemetry.metrics import Counter as ApiCounter
 from opentelemetry.metrics import Histogram as ApiHistogram
@@ -11,15 +12,26 @@ from opentelemetry.metrics import ObservableCounter as ApiObservableCounter
 from opentelemetry.metrics import ObservableGauge as ApiObservableGauge
 from opentelemetry.metrics import ObservableUpDownCounter as ApiObservableUpDownCounter
 
+from otelmini.grpc import GrpcExporter
+
 if TYPE_CHECKING:
     from opentelemetry.context import Context
     from opentelemetry.metrics import CallbackT
     from opentelemetry.metrics import UpDownCounter as ApiUpDownCounter
     from opentelemetry.util.types import Attributes
+    from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import ExportMetricsServiceRequest, ExportMetricsServiceResponse
+    from opentelemetry.proto.metrics.v1.metrics_pb2 import ResourceMetrics
 
 
 class MetricExporter:
-    pass
+    def export(self, metrics: Sequence[Metric], **kwargs) -> MetricExportResult:
+        return MetricExportResult.SUCCESS
+
+    def force_flush(self, timeout_millis: float = 10_000) -> bool:
+        return True
+
+    def shutdown(self, timeout_millis: float = 30_000, **kwargs) -> None:
+        return None
 
 
 class MetricExportResult(Enum):
@@ -37,6 +49,109 @@ class MetricReader:
 
 class MetricsData:
     pass
+
+
+def mk_metric_request(metrics: Sequence[Metric]) -> ExportMetricsServiceRequest:
+    """
+    Create a metric request from a sequence of metrics.
+    
+    Args:
+        metrics: The metrics to include in the request
+        
+    Returns:
+        An ExportMetricsServiceRequest containing the metrics
+    """
+    # This is a placeholder implementation
+    # In a real implementation, you would convert the metrics to protobuf format
+    from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import ExportMetricsServiceRequest
+    from opentelemetry.proto.metrics.v1.metrics_pb2 import ResourceMetrics
+    
+    # Create a request with empty resource metrics
+    # This needs to be implemented properly based on the protobuf definitions
+    request = ExportMetricsServiceRequest(resource_metrics=[ResourceMetrics()])
+    
+    return request
+
+
+def handle_metric_response(resp):
+    """
+    Handle the response from the gRPC endpoint for metrics.
+    
+    Args:
+        resp: The response from the gRPC endpoint
+    """
+    if resp.HasField("partial_success") and resp.partial_success:
+        ps = resp.partial_success
+        msg = f"partial success: rejected_data_points: [{ps.rejected_data_points}], error_message: [{ps.error_message}]"
+        import logging
+        logging.warning(msg)
+
+
+class GrpcMetricExporter(MetricExporter):
+    """
+    A gRPC exporter for metrics that uses composition with the generic GrpcExporter.
+    """
+    
+    def __init__(self, addr="127.0.0.1:4317", max_retries=3, channel_provider=None, sleep=time.sleep):
+        """
+        Initialize the gRPC metric exporter.
+        
+        Args:
+            addr: The address of the gRPC endpoint
+            max_retries: Maximum number of retry attempts
+            channel_provider: A function that returns a gRPC channel
+            sleep: A function used for sleeping between retries
+        """
+        try:
+            from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2_grpc import MetricsServiceStub
+        except ImportError:
+            raise ImportError("opentelemetry-proto package is required for GrpcMetricExporter")
+        
+        self._exporter = GrpcExporter(
+            addr=addr,
+            max_retries=max_retries,
+            channel_provider=channel_provider,
+            sleep=sleep,
+            stub_class=MetricsServiceStub,
+            response_handler=handle_metric_response,
+            success_result=MetricExportResult.SUCCESS,
+            failure_result=MetricExportResult.FAILURE
+        )
+    
+    def export(self, metrics: Sequence[Metric], **kwargs) -> MetricExportResult:
+        """
+        Export metrics to the gRPC endpoint.
+        
+        Args:
+            metrics: The metrics to export
+            
+        Returns:
+            The result of the export operation
+        """
+        # Create the request here instead of relying on a request factory
+        req = mk_metric_request(metrics)
+        return self._exporter.export_request(req)
+    
+    def force_flush(self, timeout_millis: float = 10_000) -> bool:
+        """
+        Force flush any pending exports.
+        
+        Args:
+            timeout_millis: The timeout in milliseconds
+            
+        Returns:
+            Whether the flush was successful
+        """
+        return self._exporter.force_flush(timeout_millis)
+    
+    def shutdown(self, timeout_millis: float = 30_000, **kwargs) -> None:
+        """
+        Shutdown the exporter.
+        
+        Args:
+            timeout_millis: The timeout in milliseconds
+        """
+        self._exporter.shutdown()
 
 
 class SimpleMetricExporter(MetricExporter):
