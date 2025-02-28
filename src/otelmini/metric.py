@@ -1,18 +1,42 @@
 from __future__ import annotations
 
-from typing import Optional, Sequence, TYPE_CHECKING
+from enum import Enum
+from typing import TYPE_CHECKING, Optional, Sequence
 
-from opentelemetry.metrics import Histogram as ApiHistogram, Meter as ApiMeter, MeterProvider as ApiMeterProvider, \
-    ObservableCounter as ApiObservableCounter, ObservableGauge as ApiObservableGauge, \
-    ObservableUpDownCounter as ApiObservableUpDownCounter
+from opentelemetry.metrics import Counter as ApiCounter
+from opentelemetry.metrics import Histogram as ApiHistogram
+from opentelemetry.metrics import Meter as ApiMeter
+from opentelemetry.metrics import MeterProvider as ApiMeterProvider
+from opentelemetry.metrics import ObservableCounter as ApiObservableCounter
+from opentelemetry.metrics import ObservableGauge as ApiObservableGauge
+from opentelemetry.metrics import ObservableUpDownCounter as ApiObservableUpDownCounter
 
 if TYPE_CHECKING:
+    from opentelemetry.context import Context
     from opentelemetry.metrics import CallbackT
-    from opentelemetry.metrics import Counter as ApiCounter
     from opentelemetry.metrics import UpDownCounter as ApiUpDownCounter
     from opentelemetry.util.types import Attributes
 
-from opentelemetry.sdk.metrics.export import Metric, MetricExporter, MetricExportResult, MetricReader, MetricsData
+
+class MetricExporter:
+    pass
+
+
+class MetricExportResult(Enum):
+    SUCCESS = 0
+    FAILURE = 1
+
+
+class Metric:
+    pass
+
+
+class MetricReader:
+    pass
+
+
+class MetricsData:
+    pass
 
 
 class SimpleMetricExporter(MetricExporter):
@@ -47,14 +71,48 @@ class MeterProvider(ApiMeterProvider):
         name: str,
         version: Optional[str] = None,
         schema_url: Optional[str] = None,
-        attributes: Optional[Attributes] = None,
+        attributes: Optional[Attributes] = None,  # noqa: ARG002
     ) -> ApiMeter:
-        pass
+        return Meter(name, version, schema_url, self.metric_readers)
+
+
+class Counter(ApiCounter):
+    def __init__(self, name: str, unit: str = "", description: str = ""):
+        self.name = name
+        self.unit = unit
+        self.description = description
+        self._value = 0.0
+
+    def add(
+        self,
+        amount: float,
+        attributes: Optional[Attributes] = None,  # noqa: ARG002
+        context: Optional[Context] = None,  # noqa: ARG002
+    ) -> None:
+        """Add an amount to the counter."""
+        if amount < 0:
+            raise CounterError
+        self._value += amount
+
+
+class CounterError(Exception):
+    def __init__(self) -> None:
+        super().__init__("Counter amount must be non-negative")
 
 
 class Meter(ApiMeter):
+    def __init__(
+        self,
+        name: str,
+        version: Optional[str] = None,
+        schema_url: Optional[str] = None,
+        metric_readers: Sequence[MetricReader] = (),
+    ):
+        super().__init__(name, version, schema_url)
+        self.metric_readers = metric_readers
+
     def create_counter(self, name: str, unit: str = "", description: str = "") -> ApiCounter:
-        pass
+        return Counter(name=name, unit=unit, description=description)
 
     def create_up_down_counter(self, name: str, unit: str = "", description: str = "") -> ApiUpDownCounter:
         pass
