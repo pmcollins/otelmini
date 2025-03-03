@@ -4,8 +4,6 @@ import logging
 import time
 from typing import Any, Callable, Generic, Sequence, TypeVar, Optional
 
-from grpc import RpcError, insecure_channel
-
 from otelmini._tracelib import ExponentialBackoff
 
 _logger = logging.getLogger(__name__)

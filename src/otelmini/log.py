@@ -18,8 +18,7 @@ from opentelemetry.util.types import Attributes
 from otelmini.grpc import GrpcExporter
 
 if TYPE_CHECKING:
-    from opentelemetry.proto.collector.logs.v1.logs_service_pb2 import ExportLogsServiceRequest, ExportLogsServiceResponse
-    from opentelemetry.proto.logs.v1.logs_pb2 import ResourceLogs, ScopeLogs, LogRecord as PB2LogRecord
+    from opentelemetry.proto.collector.logs.v1.logs_service_pb2 import ExportLogsServiceRequest
 
 
 class LogExportResult(Enum):
@@ -249,23 +248,6 @@ class LogRecordProcessor:
         return True
 
 
-class ExportingLogRecordProcessor(LogRecordProcessor):
-    def __init__(self, exporter: LogRecordExporter):
-        super().__init__()
-        self._exporter = exporter
-        self._logs_buffer = []
-
-    def on_emit(self, log_record: LogRecord) -> None:
-        self._exporter.export([log_record])
-
-    def shutdown(self) -> None:
-        self.force_flush()
-        self._exporter.shutdown()
-
-    def force_flush(self, timeout_millis: Optional[int] = None) -> bool:
-        return self._exporter.force_flush(timeout_millis)
-
-
 class BatchLogRecordProcessor(LogRecordProcessor):
     def __init__(self, exporter: LogRecordExporter, max_queue_size: int = 2048,
                  batch_size: int = 512, export_interval_millis: int = 5000):
@@ -337,10 +319,9 @@ def _get_severity_number(levelno):
 
 
 class OtelBridgeHandler(logging.Handler):
-    def __init__(self, level=logging.NOTSET, logger_provider=None):
+    def __init__(self, logger_provider, level=logging.NOTSET):
         super().__init__(level=level)
-        provider = logger_provider or LoggerProvider()
-        self._logger = provider.get_logger("python.logging")
+        self._logger = logger_provider.get_logger("python.logging")
 
     def emit(self, record):
         try:
