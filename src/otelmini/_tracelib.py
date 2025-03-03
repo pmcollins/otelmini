@@ -162,16 +162,16 @@ class InstrumentationScope:
 
 
 def mk_trace_request(spans: Sequence[MiniSpan]) -> PB2ExportTraceServiceRequest:
-    return PB2ExportTraceServiceRequest(resource_spans=_encode_resource_spans(spans))
+    return PB2ExportTraceServiceRequest(resource_spans=encode_resource_spans(spans))
 
 
-def _encode_resource_spans(spans: Sequence[MiniSpan]) -> list[PB2ResourceSpans]:
+def encode_resource_spans(spans: Sequence[MiniSpan]) -> list[PB2ResourceSpans]:
     sdk_resource_spans = defaultdict(lambda: defaultdict(list))
 
     for span in spans:
         resource = span.get_resource()
         instrumentation_scope = span.get_instrumentation_scope()
-        pb2_span = _encode_span(span)
+        pb2_span = encode_span(span)
         sdk_resource_spans[resource][instrumentation_scope].append(pb2_span)
 
     pb2_resource_spans = []
@@ -181,13 +181,13 @@ def _encode_resource_spans(spans: Sequence[MiniSpan]) -> list[PB2ResourceSpans]:
         for instrumentation_scope, pb2_spans in sdk_instrumentations.items():
             scope_spans.append(
                 PB2ScopeSpans(
-                    scope=(_encode_instrumentation_scope(instrumentation_scope)),
+                    scope=(encode_instrumentation_scope(instrumentation_scope)),
                     spans=pb2_spans,
                 )
             )
         pb2_resource_spans.append(
             PB2ResourceSpans(
-                resource=_encode_resource(resource),
+                resource=encode_resource(resource),
                 scope_spans=scope_spans,
                 schema_url=resource.get_schema_url(),
             )
@@ -196,18 +196,18 @@ def _encode_resource_spans(spans: Sequence[MiniSpan]) -> list[PB2ResourceSpans]:
     return pb2_resource_spans
 
 
-def _encode_resource(resource: Resource) -> PB2Resource:
-    return PB2Resource(attributes=_encode_attributes(resource.get_attributes()))
+def encode_resource(resource: Resource) -> PB2Resource:
+    return PB2Resource(attributes=encode_attributes(resource.get_attributes()))
 
 
-def _encode_instrumentation_scope(instrumentation_scope: InstrumentationScope) -> PB2InstrumentationScope:
+def encode_instrumentation_scope(instrumentation_scope: InstrumentationScope) -> PB2InstrumentationScope:
     return PB2InstrumentationScope(
         name=instrumentation_scope.get_name(),
         version=instrumentation_scope.get_version(),
     )
 
 
-def _span_flags(parent_span_context: Optional[SpanContext]) -> int:
+def span_flags(parent_span_context: Optional[SpanContext]) -> int:
     flags = PB2SpanFlags.SPAN_FLAGS_CONTEXT_HAS_IS_REMOTE_MASK
     if parent_span_context and parent_span_context.is_remote:
         flags |= PB2SpanFlags.SPAN_FLAGS_CONTEXT_IS_REMOTE_MASK
@@ -223,21 +223,21 @@ _SPAN_KIND_MAP = {
 }
 
 
-def _encode_span(span: MiniSpan) -> PB2SPan:
+def encode_span(span: MiniSpan) -> PB2SPan:
     span_context = span.get_span_context()
     return PB2SPan(
-        trace_id=_encode_trace_id(span_context.trace_id),
-        span_id=_encode_span_id(span_context.span_id),
-        trace_state=_encode_trace_state(span_context.trace_state),
+        trace_id=encode_trace_id(span_context.trace_id),
+        span_id=encode_span_id(span_context.span_id),
+        trace_state=encode_trace_state(span_context.trace_state),
         name=span.get_name(),
-        # parent_span_id=_encode_parent_id(span.parent),
+        # parent_span_id=encode_parent_id(span.parent),
         # kind=_SPAN_KIND_MAP[span.kind],
         # start_time_unix_nano=span.start_time,
         # end_time_unix_nano=span.end_time,
-        # attributes=_encode_attributes(span.attributes),
-        # events=_encode_events(span.events),
-        # links=_encode_links(span.links),
-        # status=_encode_status(span.status),
+        # attributes=encode_attributes(span.attributes),
+        # events=encode_events(span.events),
+        # links=encode_links(span.links),
+        # status=encode_status(span.status),
         # dropped_attributes_count=span.dropped_attributes,
         # dropped_events_count=span.dropped_events,
         # dropped_links_count=span.dropped_links,
@@ -245,7 +245,7 @@ def _encode_span(span: MiniSpan) -> PB2SPan:
     )
 
 
-def _encode_attributes(
+def encode_attributes(
     attributes: Attributes,
 ) -> Optional[list[PB2KeyValue]]:
     if attributes:
@@ -253,7 +253,7 @@ def _encode_attributes(
         for key, value in attributes.items():
             # pylint: disable=broad-exception-caught
             try:
-                pb2_attributes.append(_encode_key_value(key, value))
+                pb2_attributes.append(encode_key_value(key, value))
             except Exception:
                 _pylogger.exception("Failed to encode key %s", key)
     else:
@@ -261,7 +261,7 @@ def _encode_attributes(
     return pb2_attributes
 
 
-# def _encode_events(events: Sequence[Event],) -> Optional[list[PB2SPan.Event]]:
+# def encode_events(events: Sequence[Event],) -> Optional[list[PB2SPan.Event]]:
 #     pb2_events = None
 #     if events:
 #         pb2_events = []
@@ -269,30 +269,30 @@ def _encode_attributes(
 #             encoded_event = PB2SPan.Event(
 #                 name=event.name,
 #                 time_unix_nano=event.timestamp,
-#                 attributes=_encode_attributes(event.attributes),
+#                 attributes=encode_attributes(event.attributes),
 #                 dropped_attributes_count=event.dropped_attributes,
 #             )
 #             pb2_events.append(encoded_event)
 #     return pb2_events
 
 
-def _encode_links(links: Sequence[Link]) -> Sequence[PB2SPan.Link]:
+def encode_links(links: Sequence[Link]) -> Sequence[PB2SPan.Link]:
     pb2_links = None
     if links:
         pb2_links = []
         for link in links:
             encoded_link = PB2SPan.Link(
-                trace_id=_encode_trace_id(link.context.trace_id),
-                span_id=_encode_span_id(link.context.span_id),
-                attributes=_encode_attributes(link.attributes),
+                trace_id=encode_trace_id(link.context.trace_id),
+                span_id=encode_span_id(link.context.span_id),
+                attributes=encode_attributes(link.attributes),
                 dropped_attributes_count=link.dropped_attributes,
-                flags=_span_flags(link.context),
+                flags=span_flags(link.context),
             )
             pb2_links.append(encoded_link)
     return pb2_links
 
 
-def _encode_status(status: Status) -> Optional[PB2Status]:
+def encode_status(status: Status) -> Optional[PB2Status]:
     pb2_status = None
     if status is not None:
         pb2_status = PB2Status(
@@ -302,32 +302,32 @@ def _encode_status(status: Status) -> Optional[PB2Status]:
     return pb2_status
 
 
-def _encode_trace_state(trace_state: TraceState) -> Optional[str]:
+def encode_trace_state(trace_state: TraceState) -> Optional[str]:
     pb2_trace_state = None
     if trace_state is not None:
         pb2_trace_state = ",".join([f"{key}={value}" for key, value in (trace_state.items())])
     return pb2_trace_state
 
 
-def _encode_parent_id(context: Optional[SpanContext]) -> Optional[bytes]:
+def encode_parent_id(context: Optional[SpanContext]) -> Optional[bytes]:
     if context:
-        return _encode_span_id(context.span_id)
+        return encode_span_id(context.span_id)
     return None
 
 
-def _encode_span_id(span_id: int) -> bytes:
+def encode_span_id(span_id: int) -> bytes:
     return span_id.to_bytes(length=8, byteorder="big", signed=False)
 
 
-def _encode_key_value(key: str, value: Any) -> PB2KeyValue:
-    return PB2KeyValue(key=key, value=_encode_value(value))
+def encode_key_value(key: str, value: Any) -> PB2KeyValue:
+    return PB2KeyValue(key=key, value=encode_value(value))
 
 
-def _encode_trace_id(trace_id: int) -> bytes:
+def encode_trace_id(trace_id: int) -> bytes:
     return trace_id.to_bytes(length=16, byteorder="big", signed=False)
 
 
-def _encode_value(value: Any) -> PB2AnyValue:
+def encode_value(value: Any) -> PB2AnyValue:
     if isinstance(value, bool):
         return PB2AnyValue(bool_value=value)
     if isinstance(value, str):
@@ -339,10 +339,10 @@ def _encode_value(value: Any) -> PB2AnyValue:
     if isinstance(value, bytes):
         return PB2AnyValue(bytes_value=value)
     if isinstance(value, Sequence):
-        return PB2AnyValue(array_value=PB2ArrayValue(values=[_encode_value(v) for v in value]))
+        return PB2AnyValue(array_value=PB2ArrayValue(values=[encode_value(v) for v in value]))
     if isinstance(value, Mapping):
         return PB2AnyValue(
-            kvlist_value=PB2KeyValueList(values=[_encode_key_value(str(k), v) for k, v in value.items()])
+            kvlist_value=PB2KeyValueList(values=[encode_key_value(str(k), v) for k, v in value.items()])
         )
     raise EncodingError(value)
 
