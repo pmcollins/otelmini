@@ -25,9 +25,7 @@ classifiers = [
 ]
 dependencies = [
   "opentelemetry-api",
-  "opentelemetry-sdk",
   "opentelemetry-proto",
-  "opentelemetry-instrumentation",
   "googleapis-common-protos",
   "grpcio",
   "oteltest",

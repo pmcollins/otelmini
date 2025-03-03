@@ -3,21 +3,13 @@ from __future__ import annotations
 import logging
 import threading
 import time
-import typing
-from typing import TYPE_CHECKING, Optional, Sequence
+from typing import Sequence
 
-from grpc import RpcError, insecure_channel
 from opentelemetry import trace
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2_grpc import TraceServiceStub
-from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor
-from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 
-from otelmini._tracelib import Batcher, ExponentialBackoff, Timer, mk_trace_request
-from otelmini.grpc import GrpcExporter, SingleReqExporter
-
-if TYPE_CHECKING:
-    from opentelemetry.context import context
-    from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest, ExportTraceServiceResponse
+from otelmini._tracelib import Batcher, MiniSpan, mk_trace_request, Timer
+from otelmini.grpc import GrpcExporter
 
 _tracer = trace.get_tracer(__name__)
 _logger = logging.getLogger(__name__)
@@ -36,11 +28,27 @@ def handle_trace_response(resp):
         _logger.warning(msg)
 
 
+class Span:
+    pass
+
+
+class SpanProcessor:
+    pass
+
+
+class SpanExporter:
+    pass
+
+
+class SpanExportResult:
+    pass
+
+
 class GrpcSpanExporter(SpanExporter):
     """
     A gRPC exporter for spans that uses composition with the generic GrpcExporter.
     """
-    
+
     def __init__(self, addr="127.0.0.1:4317", max_retries=3, channel_provider=None, sleep=time.sleep):
         """
         Initialize the gRPC span exporter.
@@ -58,11 +66,9 @@ class GrpcSpanExporter(SpanExporter):
             sleep=sleep,
             stub_class=TraceServiceStub,
             response_handler=handle_trace_response,
-            success_result=SpanExportResult.SUCCESS,
-            failure_result=SpanExportResult.FAILURE
         )
-    
-    def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
+
+    def export(self, spans: Sequence[MiniSpan]) -> SpanExportResult:
         """
         Export spans to the gRPC endpoint.
         
@@ -74,7 +80,7 @@ class GrpcSpanExporter(SpanExporter):
         """
         req = mk_trace_request(spans)
         return self._exporter.export_request(req)
-    
+
     def force_flush(self, timeout_millis: int = 30000) -> bool:
         """
         Force flush any pending exports.
@@ -86,7 +92,7 @@ class GrpcSpanExporter(SpanExporter):
             Whether the flush was successful
         """
         return self._exporter.force_flush(timeout_millis)
-    
+
     def shutdown(self) -> None:
         """
         Shutdown the exporter.
@@ -103,7 +109,7 @@ class BatchProcessor(SpanProcessor):
         self.timer = Timer(self._export, interval_seconds)
         self.timer.start()
 
-    def on_start(self, span: Span, parent_context: Optional[context.Context] = None) -> None:
+    def on_start(self, span: Span) -> None:
         pass
 
     def on_end(self, span: ReadableSpan) -> None:

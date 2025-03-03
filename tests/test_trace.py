@@ -7,9 +7,8 @@ from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest,
     ExportTraceServiceResponse,
 )
-from opentelemetry.sdk.trace.export import SpanExportResult
-
 from otelmini._tracelib import ExponentialBackoff, Timer
+from otelmini.grpc import GrpcExportResult
 from otelmini.trace import GrpcSpanExporter
 
 
@@ -41,7 +40,7 @@ def test_faked_exporter_with_retry_then_success():
     exporter = GrpcSpanExporter(channel_provider=lambda: channel, sleep=sleeper.sleep)
     spans = [mk_span("my-span")]
     resp = exporter.export(spans)
-    assert resp == SpanExportResult.SUCCESS
+    assert resp == GrpcExportResult.SUCCESS
     assert len(channel.export_requests) == 4
 
 
@@ -51,7 +50,7 @@ def test_faked_exporter_with_retry_failure():
     exporter = GrpcSpanExporter(channel_provider=lambda: channel, sleep=sleeper.sleep)
     spans = [mk_span("my-span")]
     resp = exporter.export(spans)
-    assert resp == SpanExportResult.FAILURE
+    assert resp == GrpcExportResult.FAILURE
     assert len(channel.export_requests) == 4
 
 

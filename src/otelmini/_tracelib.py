@@ -5,29 +5,21 @@ import logging
 import threading
 import time
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence
+from typing import Any, Mapping, Optional, Sequence, TYPE_CHECKING
 
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest as PB2ExportTraceServiceRequest,
 )
-from opentelemetry.proto.common.v1.common_pb2 import AnyValue as PB2AnyValue
-from opentelemetry.proto.common.v1.common_pb2 import ArrayValue as PB2ArrayValue
-from opentelemetry.proto.common.v1.common_pb2 import InstrumentationScope as PB2InstrumentationScope
-from opentelemetry.proto.common.v1.common_pb2 import KeyValue as PB2KeyValue
-from opentelemetry.proto.common.v1.common_pb2 import KeyValueList as PB2KeyValueList
+from opentelemetry.proto.common.v1.common_pb2 import AnyValue as PB2AnyValue, ArrayValue as PB2ArrayValue, \
+    InstrumentationScope as PB2InstrumentationScope, KeyValue as PB2KeyValue, KeyValueList as PB2KeyValueList
 from opentelemetry.proto.resource.v1.resource_pb2 import (
     Resource as PB2Resource,
 )
-from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans as PB2ResourceSpans
-from opentelemetry.proto.trace.v1.trace_pb2 import ScopeSpans as PB2ScopeSpans
-from opentelemetry.proto.trace.v1.trace_pb2 import Span as PB2SPan
-from opentelemetry.proto.trace.v1.trace_pb2 import SpanFlags as PB2SpanFlags
-from opentelemetry.proto.trace.v1.trace_pb2 import Status as PB2Status
+from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans as PB2ResourceSpans, ScopeSpans as PB2ScopeSpans, \
+    Span as PB2SPan, SpanFlags as PB2SpanFlags, Status as PB2Status
 from opentelemetry.trace import Link, SpanKind
 
 if TYPE_CHECKING:
-    from opentelemetry.sdk.trace import Event, ReadableSpan, Resource
-    from opentelemetry.sdk.util.instrumentation import InstrumentationScope
     from opentelemetry.trace.span import SpanContext, Status, TraceState
     from opentelemetry.util.types import Attributes
 
@@ -84,7 +76,7 @@ class ExponentialBackoff:
                 return func()
             except self.exceptions as e:
                 if attempt < self.max_retries:
-                    seconds = (2**attempt) * self.base_seconds
+                    seconds = (2 ** attempt) * self.base_seconds
                     _pylogger.warning("Retry will sleep %d seconds", seconds)
                     self.sleep(seconds)
                 else:
@@ -122,38 +114,82 @@ class Batcher:
         self.items = []
 
 
-def mk_trace_request(spans: Sequence[ReadableSpan]) -> PB2ExportTraceServiceRequest:
+class MiniSpan:
+
+    def __init__(self, name: str, span_context: SpanContext, resource: Resource,
+                 instrumentation_scope: InstrumentationScope):
+        self.name = name
+        self.span_context = span_context
+        self.resource = resource
+        self.instrumentation_scope = instrumentation_scope
+
+    def get_name(self):
+        return self.name
+
+    def get_span_context(self):
+        return self.span_context
+
+    def get_resource(self):
+        return self.resource
+
+    def get_instrumentation_scope(self):
+        return self.instrumentation_scope
+
+
+class Resource:
+
+    def __init__(self, schema_url):
+        self.schema_url = schema_url
+
+    def get_attributes(self):
+        return {}
+
+    def get_schema_url(self):
+        return self.schema_url
+
+
+class InstrumentationScope:
+
+    def __init__(self, name, version):
+        self.name = name
+        self.version = version
+
+    def get_name(self):
+        return self.name
+
+    def get_version(self):
+        return self.version
+
+
+def mk_trace_request(spans: Sequence[MiniSpan]) -> PB2ExportTraceServiceRequest:
     return PB2ExportTraceServiceRequest(resource_spans=_encode_resource_spans(spans))
 
 
-def _encode_resource_spans(
-    sdk_spans: Sequence[ReadableSpan],
-) -> list[PB2ResourceSpans]:
+def _encode_resource_spans(spans: Sequence[MiniSpan]) -> list[PB2ResourceSpans]:
     sdk_resource_spans = defaultdict(lambda: defaultdict(list))
 
-    for sdk_span in sdk_spans:
-        sdk_resource = sdk_span.resource
-        sdk_instrumentation = sdk_span.instrumentation_scope or None
-        pb2_span = _encode_span(sdk_span)
-
-        sdk_resource_spans[sdk_resource][sdk_instrumentation].append(pb2_span)
+    for span in spans:
+        resource = span.get_resource()
+        instrumentation_scope = span.get_instrumentation_scope()
+        pb2_span = _encode_span(span)
+        sdk_resource_spans[resource][instrumentation_scope].append(pb2_span)
 
     pb2_resource_spans = []
 
-    for sdk_resource, sdk_instrumentations in sdk_resource_spans.items():
+    for resource, sdk_instrumentations in sdk_resource_spans.items():
         scope_spans = []
-        for sdk_instrumentation, pb2_spans in sdk_instrumentations.items():
+        for instrumentation_scope, pb2_spans in sdk_instrumentations.items():
             scope_spans.append(
                 PB2ScopeSpans(
-                    scope=(_encode_instrumentation_scope(sdk_instrumentation)),
+                    scope=(_encode_instrumentation_scope(instrumentation_scope)),
                     spans=pb2_spans,
                 )
             )
         pb2_resource_spans.append(
             PB2ResourceSpans(
-                resource=_encode_resource(sdk_resource),
+                resource=_encode_resource(resource),
                 scope_spans=scope_spans,
-                schema_url=sdk_resource.schema_url,
+                schema_url=resource.get_schema_url(),
             )
         )
 
@@ -161,17 +197,13 @@ def _encode_resource_spans(
 
 
 def _encode_resource(resource: Resource) -> PB2Resource:
-    return PB2Resource(attributes=_encode_attributes(resource.attributes))
+    return PB2Resource(attributes=_encode_attributes(resource.get_attributes()))
 
 
-def _encode_instrumentation_scope(
-    instrumentation_scope: InstrumentationScope,
-) -> PB2InstrumentationScope:
-    if instrumentation_scope is None:
-        return PB2InstrumentationScope()
+def _encode_instrumentation_scope(instrumentation_scope: InstrumentationScope) -> PB2InstrumentationScope:
     return PB2InstrumentationScope(
-        name=instrumentation_scope.name,
-        version=instrumentation_scope.version,
+        name=instrumentation_scope.get_name(),
+        version=instrumentation_scope.get_version(),
     )
 
 
@@ -191,25 +223,25 @@ _SPAN_KIND_MAP = {
 }
 
 
-def _encode_span(sdk_span: ReadableSpan) -> PB2SPan:
-    span_context = sdk_span.get_span_context()
+def _encode_span(span: MiniSpan) -> PB2SPan:
+    span_context = span.get_span_context()
     return PB2SPan(
         trace_id=_encode_trace_id(span_context.trace_id),
         span_id=_encode_span_id(span_context.span_id),
         trace_state=_encode_trace_state(span_context.trace_state),
-        parent_span_id=_encode_parent_id(sdk_span.parent),
-        name=sdk_span.name,
-        kind=_SPAN_KIND_MAP[sdk_span.kind],
-        start_time_unix_nano=sdk_span.start_time,
-        end_time_unix_nano=sdk_span.end_time,
-        attributes=_encode_attributes(sdk_span.attributes),
-        events=_encode_events(sdk_span.events),
-        links=_encode_links(sdk_span.links),
-        status=_encode_status(sdk_span.status),
-        dropped_attributes_count=sdk_span.dropped_attributes,
-        dropped_events_count=sdk_span.dropped_events,
-        dropped_links_count=sdk_span.dropped_links,
-        flags=_span_flags(sdk_span.parent),
+        name=span.get_name(),
+        # parent_span_id=_encode_parent_id(span.parent),
+        # kind=_SPAN_KIND_MAP[span.kind],
+        # start_time_unix_nano=span.start_time,
+        # end_time_unix_nano=span.end_time,
+        # attributes=_encode_attributes(span.attributes),
+        # events=_encode_events(span.events),
+        # links=_encode_links(span.links),
+        # status=_encode_status(span.status),
+        # dropped_attributes_count=span.dropped_attributes,
+        # dropped_events_count=span.dropped_events,
+        # dropped_links_count=span.dropped_links,
+        # flags=_span_flags(span.parent),
     )
 
 
@@ -229,21 +261,19 @@ def _encode_attributes(
     return pb2_attributes
 
 
-def _encode_events(
-    events: Sequence[Event],
-) -> Optional[list[PB2SPan.Event]]:
-    pb2_events = None
-    if events:
-        pb2_events = []
-        for event in events:
-            encoded_event = PB2SPan.Event(
-                name=event.name,
-                time_unix_nano=event.timestamp,
-                attributes=_encode_attributes(event.attributes),
-                dropped_attributes_count=event.dropped_attributes,
-            )
-            pb2_events.append(encoded_event)
-    return pb2_events
+# def _encode_events(events: Sequence[Event],) -> Optional[list[PB2SPan.Event]]:
+#     pb2_events = None
+#     if events:
+#         pb2_events = []
+#         for event in events:
+#             encoded_event = PB2SPan.Event(
+#                 name=event.name,
+#                 time_unix_nano=event.timestamp,
+#                 attributes=_encode_attributes(event.attributes),
+#                 dropped_attributes_count=event.dropped_attributes,
+#             )
+#             pb2_events.append(encoded_event)
+#     return pb2_events
 
 
 def _encode_links(links: Sequence[Link]) -> Sequence[PB2SPan.Link]:
