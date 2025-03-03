@@ -3,10 +3,14 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from typing import Sequence
+import typing
+from typing import Iterator, Optional, Sequence
 
 from opentelemetry import trace
+from opentelemetry.context import Context
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2_grpc import TraceServiceStub
+from opentelemetry.trace import _Links, SpanKind, Tracer, TracerProvider
+from opentelemetry.util import types
 
 from otelmini._tracelib import Batcher, MiniSpan, mk_trace_request, Timer
 from otelmini.grpc import GrpcExporter
@@ -42,6 +46,49 @@ class SpanExporter:
 
 class SpanExportResult:
     pass
+
+
+class MiniTracer(Tracer):
+
+    def start_span(
+        self, name: str,
+        context: Optional[Context] = None,
+        kind: SpanKind = SpanKind.INTERNAL,
+        attributes: types.Attributes = None,
+        links: _Links = None,
+        start_time: Optional[int] = None,
+        record_exception: bool = True,
+        set_status_on_exception: bool = True
+    ) -> Span:
+        pass
+
+    def start_as_current_span(
+        self,
+        name: str,
+        context: Optional[Context] = None,
+        kind: SpanKind = SpanKind.INTERNAL,
+        attributes: types.Attributes = None,
+        links: _Links = None,
+        start_time: Optional[int] = None,
+        record_exception: bool = True,
+        set_status_on_exception: bool = True,
+        end_on_exit: bool = True
+    ) -> Iterator["Span"]:
+        pass
+
+
+class MiniTracerProvider(TracerProvider):
+
+    def __init__(self, span_processor=None):
+        self.span_processor = span_processor
+
+    def get_tracer(
+        self, instrumenting_module_name: str,
+        instrumenting_library_version: typing.Optional[str] = None,
+        schema_url: typing.Optional[str] = None,
+        attributes: typing.Optional[types.Attributes] = None,
+    ) -> Tracer:
+        return MiniTracer()
 
 
 class GrpcSpanExporter(SpanExporter):
