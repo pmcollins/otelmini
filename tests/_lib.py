@@ -1,6 +1,15 @@
 from opentelemetry.trace import SpanContext
 
-from otelmini._tracelib import InstrumentationScope, MiniSpan, Resource
+from otelmini.trace import InstrumentationScope, MiniSpan, Resource, SpanProcessor
+
+
+class FakeSpanProcessor(SpanProcessor):
+
+    def on_start(self, span: MiniSpan) -> None:
+        pass
+
+    def on_end(self, span) -> None:
+        pass
 
 
 def mk_span(name):
@@ -8,5 +17,6 @@ def mk_span(name):
         name,
         span_context=SpanContext(0, 0, False),
         resource=Resource(""),
-        instrumentation_scope=InstrumentationScope("", "")
+        instrumentation_scope=InstrumentationScope("", ""),
+        span_processor=FakeSpanProcessor(),
     )

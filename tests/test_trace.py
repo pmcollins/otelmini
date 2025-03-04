@@ -7,9 +7,10 @@ from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest,
     ExportTraceServiceResponse,
 )
-from otelmini._tracelib import ExponentialBackoff, Timer
+
+from otelmini._tracelib import ExponentialBackoff
 from otelmini.grpc import GrpcExportResult
-from otelmini.trace import GrpcSpanExporter
+from otelmini.trace import GrpcSpanExporter, Timer
 
 
 def test_eventual_runner():

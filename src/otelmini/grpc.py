@@ -69,9 +69,6 @@ class GrpcExporter(Generic[R, S]):
         self._connect()
 
     def _connect(self) -> None:
-        """
-        Connect to the gRPC endpoint.
-        """
         if not self.stub_class:
             raise ValueError("Stub class not provided")
 
