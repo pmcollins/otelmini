@@ -36,11 +36,8 @@ Documentation = "https://github.com/pmcollins/otelmini#readme"
 Issues = "https://github.com/pmcollins/otelmini/issues"
 Source = "https://github.com/pmcollins/otelmini"
 
-[project.entry-points.opentelemetry_configurator]
-configurator = "otelmini.distro:OtelMiniConfigurator"
-
-[project.entry-points.opentelemetry_distro]
-distro = "otelmini.distro:OtelMiniDistro"
+[project.scripts]
+otel = "otelmini.distro:auto_instrument"
 
 [tool.hatch.version]
 path = "src/otelmini/__about__.py"

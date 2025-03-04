@@ -1,25 +1,28 @@
 import logging
-import typing
+import subprocess
+import sys
 
 from opentelemetry import trace
-from opentelemetry.trace import Tracer, TracerProvider
-from opentelemetry.util import types
 
 from otelmini.log import BatchLogRecordProcessor, ConsoleLogExporter, LoggerProvider, OtelBridgeHandler
-from otelmini.trace import BatchProcessor, GrpcSpanExporter
+from otelmini.trace import BatchProcessor, GrpcSpanExporter, TracerProvider
 
 
-class OtelMiniAutoInstrumentor:
-    def configure(self):
-        logging.getLogger(__name__).info("OtelMiniAutoInstrumentor configure running")
-        set_up_tracing()
-        set_up_logging()
+logging.basicConfig()
+_pylogger = logging.getLogger(__name__)
 
+def auto_instrument():
+    _pylogger.warning("OtelMiniAutoInstrumentor configure running")
+    _pylogger.warning(sys.argv)
+    set_up_tracing()
+    set_up_logging()
+    cmd = sys.argv[1:]
+    subprocess.run(cmd)
 
 
 def set_up_tracing():
-    tracer_provider = MiniTracerProvider(BatchProcessor(
-        GrpcSpanExporter(logging.getLogger("GrpcExporter")),
+    tracer_provider = TracerProvider(BatchProcessor(
+        GrpcSpanExporter(),
         batch_size=144,
         interval_seconds=12,
     ))
