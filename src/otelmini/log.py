@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import logging
-import sys
 import json
-from enum import Enum
-from typing import Any, Optional, Sequence, TYPE_CHECKING
+import logging
 import threading
 import time
+from enum import Enum
+from typing import TYPE_CHECKING, Any, Optional, Sequence
 
 from opentelemetry._logs import Logger as ApiLogger
 from opentelemetry._logs import LoggerProvider as ApiLoggerProvider
@@ -73,11 +72,11 @@ def mk_log_request(logs: Sequence[LogRecord]) -> ExportLogsServiceRequest:
     # In a real implementation, you would convert the logs to protobuf format
     from opentelemetry.proto.collector.logs.v1.logs_service_pb2 import ExportLogsServiceRequest
     from opentelemetry.proto.logs.v1.logs_pb2 import ResourceLogs
-    
+
     # Create a request with empty resource logs
     # This needs to be implemented properly based on the protobuf definitions
     request = ExportLogsServiceRequest(resource_logs=[ResourceLogs()])
-    
+
     return request
 
 
@@ -98,7 +97,7 @@ class GrpcLogExporter(LogRecordExporter):
     """
     A gRPC exporter for logs that uses composition with the generic GrpcExporter.
     """
-    
+
     def __init__(self, addr="127.0.0.1:4317", max_retries=3, channel_provider=None, sleep=time.sleep):
         """
         Initialize the gRPC log exporter.
@@ -113,7 +112,7 @@ class GrpcLogExporter(LogRecordExporter):
             from opentelemetry.proto.collector.logs.v1.logs_service_pb2_grpc import LogsServiceStub
         except ImportError:
             raise ImportError("opentelemetry-proto package is required for GrpcLogExporter")
-        
+
         self._exporter = GrpcExporter(
             addr=addr,
             max_retries=max_retries,
@@ -124,7 +123,7 @@ class GrpcLogExporter(LogRecordExporter):
             success_result=LogExportResult.SUCCESS,
             failure_result=LogExportResult.FAILURE
         )
-    
+
     def export(self, logs: Sequence[LogRecord], **kwargs) -> LogExportResult:
         """
         Export logs to the gRPC endpoint.
@@ -138,7 +137,7 @@ class GrpcLogExporter(LogRecordExporter):
         # Create the request here instead of relying on a request factory
         req = mk_log_request(logs)
         return self._exporter.export_request(req)
-    
+
     def force_flush(self, timeout_millis: Optional[int] = None) -> bool:
         """
         Force flush any pending exports.
@@ -150,7 +149,7 @@ class GrpcLogExporter(LogRecordExporter):
             Whether the flush was successful
         """
         return self._exporter.force_flush(timeout_millis)
-    
+
     def shutdown(self, timeout_millis: Optional[int] = None) -> None:
         """
         Shutdown the exporter.

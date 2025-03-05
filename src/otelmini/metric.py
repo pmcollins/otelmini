@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import time
 from enum import Enum
 from typing import TYPE_CHECKING, Optional, Sequence
-import time
 
 from opentelemetry.metrics import Counter as ApiCounter
 from opentelemetry.metrics import Histogram as ApiHistogram
@@ -18,9 +18,10 @@ if TYPE_CHECKING:
     from opentelemetry.context import Context
     from opentelemetry.metrics import CallbackT
     from opentelemetry.metrics import UpDownCounter as ApiUpDownCounter
+    from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import (
+        ExportMetricsServiceRequest,
+    )
     from opentelemetry.util.types import Attributes
-    from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import ExportMetricsServiceRequest, ExportMetricsServiceResponse
-    from opentelemetry.proto.metrics.v1.metrics_pb2 import ResourceMetrics
 
 
 class MetricExporter:
@@ -65,11 +66,11 @@ def mk_metric_request(metrics: Sequence[Metric]) -> ExportMetricsServiceRequest:
     # In a real implementation, you would convert the metrics to protobuf format
     from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import ExportMetricsServiceRequest
     from opentelemetry.proto.metrics.v1.metrics_pb2 import ResourceMetrics
-    
+
     # Create a request with empty resource metrics
     # This needs to be implemented properly based on the protobuf definitions
     request = ExportMetricsServiceRequest(resource_metrics=[ResourceMetrics()])
-    
+
     return request
 
 
@@ -91,7 +92,7 @@ class GrpcMetricExporter(MetricExporter):
     """
     A gRPC exporter for metrics that uses composition with the generic GrpcExporter.
     """
-    
+
     def __init__(self, addr="127.0.0.1:4317", max_retries=3, channel_provider=None, sleep=time.sleep):
         """
         Initialize the gRPC metric exporter.
@@ -106,7 +107,7 @@ class GrpcMetricExporter(MetricExporter):
             from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2_grpc import MetricsServiceStub
         except ImportError:
             raise ImportError("opentelemetry-proto package is required for GrpcMetricExporter")
-        
+
         self._exporter = GrpcExporter(
             addr=addr,
             max_retries=max_retries,
@@ -117,7 +118,7 @@ class GrpcMetricExporter(MetricExporter):
             success_result=MetricExportResult.SUCCESS,
             failure_result=MetricExportResult.FAILURE
         )
-    
+
     def export(self, metrics: Sequence[Metric], **kwargs) -> MetricExportResult:
         """
         Export metrics to the gRPC endpoint.
@@ -131,7 +132,7 @@ class GrpcMetricExporter(MetricExporter):
         # Create the request here instead of relying on a request factory
         req = mk_metric_request(metrics)
         return self._exporter.export_request(req)
-    
+
     def force_flush(self, timeout_millis: float = 10_000) -> bool:
         """
         Force flush any pending exports.
@@ -143,7 +144,7 @@ class GrpcMetricExporter(MetricExporter):
             Whether the flush was successful
         """
         return self._exporter.force_flush(timeout_millis)
-    
+
     def shutdown(self, timeout_millis: float = 30_000, **kwargs) -> None:
         """
         Shutdown the exporter.

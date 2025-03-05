@@ -5,7 +5,7 @@ import time
 from enum import Enum
 from typing import Any, Callable, Generic, TypeVar
 
-from grpc import insecure_channel, RpcError
+from grpc import RpcError, insecure_channel
 
 from otelmini._tracelib import ExponentialBackoff
 

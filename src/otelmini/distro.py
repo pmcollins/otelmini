@@ -13,7 +13,7 @@ def auto_instrument():
 
     filedir_path = dirname(abspath(__file__))
     auto_path = abspath(os.path.join(filedir_path, "auto"))
-    
+
     # Modify PYTHONPATH to include the auto directory
     env = dict(os.environ)
     if "PYTHONPATH" in env:
@@ -21,7 +21,5 @@ def auto_instrument():
     else:
         env["PYTHONPATH"] = auto_path
 
-    print(f"PYTHONPATH: [{env['PYTHONPATH']}]")
-
-    subprocess.run(cmd, env=env)
+    subprocess.run(cmd, env=env, check=False)
 
