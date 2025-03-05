@@ -18,5 +18,5 @@ def mk_span(name):
         span_context=SpanContext(0, 0, False),
         resource=Resource(""),
         instrumentation_scope=InstrumentationScope("", ""),
-        span_processor=FakeSpanProcessor(),
+        on_end_callback=lambda _: None
     )

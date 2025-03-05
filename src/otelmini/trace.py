@@ -322,13 +322,13 @@ class MiniSpan(ApiSpan):
         span_context: SpanContext,
         resource: Resource,
         instrumentation_scope: InstrumentationScope,
-        span_processor: SpanProcessor,
+        on_end_callback: typing.Callable[[MiniSpan], None],
     ):
         self.name = name
         self.span_context = span_context
         self.resource = resource
         self.instrumentation_scope = instrumentation_scope
-        self.span_processor = span_processor
+        self.on_end_callback = on_end_callback
 
     def __enter__(self):
         return self
@@ -379,7 +379,7 @@ class MiniSpan(ApiSpan):
         pass
 
     def end(self, end_time: typing.Optional[int] = None) -> None:
-        self.span_processor.on_end(self)
+        self.on_end_callback(self)
 
 
 class SpanProcessor(ABC):
@@ -458,7 +458,13 @@ class Tracer(ApiTracer):
         record_exception: bool = True,
         set_status_on_exception: bool = True
     ) -> ApiSpan:
-        span = MiniSpan(name, SpanContext(0, 0, False), Resource(""), InstrumentationScope("", ""), self.span_processor)
+        span = MiniSpan(
+            name, 
+            SpanContext(0, 0, False), 
+            Resource(""), 
+            InstrumentationScope("", ""), 
+            self.span_processor.on_end
+        )
         self.span_processor.on_start(span)
         return span
 
