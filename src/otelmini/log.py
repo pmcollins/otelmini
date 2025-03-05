@@ -78,18 +78,7 @@ class ConsoleLogExporter(LogRecordExporter):
     def export(self, logs: Sequence[LogRecord]) -> GrpcExportResult:
         try:
             for log in logs:
-                log_dict = {
-                    "timestamp": log.timestamp,
-                    "observed_timestamp": log.observed_timestamp,
-                    "trace_id": f"{log.trace_id:032x}" if log.trace_id else None,
-                    "span_id": f"{log.span_id:016x}" if log.span_id else None,
-                    "trace_flags": str(log.trace_flags) if log.trace_flags else None,
-                    "severity_text": log.severity_text,
-                    "severity_number": log.severity_number.name if log.severity_number else None,
-                    "body": log.body,
-                    "attributes": log.attributes,
-                }
-                print(json.dumps(log_dict, default=str))  # noqa: T201
+                print(f"log: {log}")  # noqa: T201
         except Exception as e:
             raise LogExportException("Error exporting logs") from e
         else:
