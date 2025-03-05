@@ -112,13 +112,12 @@ def handle_log_response(resp):
 
 
 class GrpcLogExporter(LogRecordExporter):
-    PROTO_PACKAGE_REQUIRED = "opentelemetry-proto package is required for GrpcLogExporter"
 
     def __init__(self, addr="127.0.0.1:4317", max_retries=3, channel_provider=None, sleep=time.sleep):
         try:
             from opentelemetry.proto.collector.logs.v1.logs_service_pb2_grpc import LogsServiceStub
         except ImportError as err:
-            raise ImportError(self.PROTO_PACKAGE_REQUIRED) from err
+            raise ImportError("opentelemetry-proto package is required for GrpcLogExporter") from err
 
         self._exporter = GrpcExporter(
             addr=addr,
