@@ -13,7 +13,7 @@ from opentelemetry._logs import LogRecord as ApiLogRecord
 from opentelemetry._logs import SeverityNumber
 
 from otelmini.grpc import GrpcExporter, GrpcExportResult
-from otelmini.processor import BatchProcessor, Processor, Exporter
+from otelmini.processor import BatchProcessor, Exporter, Processor
 
 if TYPE_CHECKING:
     from opentelemetry.proto.collector.logs.v1.logs_service_pb2 import ExportLogsServiceRequest
@@ -55,6 +55,11 @@ class LogRecord(ApiLogRecord):
         )
 
 
+class LogExportException(Exception):
+    def __init__(self, message: str):
+        super().__init__(message)
+
+
 class LogRecordExporter(Exporter[LogRecord]):
     @abstractmethod
     def export(self, logs: Sequence[LogRecord]) -> GrpcExportResult:
@@ -84,10 +89,9 @@ class ConsoleLogExporter(LogRecordExporter):
                     "body": log.body,
                     "attributes": log.attributes,
                 }
-                print(json.dumps(log_dict, default=str))
-        except Exception:
-            logging.exception("Error exporting logs")
-            return GrpcExportResult.FAILURE
+                print(json.dumps(log_dict, default=str))  # noqa: T201
+        except Exception as e:
+            raise LogExportException("Error exporting logs") from e
         else:
             return GrpcExportResult.SUCCESS
 
