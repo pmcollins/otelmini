@@ -82,6 +82,23 @@ def mk_metric_request(metrics: Sequence[Metric]) -> ExportMetricsServiceRequest:
     return ExportMetricsServiceRequest(resource_metrics=[ResourceMetrics()])
 
 
+class CounterError(Exception):
+    def __init__(self) -> None:
+        super().__init__("Counter cannot be decremented (amount must be non-negative)")
+
+
+class MetricResponseError(Exception):
+    def __init__(self, rejected_data_points: int, error_message: str) -> None:
+        super().__init__(
+            f"partial success: rejected_data_points: [{rejected_data_points}], error_message: [{error_message}]"
+        )
+
+
+class GrpcMetricExporterError(Exception):
+    def __init__(self) -> None:
+        super().__init__("opentelemetry-proto package is required for GrpcMetricExporter")
+
+
 def handle_metric_response(resp):
     """
     Handle the response from the gRPC endpoint for metrics.
@@ -91,9 +108,8 @@ def handle_metric_response(resp):
     """
     if resp.HasField("partial_success") and resp.partial_success:
         ps = resp.partial_success
-        msg = f"partial success: rejected_data_points: [{ps.rejected_data_points}], error_message: [{ps.error_message}]"
         import logging
-        logging.warning(msg)
+        logging.warning(str(MetricResponseError(ps.rejected_data_points, ps.error_message)))
 
 
 class GrpcMetricExporter(MetricExporter):
@@ -114,7 +130,7 @@ class GrpcMetricExporter(MetricExporter):
         try:
             from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2_grpc import MetricsServiceStub
         except ImportError as err:
-            raise ImportError("opentelemetry-proto package is required for GrpcMetricExporter") from err
+            raise GrpcMetricExporterError from err
 
         self._exporter = GrpcExporter(
             addr=addr,
@@ -214,11 +230,6 @@ class Counter(ApiCounter):
         if amount < 0:
             raise CounterError
         self._value += amount
-
-
-class CounterError(Exception):
-    def __init__(self) -> None:
-        super().__init__("Counter amount must be non-negative")
 
 
 class Meter(ApiMeter):
