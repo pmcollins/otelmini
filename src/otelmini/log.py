@@ -26,13 +26,13 @@ class LogExportResult(Enum):
 
 
 class LogRecordExporter:
-    def export(self, logs: Sequence[LogRecord], **kwargs) -> LogExportResult:
+    def export(self, logs: Sequence[LogRecord], **kwargs) -> LogExportResult:  # noqa: ARG002
         return LogExportResult.SUCCESS
 
-    def force_flush(self, timeout_millis: Optional[int] = None) -> bool:
+    def force_flush(self, timeout_millis: Optional[int] = None) -> bool:  # noqa: ARG002
         return True
 
-    def shutdown(self, timeout_millis: Optional[int] = None) -> None:
+    def shutdown(self, timeout_millis: Optional[int] = None) -> None:  # noqa: ARG002
         pass
 
 
@@ -51,14 +51,14 @@ class ConsoleLogExporter(LogRecordExporter):
                     "body": log.body,
                     "attributes": log.attributes,
                 }
-                print(json.dumps(log_dict, default=str))
+                logging.info(json.dumps(log_dict, default=str))
             return LogExportResult.SUCCESS
-        except Exception as e:
-            print(f"Error exporting logs: {e}")
+        except Exception as e:  # noqa: BLE001
+            logging.error("Error exporting logs: %s", e)
             return LogExportResult.FAILURE
 
 
-def mk_log_request(logs: Sequence[LogRecord]) -> ExportLogsServiceRequest:
+def mk_log_request(logs: Sequence[LogRecord]) -> ExportLogsServiceRequest:  # noqa: ARG001
     """
     Create a log request from a sequence of log records.
     
@@ -75,9 +75,7 @@ def mk_log_request(logs: Sequence[LogRecord]) -> ExportLogsServiceRequest:
 
     # Create a request with empty resource logs
     # This needs to be implemented properly based on the protobuf definitions
-    request = ExportLogsServiceRequest(resource_logs=[ResourceLogs()])
-
-    return request
+    return ExportLogsServiceRequest(resource_logs=[ResourceLogs()])
 
 
 def handle_log_response(resp):
@@ -124,7 +122,7 @@ class GrpcLogExporter(LogRecordExporter):
             failure_result=LogExportResult.FAILURE
         )
 
-    def export(self, logs: Sequence[LogRecord], **kwargs) -> LogExportResult:
+    def export(self, logs: Sequence[LogRecord], **kwargs) -> LogExportResult:  # noqa: ARG002
         """
         Export logs to the gRPC endpoint.
         
@@ -138,7 +136,7 @@ class GrpcLogExporter(LogRecordExporter):
         req = mk_log_request(logs)
         return self._exporter.export_request(req)
 
-    def force_flush(self, timeout_millis: Optional[int] = None) -> bool:
+    def force_flush(self, timeout_millis: Optional[int] = None) -> bool:  # noqa: ARG002
         """
         Force flush any pending exports.
         
@@ -150,7 +148,7 @@ class GrpcLogExporter(LogRecordExporter):
         """
         return self._exporter.force_flush(timeout_millis)
 
-    def shutdown(self, timeout_millis: Optional[int] = None) -> None:
+    def shutdown(self, timeout_millis: Optional[int] = None) -> None:  # noqa: ARG002
         """
         Shutdown the exporter.
         
@@ -250,56 +248,44 @@ class LogRecordProcessor:
 class BatchLogRecordProcessor(LogRecordProcessor):
     def __init__(self, exporter: LogRecordExporter, max_queue_size: int = 2048,
                  batch_size: int = 512, export_interval_millis: int = 5000):
-        super().__init__()
         self._exporter = exporter
         self._max_queue_size = max_queue_size
         self._batch_size = batch_size
         self._export_interval_millis = export_interval_millis
-        self._logs_buffer = []
+        self._queue = []
         self._lock = threading.Lock()
-        self._condition = threading.Condition(self._lock)
-        self._export_thread = threading.Thread(target=self._export_worker, daemon=True)
-        self._shutdown = False
-        self._export_thread.start()
+        self._thread = threading.Thread(target=self._export_worker, daemon=True)
+        self._thread.start()
 
     def on_emit(self, log_record: LogRecord) -> None:
         with self._lock:
-            if len(self._logs_buffer) < self._max_queue_size:
-                self._logs_buffer.append(log_record)
-                self._condition.notify()
+            if len(self._queue) >= self._max_queue_size:
+                self._export_batch()
+            self._queue.append(log_record)
 
     def _export_worker(self) -> None:
-        while not self._shutdown:
-            with self._condition:
-                if not self._logs_buffer:
-                    self._condition.wait(self._export_interval_millis / 1000)
-                    if not self._logs_buffer and not self._shutdown:
-                        continue
+        while True:
+            time.sleep(self._export_interval_millis / 1000)
+            with self._lock:
+                if self._queue:
+                    self._export_batch()
 
-                batch = self._logs_buffer[:self._batch_size]
-                self._logs_buffer = self._logs_buffer[self._batch_size:]
-
-            if batch:
-                self._exporter.export(batch)
+    def _export_batch(self) -> None:
+        batch = self._queue[:self._batch_size]
+        self._queue = self._queue[self._batch_size:]
+        self._exporter.export(batch)
 
     def shutdown(self) -> None:
-        with self._condition:
-            self._shutdown = True
-            self._condition.notify()
-
-        self._export_thread.join()
-        self.force_flush()
-        self._exporter.shutdown()
-
-    def force_flush(self, timeout_millis: Optional[int] = None) -> bool:
         with self._lock:
-            batch = self._logs_buffer
-            self._logs_buffer = []
+            if self._queue:
+                self._export_batch()
+            self._thread.join()
 
-        if batch:
-            self._exporter.export(batch)
-
-        return self._exporter.force_flush(timeout_millis)
+    def force_flush(self, timeout_millis: Optional[int] = None) -> bool:  # noqa: ARG002
+        with self._lock:
+            if self._queue:
+                self._export_batch()
+            return True
 
 
 def _get_severity_number(levelno):
@@ -320,30 +306,14 @@ def _get_severity_number(levelno):
 class OtelBridgeHandler(logging.Handler):
     def __init__(self, logger_provider, level=logging.NOTSET):
         super().__init__(level=level)
-        self._logger = logger_provider.get_logger("python.logging")
+        self.logger_provider = logger_provider
 
     def emit(self, record):
         try:
-            severity_number = _get_severity_number(record.levelno)
-
-            otel_record = LogRecord(
-                timestamp=int(record.created * 1_000_000_000),
-                observed_timestamp=int(time.time() * 1_000_000_000),
-                severity_text=record.levelname,
-                severity_number=severity_number,
-                body=record.getMessage(),
-                attributes={
-                    "logger.name": record.name,
-                    "logger.thread_name": record.threadName,
-                    "logger.filename": record.filename,
-                    "logger.lineno": record.lineno,
-                    "logger.pathname": record.pathname,
-                    "logger.funcName": record.funcName,
-                },
-            )
-
-            self._logger.emit(otel_record)
-        except Exception:
+            logger = self.logger_provider.get_logger(record.name)
+            logger.emit(record)
+        except Exception as e:  # noqa: BLE001
+            logging.error("Error emitting log record: %s", e)
             self.handleError(record)
 
 

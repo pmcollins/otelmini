@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import time
 from enum import Enum
-from typing import Any, Callable, Generic, TypeVar
+from typing import Any, Callable, Generic, Optional, TypeVar
 
 from grpc import RpcError, insecure_channel
 
@@ -28,10 +28,10 @@ class GrpcExporter(Generic[R, S]):
         self,
         addr: str = "127.0.0.1:4317",
         max_retries: int = 3,
-        channel_provider: Callable[[], Any] = None,
+        channel_provider: Optional[Callable[[], Any]] = None,
         sleep: Callable[[float], None] = time.sleep,
-        stub_class: Any = None,
-        response_handler: Callable[[S], None] = None,
+        stub_class: Optional[Any] = None,
+        response_handler: Optional[Callable[[S], None]] = None,
     ):
         self.addr = addr
         self.channel_provider = channel_provider if channel_provider else lambda: insecure_channel(addr)

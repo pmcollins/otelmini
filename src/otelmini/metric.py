@@ -25,13 +25,13 @@ if TYPE_CHECKING:
 
 
 class MetricExporter:
-    def export(self, metrics: Sequence[Metric], **kwargs) -> MetricExportResult:
+    def export(self, metrics: Sequence[Metric], **kwargs) -> MetricExportResult:  # noqa: ARG002
         return MetricExportResult.SUCCESS
 
-    def force_flush(self, timeout_millis: float = 10_000) -> bool:
+    def force_flush(self, timeout_millis: float = 10_000) -> bool:  # noqa: ARG002
         return True
 
-    def shutdown(self, timeout_millis: float = 30_000, **kwargs) -> None:
+    def shutdown(self, timeout_millis: float = 30_000, **kwargs) -> None:  # noqa: ARG002
         return None
 
 
@@ -52,7 +52,7 @@ class MetricsData:
     pass
 
 
-def mk_metric_request(metrics: Sequence[Metric]) -> ExportMetricsServiceRequest:
+def mk_metric_request(metrics: Sequence[Metric]) -> ExportMetricsServiceRequest:  # noqa: ARG001
     """
     Create a metric request from a sequence of metrics.
     
@@ -69,9 +69,7 @@ def mk_metric_request(metrics: Sequence[Metric]) -> ExportMetricsServiceRequest:
 
     # Create a request with empty resource metrics
     # This needs to be implemented properly based on the protobuf definitions
-    request = ExportMetricsServiceRequest(resource_metrics=[ResourceMetrics()])
-
-    return request
+    return ExportMetricsServiceRequest(resource_metrics=[ResourceMetrics()])
 
 
 def handle_metric_response(resp):
@@ -119,7 +117,7 @@ class GrpcMetricExporter(MetricExporter):
             failure_result=MetricExportResult.FAILURE
         )
 
-    def export(self, metrics: Sequence[Metric], **kwargs) -> MetricExportResult:
+    def export(self, metrics: Sequence[Metric], **kwargs) -> MetricExportResult:  # noqa: ARG002
         """
         Export metrics to the gRPC endpoint.
         
@@ -133,7 +131,7 @@ class GrpcMetricExporter(MetricExporter):
         req = mk_metric_request(metrics)
         return self._exporter.export_request(req)
 
-    def force_flush(self, timeout_millis: float = 10_000) -> bool:
+    def force_flush(self, timeout_millis: float = 10_000) -> bool:  # noqa: ARG002
         """
         Force flush any pending exports.
         
@@ -145,7 +143,7 @@ class GrpcMetricExporter(MetricExporter):
         """
         return self._exporter.force_flush(timeout_millis)
 
-    def shutdown(self, timeout_millis: float = 30_000, **kwargs) -> None:
+    def shutdown(self, timeout_millis: float = 30_000, **kwargs) -> None:  # noqa: ARG002
         """
         Shutdown the exporter.
         
@@ -171,10 +169,10 @@ class ExportingMetricReader(MetricReader):
         super().__init__()
         self.exporter = exporter
 
-    def _receive_metrics(self, metrics_data: MetricsData, timeout_millis: float = 10_000, **kwargs) -> None:
+    def _receive_metrics(self, metrics_data: MetricsData, timeout_millis: float = 10_000, **kwargs) -> None:  # noqa: ARG002
         pass
 
-    def shutdown(self, timeout_millis: float = 30_000, **kwargs) -> None:
+    def shutdown(self, timeout_millis: float = 30_000, **kwargs) -> None:  # noqa: ARG002
         pass
 
 
