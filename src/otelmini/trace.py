@@ -7,7 +7,6 @@ from collections import defaultdict
 from typing import TYPE_CHECKING, Any, Iterator, Mapping, Optional, Sequence
 
 from opentelemetry import trace
-from opentelemetry.context import Context
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest as PB2ExportTraceServiceRequest,
 )
@@ -25,19 +24,20 @@ from opentelemetry.proto.trace.v1.trace_pb2 import ScopeSpans as PB2ScopeSpans
 from opentelemetry.proto.trace.v1.trace_pb2 import Span as PB2SPan
 from opentelemetry.proto.trace.v1.trace_pb2 import SpanFlags as PB2SpanFlags
 from opentelemetry.proto.trace.v1.trace_pb2 import Status as PB2Status
-from opentelemetry.trace import Link, SpanContext, SpanKind, Status, StatusCode, _Links
+from opentelemetry.trace import Link, SpanKind, StatusCode, _Links
 from opentelemetry.trace import Span as ApiSpan
 from opentelemetry.trace import SpanContext as ApiSpanContext
 from opentelemetry.trace import Tracer as ApiTracer
 from opentelemetry.trace import TracerProvider as ApiTracerProvider
-from opentelemetry.util import types
+from opentelemetry.trace.span import SpanContext, Status, TraceState
 from opentelemetry.util._decorator import _agnosticcontextmanager
 
 from otelmini.grpc import GrpcExporter, GrpcExportResult
 from otelmini.processor import Exporter, Processor
 
 if TYPE_CHECKING:
-    from opentelemetry.trace.span import SpanContext, Status, TraceState
+    from opentelemetry.context import Context
+    from opentelemetry.util import types
     from opentelemetry.util.types import Attributes
 
 _pylogger = logging.getLogger(__name__)
@@ -74,14 +74,10 @@ class Tracer(ApiTracer):
         links: _Links = None,
         start_time: Optional[int] = None,
         record_exception: bool = True,  # noqa: FBT001, FBT002
-        set_status_on_exception: bool = True  # noqa: FBT001, FBT002
+        set_status_on_exception: bool = True,  # noqa: FBT001, FBT002
     ) -> ApiSpan:
         span = MiniSpan(
-            name,
-            SpanContext(0, 0, False),
-            Resource(""),
-            InstrumentationScope("", ""),
-            self.span_processor.on_end
+            name, SpanContext(0, 0, False), Resource(""), InstrumentationScope("", ""), self.span_processor.on_end
         )
         self.span_processor.on_start(span)
         return span
@@ -97,7 +93,7 @@ class Tracer(ApiTracer):
         start_time: Optional[int] = None,
         record_exception: bool = True,  # noqa: FBT001, FBT002
         set_status_on_exception: bool = True,  # noqa: FBT001, FBT002
-        end_on_exit: bool = True  # noqa: FBT001, FBT002
+        end_on_exit: bool = True,  # noqa: FBT001, FBT002
     ) -> Iterator[ApiSpan]:
         span = self.start_span(name, context, kind, attributes, links, start_time, end_on_exit)
         with trace.use_span(span, end_on_exit=True) as active_span:
@@ -105,7 +101,6 @@ class Tracer(ApiTracer):
 
 
 class InstrumentationScope:
-
     def __init__(self, name, version):
         self.name = name
         self.version = version
@@ -118,7 +113,6 @@ class InstrumentationScope:
 
 
 class MiniSpan(ApiSpan):
-
     def __init__(
         self,
         name,
@@ -170,19 +164,16 @@ class MiniSpan(ApiSpan):
     def is_recording(self) -> bool:
         return self._status is None
 
-    def set_status(
-        self,
-        status: typing.Union[Status, StatusCode],
-        description: typing.Optional[str] = None
-    ) -> None:
+    def set_status(self, status: typing.Union[Status, StatusCode], description: typing.Optional[str] = None) -> None:
         self._status = status
         self._status_description = description
 
     def record_exception(
-        self, exception: BaseException,
+        self,
+        exception: BaseException,
         attributes: types.Attributes = None,
         timestamp: typing.Optional[int] = None,
-        escaped: bool = False
+        escaped: bool = False,  # noqa: FBT001, FBT002
     ) -> None:
         self._events.append((exception.__class__.__name__, attributes, timestamp))
 
@@ -213,7 +204,6 @@ class GrpcSpanExporter(Exporter[MiniSpan]):
 
 
 class Resource:
-
     def __init__(self, schema_url):
         self.schema_url = schema_url
         self._attributes = {}
@@ -411,9 +401,7 @@ def encode_value(value: Any) -> PB2AnyValue:
     if isinstance(value, Sequence):
         return PB2AnyValue(array_value=PB2ArrayValue(values=[encode_value(v) for v in value]))
     if isinstance(value, Mapping):
-        return PB2AnyValue(
-            kvlist_value=PB2KeyValueList(values=[encode_key_value(str(k), v) for k, v in value.items()])
-        )
+        return PB2AnyValue(kvlist_value=PB2KeyValueList(values=[encode_key_value(str(k), v) for k, v in value.items()]))
     raise EncodingError(value)
 
 

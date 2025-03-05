@@ -6,6 +6,7 @@ from os.path import abspath, dirname
 
 _pylogger = logging.getLogger(__name__)
 
+
 def auto_instrument():
     _pylogger.warning("OtelMiniAutoInstrumentor configure running")
 
@@ -22,4 +23,3 @@ def auto_instrument():
         env["PYTHONPATH"] = auto_path
 
     subprocess.run(cmd, env=env, check=False)
-

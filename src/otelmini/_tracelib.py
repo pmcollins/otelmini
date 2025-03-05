@@ -20,7 +20,7 @@ class ExponentialBackoff:
                 return func()
             except self.exceptions as e:
                 if attempt < self.max_retries:
-                    seconds = (2 ** attempt) * self.base_seconds
+                    seconds = (2**attempt) * self.base_seconds
                     _pylogger.warning("Retry will sleep %d seconds", seconds)
                     self.sleep(seconds)
                 else:

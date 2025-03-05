@@ -8,11 +8,13 @@ from otelmini.trace import GrpcSpanExporter, TracerProvider
 
 
 def set_up_tracing():
-    tracer_provider = TracerProvider(BatchProcessor(
-        GrpcSpanExporter(),
-        batch_size=144,
-        interval_seconds=12,
-    ))
+    tracer_provider = TracerProvider(
+        BatchProcessor(
+            GrpcSpanExporter(),
+            batch_size=144,
+            interval_seconds=12,
+        )
+    )
     trace.set_tracer_provider(tracer_provider)
 
 

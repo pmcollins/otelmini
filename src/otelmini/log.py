@@ -69,10 +69,10 @@ class ConsoleLogExporter(LogRecordExporter):
 def mk_log_request(logs: Sequence[LogRecord]) -> ExportLogsServiceRequest:  # noqa: ARG001
     """
     Create a log request from a sequence of log records.
-    
+
     Args:
         logs: The log records to include in the request
-        
+
     Returns:
         An ExportLogsServiceRequest containing the log records
     """
@@ -89,7 +89,7 @@ def mk_log_request(logs: Sequence[LogRecord]) -> ExportLogsServiceRequest:  # no
 def handle_log_response(resp):
     """
     Handle the response from the gRPC endpoint for logs.
-    
+
     Args:
         resp: The response from the gRPC endpoint
     """
@@ -103,12 +103,13 @@ class GrpcLogExporter(LogRecordExporter):
     """
     A gRPC exporter for logs that uses composition with the generic GrpcExporter.
     """
+
     PROTO_PACKAGE_REQUIRED = "opentelemetry-proto package is required for GrpcLogExporter"
 
     def __init__(self, addr="127.0.0.1:4317", max_retries=3, channel_provider=None, sleep=time.sleep):
         """
         Initialize the gRPC log exporter.
-        
+
         Args:
             addr: The address of the gRPC endpoint
             max_retries: Maximum number of retry attempts
@@ -132,10 +133,10 @@ class GrpcLogExporter(LogRecordExporter):
     def export(self, logs: Sequence[LogRecord]) -> LogExportResult:
         """
         Export logs to the gRPC endpoint.
-        
+
         Args:
             logs: The logs to export
-            
+
         Returns:
             The result of the export operation
         """
@@ -145,10 +146,10 @@ class GrpcLogExporter(LogRecordExporter):
     def force_flush(self, timeout_millis: Optional[int] = None) -> bool:
         """
         Force flush any pending exports.
-        
+
         Args:
             timeout_millis: The timeout in milliseconds
-            
+
         Returns:
             Whether the flush was successful
         """
@@ -157,7 +158,7 @@ class GrpcLogExporter(LogRecordExporter):
     def shutdown(self, timeout_millis: Optional[int] = None) -> None:
         """
         Shutdown the exporter.
-        
+
         Args:
             timeout_millis: The timeout in milliseconds
         """
@@ -215,8 +216,11 @@ class LoggerProvider(ApiLoggerProvider):
         self.processors = list(processors) if processors else []
 
     def get_logger(
-        self, name: str, version: Optional[str] = None, schema_url: Optional[str] = None,
-        attributes: Optional[Attributes] = None
+        self,
+        name: str,
+        version: Optional[str] = None,
+        schema_url: Optional[str] = None,
+        attributes: Optional[Attributes] = None,
     ) -> Logger:
         return Logger(
             name=name,

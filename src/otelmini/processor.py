@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 _pylogger = logging.getLogger(__name__)
 
 # Generic type for different signal types
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class Processor(ABC, Generic[T]):

@@ -12,9 +12,9 @@ from otelmini._tracelib import ExponentialBackoff
 _logger = logging.getLogger(__name__)
 
 # Generic type for different request types
-R = TypeVar('R')
+R = TypeVar("R")
 # Generic type for different response types
-S = TypeVar('S')
+S = TypeVar("S")
 
 
 class GrpcExportResult(Enum):
@@ -85,7 +85,6 @@ class GrpcExporter(Generic[R, S]):
 
 
 class SingleReqExporter:
-
     def __init__(self, exporter: GrpcExporter, req: Any):
         self.exporter = exporter
         self.req = req

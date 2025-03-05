@@ -65,10 +65,10 @@ class MetricsData:
 def mk_metric_request(metrics: Sequence[Metric]) -> ExportMetricsServiceRequest:  # noqa: ARG001
     """
     Create a metric request from a sequence of metrics.
-    
+
     Args:
         metrics: The metrics to include in the request
-        
+
     Returns:
         An ExportMetricsServiceRequest containing the metrics
     """
@@ -102,13 +102,14 @@ class GrpcMetricExporterError(Exception):
 def handle_metric_response(resp):
     """
     Handle the response from the gRPC endpoint for metrics.
-    
+
     Args:
         resp: The response from the gRPC endpoint
     """
     if resp.HasField("partial_success") and resp.partial_success:
         ps = resp.partial_success
         import logging
+
         logging.warning(str(MetricResponseError(ps.rejected_data_points, ps.error_message)))
 
 
@@ -120,7 +121,7 @@ class GrpcMetricExporter(MetricExporter):
     def __init__(self, addr="127.0.0.1:4317", max_retries=3, channel_provider=None, sleep=time.sleep):
         """
         Initialize the gRPC metric exporter.
-        
+
         Args:
             addr: The address of the gRPC endpoint
             max_retries: Maximum number of retry attempts
@@ -144,10 +145,10 @@ class GrpcMetricExporter(MetricExporter):
     def export(self, metrics: Sequence[Metric]) -> MetricExportResult:
         """
         Export metrics to the gRPC endpoint.
-        
+
         Args:
             metrics: The metrics to export
-            
+
         Returns:
             The result of the export operation
         """
@@ -157,10 +158,10 @@ class GrpcMetricExporter(MetricExporter):
     def force_flush(self, timeout_millis: float = 10_000) -> bool:
         """
         Force flush any pending exports.
-        
+
         Args:
             timeout_millis: The timeout in milliseconds
-            
+
         Returns:
             Whether the flush was successful
         """
@@ -169,7 +170,7 @@ class GrpcMetricExporter(MetricExporter):
     def shutdown(self, timeout_millis: float = 30_000) -> None:
         """
         Shutdown the exporter.
-        
+
         Args:
             timeout_millis: The timeout in milliseconds
         """
