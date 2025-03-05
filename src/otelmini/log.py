@@ -15,6 +15,7 @@ from opentelemetry.trace import TraceFlags
 from opentelemetry.util.types import Attributes
 
 from otelmini.grpc import GrpcExporter
+from otelmini.processor import Processor, BatchProcessor
 
 if TYPE_CHECKING:
     from opentelemetry.proto.collector.logs.v1.logs_service_pb2 import ExportLogsServiceRequest
@@ -199,7 +200,7 @@ class Logger(ApiLogger):
 
     def emit(self, record: ApiLogRecord) -> None:
         for processor in self._logger_provider.processors:
-            processor.on_emit(record)
+            processor.on_end(record)
 
 
 class LoggerProvider(ApiLoggerProvider):
@@ -229,11 +230,14 @@ class LoggerProvider(ApiLoggerProvider):
         return all(processor.force_flush(timeout_millis) for processor in self.processors)
 
 
-class LogRecordProcessor:
+class LogRecordProcessor(Processor[LogRecord]):
     def __init__(self):
         pass
 
-    def on_emit(self, log_record: LogRecord) -> None:
+    def on_start(self, log_record: LogRecord) -> None:
+        pass
+
+    def on_end(self, log_record: LogRecord) -> None:
         pass
 
     def shutdown(self) -> None:
@@ -244,46 +248,24 @@ class LogRecordProcessor:
 
 
 class BatchLogRecordProcessor(LogRecordProcessor):
-    def __init__(self, exporter: LogRecordExporter, max_queue_size: int = 2048,
-                 batch_size: int = 512, export_interval_millis: int = 5000):
-        self._exporter = exporter
-        self._max_queue_size = max_queue_size
-        self._batch_size = batch_size
-        self._export_interval_millis = export_interval_millis
-        self._queue = []
-        self._lock = threading.Lock()
-        self._thread = threading.Thread(target=self._export_worker, daemon=True)
-        self._thread.start()
+    def __init__(self, exporter: LogRecordExporter, batch_size: int = 512, export_interval_millis: int = 5000):
+        self._processor = BatchProcessor(
+            exporter=exporter,
+            batch_size=batch_size,
+            interval_seconds=export_interval_millis / 1000,
+        )
 
-    def on_emit(self, log_record: LogRecord) -> None:
-        with self._lock:
-            if len(self._queue) >= self._max_queue_size:
-                self._export_batch()
-            self._queue.append(log_record)
+    def on_start(self, log_record: LogRecord) -> None:
+        self._processor.on_start(log_record)
 
-    def _export_worker(self) -> None:
-        while True:
-            time.sleep(self._export_interval_millis / 1000)
-            with self._lock:
-                if self._queue:
-                    self._export_batch()
-
-    def _export_batch(self) -> None:
-        batch = self._queue[:self._batch_size]
-        self._queue = self._queue[self._batch_size:]
-        self._exporter.export(batch)
+    def on_end(self, log_record: LogRecord) -> None:
+        self._processor.on_end(log_record)
 
     def shutdown(self) -> None:
-        with self._lock:
-            if self._queue:
-                self._export_batch()
-            self._thread.join()
+        self._processor.shutdown()
 
-    def force_flush(self, timeout_millis: Optional[int] = None) -> bool:  # noqa: ARG002
-        with self._lock:
-            if self._queue:
-                self._export_batch()
-            return True
+    def force_flush(self, timeout_millis: Optional[int] = None) -> bool:
+        return self._processor.force_flush(timeout_millis)
 
 
 def _get_severity_number(levelno):
