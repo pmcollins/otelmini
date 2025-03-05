@@ -7,7 +7,7 @@ import time
 import typing
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Iterator, Mapping, Optional, Sequence, TypeVar
+from typing import TYPE_CHECKING, Any, Iterator, Mapping, Optional, Sequence, TypeVar, Generic
 
 from opentelemetry import trace
 from opentelemetry.context import Context
@@ -48,18 +48,17 @@ _tracer = trace.get_tracer(__name__)
 # Generic type for different signal types
 T = TypeVar('T')
 
-class SpanProcessor(ABC):
-
+class Processor(ABC, Generic[T]):
     @abstractmethod
-    def on_start(self, span: MiniSpan) -> None:
+    def on_start(self, item: T) -> None:
         pass
 
     @abstractmethod
-    def on_end(self, span) -> None:
+    def on_end(self, item: T) -> None:
         pass
 
 
-class BatchProcessor(SpanProcessor):
+class BatchProcessor(Processor[T]):
     def __init__(self, exporter: Exporter[T], batch_size, interval_seconds):
         self.exporter = exporter
         self.batcher = Batcher(batch_size)
@@ -68,12 +67,12 @@ class BatchProcessor(SpanProcessor):
         self.timer = Timer(self._export, interval_seconds)
         self.timer.start()
 
-    def on_start(self, span: MiniSpan) -> None:
+    def on_start(self, item: T) -> None:
         pass
 
-    def on_end(self, span) -> None:
+    def on_end(self, item: T) -> None:
         if not self.stop.is_set():
-            batched = self.batcher.add(span)
+            batched = self.batcher.add(item)
             if batched:
                 self.timer.notify_sleeper()
 
@@ -152,7 +151,6 @@ class Timer:
 
 
 class TracerProvider(ApiTracerProvider):
-
     def __init__(self, span_processor=None):
         self.span_processor = span_processor
 
@@ -170,8 +168,7 @@ class TracerProvider(ApiTracerProvider):
 
 
 class Tracer(ApiTracer):
-
-    def __init__(self, span_processor: SpanProcessor):
+    def __init__(self, span_processor: Processor[MiniSpan]):
         self.span_processor = span_processor
 
     def start_span(
