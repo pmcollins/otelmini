@@ -1,34 +1,27 @@
 import logging
+import os
 import subprocess
 import sys
+from os.path import abspath, dirname
 
-from opentelemetry import trace
-
-from otelmini.log import BatchLogRecordProcessor, ConsoleLogExporter, LoggerProvider, OtelBridgeHandler
-from otelmini.trace import BatchProcessor, GrpcSpanExporter, TracerProvider
-
-
-logging.basicConfig()
 _pylogger = logging.getLogger(__name__)
 
 def auto_instrument():
     _pylogger.warning("OtelMiniAutoInstrumentor configure running")
-    _pylogger.warning(sys.argv)
-    set_up_tracing()
-    set_up_logging()
+
     cmd = sys.argv[1:]
-    subprocess.run(cmd)
 
+    filedir_path = dirname(abspath(__file__))
+    auto_path = abspath(os.path.join(filedir_path, "auto"))
+    
+    # Modify PYTHONPATH to include the auto directory
+    env = dict(os.environ)
+    if "PYTHONPATH" in env:
+        env["PYTHONPATH"] = auto_path + os.pathsep + env["PYTHONPATH"]
+    else:
+        env["PYTHONPATH"] = auto_path
 
-def set_up_tracing():
-    tracer_provider = TracerProvider(BatchProcessor(
-        GrpcSpanExporter(),
-        batch_size=144,
-        interval_seconds=12,
-    ))
-    trace.set_tracer_provider(tracer_provider)
+    print(f"PYTHONPATH: [{env['PYTHONPATH']}]")
 
+    subprocess.run(cmd, env=env)
 
-def set_up_logging():
-    logger_provider = LoggerProvider([(BatchLogRecordProcessor(ConsoleLogExporter()))])
-    logging.getLogger().addHandler(OtelBridgeHandler(logger_provider))

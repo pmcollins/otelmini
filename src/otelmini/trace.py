@@ -25,6 +25,7 @@ from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans as PB2ResourceS
 from opentelemetry.trace import _Links, Link, Span as ApiSpan, SpanContext, SpanContext as ApiSpanContext, SpanKind, \
     Status, StatusCode, Tracer as ApiTracer, TracerProvider as ApiTracerProvider
 from opentelemetry.util import types
+from opentelemetry.util._decorator import _agnosticcontextmanager
 
 from otelmini.grpc import GrpcExporter, GrpcExportResult
 
@@ -329,6 +330,12 @@ class MiniSpan(ApiSpan):
         self.instrumentation_scope = instrumentation_scope
         self.span_processor = span_processor
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.end()
+
     def get_name(self):
         return self.name
 
@@ -455,6 +462,7 @@ class Tracer(ApiTracer):
         self.span_processor.on_start(span)
         return span
 
+    @_agnosticcontextmanager
     def start_as_current_span(
         self,
         name: str,

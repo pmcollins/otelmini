@@ -4,8 +4,6 @@ from typing import Mapping, Optional, Sequence
 
 from opentelemetry import trace
 
-from otelmini.auto import set_up_tracing
-
 
 class TraceOtelTest:
     def environment_variables(self) -> Mapping[str, str]:
@@ -15,7 +13,7 @@ class TraceOtelTest:
         return ((str(Path(__file__).resolve().parent.parent)),)
 
     def wrapper_command(self) -> str:
-        return ""
+        return "otel"
 
     def is_http(self) -> bool:
         return False
@@ -29,10 +27,9 @@ class TraceOtelTest:
 
 
 if __name__ == "__main__":
-    set_up_tracing()
-
     tracer = trace.get_tracer(__name__)
-    for i in range(144):
+    print(f"tracer: {tracer}")
+    for i in range(12):
         with tracer.start_as_current_span("foo"):
             time.sleep(0.1)
             print(i)

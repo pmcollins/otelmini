@@ -3,11 +3,12 @@ import threading
 import time
 
 import pytest
-from _lib import mk_span
 from oteltest import sink as sink_lib
+from oteltest.sink import GrpcSink
 from oteltest.sink.handler import AccumulatingHandler
 from oteltest.telemetry import count_spans
 
+from _lib import mk_span
 from otelmini.grpc import GrpcExportResult
 from otelmini.trace import GrpcSpanExporter
 
@@ -20,7 +21,7 @@ _logger = logging.getLogger(__name__)
 @pytest.mark.slow
 def test_exporter_single_grpc_request():
     handler = AccumulatingHandler()
-    sink = sink_lib.GrpcSink(handler, _logger)
+    sink = GrpcSink(handler, _logger)
     sink.start()
 
     exporter = GrpcSpanExporter()
