@@ -84,7 +84,7 @@ class ConsoleLogExporter(LogRecordExporter):
                     "body": log.body,
                     "attributes": log.attributes,
                 }
-                logging.info(json.dumps(log_dict, default=str))
+                print(json.dumps(log_dict, default=str))
         except Exception:
             logging.exception("Error exporting logs")
             return GrpcExportResult.FAILURE
@@ -98,17 +98,6 @@ class ConsoleLogExporter(LogRecordExporter):
         pass
 
 
-def mk_log_request(logs: Sequence[LogRecord]) -> ExportLogsServiceRequest:  # noqa: ARG001
-    from opentelemetry.proto.collector.logs.v1.logs_service_pb2 import ExportLogsServiceRequest
-    from opentelemetry.proto.logs.v1.logs_pb2 import ResourceLogs
-    return ExportLogsServiceRequest(resource_logs=[ResourceLogs()])
-
-
-def handle_log_response(resp):
-    if resp.HasField("partial_success") and resp.partial_success:
-        ps = resp.partial_success
-        msg = f"partial success: rejected_log_records: [{ps.rejected_log_records_count}], error_message: [{ps.error_message}]"
-        logging.warning(msg)
 
 
 class GrpcLogExporter(LogRecordExporter):
@@ -255,22 +244,15 @@ class OtelBridgeHandler(logging.Handler):
             logging.exception("Error emitting log record")
             self.handleError(record)
 
-
-def main():
-    console_exporter = ConsoleLogExporter()
-    batch_processor = BatchLogRecordProcessor(console_exporter)
-    logger_provider = LoggerProvider([batch_processor])
-    python_logger = logging.getLogger("example")
-    python_logger.setLevel(logging.DEBUG)
-    otel_handler = OtelBridgeHandler(logger_provider=logger_provider)
-    python_logger.addHandler(otel_handler)
-    python_logger.debug("This is a debug message")
-    python_logger.info("This is an info message")
-    python_logger.warning("This is a warning message")
-    python_logger.error("This is an error message")
-    python_logger.critical("This is a critical message")
-    logger_provider.shutdown()
+def mk_log_request(logs: Sequence[LogRecord]) -> ExportLogsServiceRequest:  # noqa: ARG001
+    from opentelemetry.proto.collector.logs.v1.logs_service_pb2 import ExportLogsServiceRequest
+    from opentelemetry.proto.logs.v1.logs_pb2 import ResourceLogs
+    return ExportLogsServiceRequest(resource_logs=[ResourceLogs()])
 
 
-if __name__ == "__main__":
-    main()
+def handle_log_response(resp):
+    if resp.HasField("partial_success") and resp.partial_success:
+        ps = resp.partial_success
+        msg = f"partial success: rejected_log_records: [{ps.rejected_log_records_count}], error_message: [{ps.error_message}]"
+        logging.warning(msg)
+

@@ -12,7 +12,7 @@ from otelmini.log import (
 )
 
 
-def test_basic_logging():
+def test_basic_logging(capsys):
     # Setup
     console_exporter = ConsoleLogExporter()
     batch_processor = BatchLogRecordProcessor(console_exporter)
@@ -44,8 +44,9 @@ def test_basic_logging():
     logger.emit(log_record)
     logger_provider.force_flush()
 
-    # Get the logged output
-    logged_output = string_stream.getvalue().strip()
+    # Capture the output
+    captured = capsys.readouterr()
+    logged_output = captured.out.strip()
     log_data = json.loads(logged_output)
 
     # Verify the log contents
