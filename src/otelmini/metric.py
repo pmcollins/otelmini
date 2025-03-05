@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from abc import ABC, abstractmethod
 from enum import Enum
 from typing import TYPE_CHECKING, Optional, Sequence
 
@@ -24,15 +25,18 @@ if TYPE_CHECKING:
     from opentelemetry.util.types import Attributes
 
 
-class MetricExporter:
+class MetricExporter(ABC):
+    @abstractmethod
     def export(self, metrics: Sequence[Metric], **kwargs) -> MetricExportResult:  # noqa: ARG002
-        return MetricExportResult.SUCCESS
+        pass
 
+    @abstractmethod
     def force_flush(self, timeout_millis: float = 10_000) -> bool:  # noqa: ARG002
-        return True
+        pass
 
+    @abstractmethod
     def shutdown(self, timeout_millis: float = 30_000, **kwargs) -> None:  # noqa: ARG002
-        return None
+        pass
 
 
 class MetricExportResult(Enum):
@@ -44,8 +48,14 @@ class Metric:
     pass
 
 
-class MetricReader:
-    pass
+class MetricReader(ABC):
+    @abstractmethod
+    def _receive_metrics(self, metrics_data: MetricsData, timeout_millis: float = 10_000, **kwargs) -> None:
+        pass
+
+    @abstractmethod
+    def shutdown(self, timeout_millis: float = 30_000, **kwargs) -> None:
+        pass
 
 
 class MetricsData:

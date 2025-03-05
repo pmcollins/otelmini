@@ -4,6 +4,7 @@ import json
 import logging
 import threading
 import time
+from abc import ABC, abstractmethod
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Optional, Sequence
 
@@ -26,13 +27,16 @@ class LogExportResult(Enum):
     FAILURE = 1
 
 
-class LogRecordExporter:
+class LogRecordExporter(ABC):
+    @abstractmethod
     def export(self, logs: Sequence[LogRecord], **kwargs) -> LogExportResult:  # noqa: ARG002
-        return LogExportResult.SUCCESS
+        pass
 
+    @abstractmethod
     def force_flush(self, timeout_millis: Optional[int] = None) -> bool:  # noqa: ARG002
-        return True
+        pass
 
+    @abstractmethod
     def shutdown(self, timeout_millis: Optional[int] = None) -> None:
         pass
 
@@ -230,21 +234,22 @@ class LoggerProvider(ApiLoggerProvider):
         return all(processor.force_flush(timeout_millis) for processor in self.processors)
 
 
-class LogRecordProcessor(Processor[LogRecord]):
-    def __init__(self):
-        pass
-
+class LogRecordProcessor(Processor[LogRecord], ABC):
+    @abstractmethod
     def on_start(self, log_record: LogRecord) -> None:
         pass
 
+    @abstractmethod
     def on_end(self, log_record: LogRecord) -> None:
         pass
 
+    @abstractmethod
     def shutdown(self) -> None:
         pass
 
+    @abstractmethod
     def force_flush(self, timeout_millis: Optional[int] = None) -> bool:
-        return True
+        pass
 
 
 class BatchLogRecordProcessor(LogRecordProcessor):
