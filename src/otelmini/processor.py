@@ -4,9 +4,10 @@ import atexit
 import logging
 import threading
 from abc import ABC, abstractmethod
-from typing import Generic, Sequence, TypeVar
+from typing import TYPE_CHECKING, Generic, Sequence, TypeVar
 
-from otelmini.grpc import GrpcExportResult
+if TYPE_CHECKING:
+    from otelmini.grpc import GrpcExportResult
 
 _pylogger = logging.getLogger(__name__)
 
