@@ -118,8 +118,6 @@ class GrpcLogExporter(LogRecordExporter):
             sleep=sleep,
             stub_class=LogsServiceStub,
             response_handler=handle_log_response,
-            success_result=LogExportResult.SUCCESS,
-            failure_result=LogExportResult.FAILURE
         )
 
     def export(self, logs: Sequence[LogRecord], **kwargs) -> LogExportResult:  # noqa: ARG002
