@@ -53,7 +53,8 @@ class BatchProcessor(Processor[T]):
         self.timer.stop()
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
-        return False
+        self._export()
+        return True
 
 
 class Batcher:

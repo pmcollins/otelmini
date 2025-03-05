@@ -12,8 +12,8 @@ from opentelemetry._logs import LoggerProvider as ApiLoggerProvider
 from opentelemetry._logs import LogRecord as ApiLogRecord
 from opentelemetry._logs import SeverityNumber
 
-from otelmini.grpc import GrpcExporter
-from otelmini.processor import BatchProcessor, Processor
+from otelmini.grpc import GrpcExporter, GrpcExportResult
+from otelmini.processor import BatchProcessor, Processor, Exporter
 
 if TYPE_CHECKING:
     from opentelemetry.proto.collector.logs.v1.logs_service_pb2 import ExportLogsServiceRequest
@@ -27,142 +27,6 @@ else:
 class LogExportResult(Enum):
     SUCCESS = 0
     FAILURE = 1
-
-
-class LogRecordExporter(ABC):
-    @abstractmethod
-    def export(self, logs: Sequence[LogRecord]) -> LogExportResult:
-        pass
-
-    @abstractmethod
-    def force_flush(self, timeout_millis: Optional[int] = None) -> bool:
-        pass
-
-    @abstractmethod
-    def shutdown(self, timeout_millis: Optional[int] = None) -> None:
-        pass
-
-
-class ConsoleLogExporter(LogRecordExporter):
-    def export(self, logs: Sequence[LogRecord]) -> LogExportResult:
-        try:
-            for log in logs:
-                log_dict = {
-                    "timestamp": log.timestamp,
-                    "observed_timestamp": log.observed_timestamp,
-                    "trace_id": f"{log.trace_id:032x}" if log.trace_id else None,
-                    "span_id": f"{log.span_id:016x}" if log.span_id else None,
-                    "trace_flags": str(log.trace_flags) if log.trace_flags else None,
-                    "severity_text": log.severity_text,
-                    "severity_number": log.severity_number.name if log.severity_number else None,
-                    "body": log.body,
-                    "attributes": log.attributes,
-                }
-                logging.info(json.dumps(log_dict, default=str))
-        except Exception:
-            logging.exception("Error exporting logs")
-            return LogExportResult.FAILURE
-        else:
-            return LogExportResult.SUCCESS
-
-
-def mk_log_request(logs: Sequence[LogRecord]) -> ExportLogsServiceRequest:  # noqa: ARG001
-    """
-    Create a log request from a sequence of log records.
-
-    Args:
-        logs: The log records to include in the request
-
-    Returns:
-        An ExportLogsServiceRequest containing the log records
-    """
-    # This is a placeholder implementation
-    # In a real implementation, you would convert the logs to protobuf format
-    from opentelemetry.proto.collector.logs.v1.logs_service_pb2 import ExportLogsServiceRequest
-    from opentelemetry.proto.logs.v1.logs_pb2 import ResourceLogs
-
-    # Create a request with empty resource logs
-    # This needs to be implemented properly based on the protobuf definitions
-    return ExportLogsServiceRequest(resource_logs=[ResourceLogs()])
-
-
-def handle_log_response(resp):
-    """
-    Handle the response from the gRPC endpoint for logs.
-
-    Args:
-        resp: The response from the gRPC endpoint
-    """
-    if resp.HasField("partial_success") and resp.partial_success:
-        ps = resp.partial_success
-        msg = f"partial success: rejected_log_records: [{ps.rejected_log_records_count}], error_message: [{ps.error_message}]"
-        logging.warning(msg)
-
-
-class GrpcLogExporter(LogRecordExporter):
-    """
-    A gRPC exporter for logs that uses composition with the generic GrpcExporter.
-    """
-
-    PROTO_PACKAGE_REQUIRED = "opentelemetry-proto package is required for GrpcLogExporter"
-
-    def __init__(self, addr="127.0.0.1:4317", max_retries=3, channel_provider=None, sleep=time.sleep):
-        """
-        Initialize the gRPC log exporter.
-
-        Args:
-            addr: The address of the gRPC endpoint
-            max_retries: Maximum number of retry attempts
-            channel_provider: A function that returns a gRPC channel
-            sleep: A function used for sleeping between retries
-        """
-        try:
-            from opentelemetry.proto.collector.logs.v1.logs_service_pb2_grpc import LogsServiceStub
-        except ImportError as err:
-            raise ImportError(self.PROTO_PACKAGE_REQUIRED) from err
-
-        self._exporter = GrpcExporter(
-            addr=addr,
-            max_retries=max_retries,
-            channel_provider=channel_provider,
-            sleep=sleep,
-            stub_class=LogsServiceStub,
-            response_handler=handle_log_response,
-        )
-
-    def export(self, logs: Sequence[LogRecord]) -> LogExportResult:
-        """
-        Export logs to the gRPC endpoint.
-
-        Args:
-            logs: The logs to export
-
-        Returns:
-            The result of the export operation
-        """
-        req = mk_log_request(logs)
-        return self._exporter.export_request(req)
-
-    def force_flush(self, timeout_millis: Optional[int] = None) -> bool:
-        """
-        Force flush any pending exports.
-
-        Args:
-            timeout_millis: The timeout in milliseconds
-
-        Returns:
-            Whether the flush was successful
-        """
-        return self._exporter.force_flush(timeout_millis)
-
-    def shutdown(self, timeout_millis: Optional[int] = None) -> None:
-        """
-        Shutdown the exporter.
-
-        Args:
-            timeout_millis: The timeout in milliseconds
-        """
-        self._exporter.shutdown()
 
 
 class LogRecord(ApiLogRecord):
@@ -189,6 +53,91 @@ class LogRecord(ApiLogRecord):
             body=body,
             attributes=attributes,
         )
+
+
+class LogRecordExporter(Exporter[LogRecord]):
+    @abstractmethod
+    def export(self, logs: Sequence[LogRecord]) -> GrpcExportResult:
+        pass
+
+    @abstractmethod
+    def force_flush(self, timeout_millis: Optional[int] = None) -> bool:
+        pass
+
+    @abstractmethod
+    def shutdown(self, timeout_millis: Optional[int] = None) -> None:
+        pass
+
+
+class ConsoleLogExporter(LogRecordExporter):
+    def export(self, logs: Sequence[LogRecord]) -> GrpcExportResult:
+        try:
+            for log in logs:
+                log_dict = {
+                    "timestamp": log.timestamp,
+                    "observed_timestamp": log.observed_timestamp,
+                    "trace_id": f"{log.trace_id:032x}" if log.trace_id else None,
+                    "span_id": f"{log.span_id:016x}" if log.span_id else None,
+                    "trace_flags": str(log.trace_flags) if log.trace_flags else None,
+                    "severity_text": log.severity_text,
+                    "severity_number": log.severity_number.name if log.severity_number else None,
+                    "body": log.body,
+                    "attributes": log.attributes,
+                }
+                logging.info(json.dumps(log_dict, default=str))
+        except Exception:
+            logging.exception("Error exporting logs")
+            return GrpcExportResult.FAILURE
+        else:
+            return GrpcExportResult.SUCCESS
+
+    def force_flush(self, timeout_millis: Optional[int] = None) -> bool:
+        pass
+
+    def shutdown(self, timeout_millis: Optional[int] = None) -> None:
+        pass
+
+
+def mk_log_request(logs: Sequence[LogRecord]) -> ExportLogsServiceRequest:  # noqa: ARG001
+    from opentelemetry.proto.collector.logs.v1.logs_service_pb2 import ExportLogsServiceRequest
+    from opentelemetry.proto.logs.v1.logs_pb2 import ResourceLogs
+    return ExportLogsServiceRequest(resource_logs=[ResourceLogs()])
+
+
+def handle_log_response(resp):
+    if resp.HasField("partial_success") and resp.partial_success:
+        ps = resp.partial_success
+        msg = f"partial success: rejected_log_records: [{ps.rejected_log_records_count}], error_message: [{ps.error_message}]"
+        logging.warning(msg)
+
+
+class GrpcLogExporter(LogRecordExporter):
+    PROTO_PACKAGE_REQUIRED = "opentelemetry-proto package is required for GrpcLogExporter"
+
+    def __init__(self, addr="127.0.0.1:4317", max_retries=3, channel_provider=None, sleep=time.sleep):
+        try:
+            from opentelemetry.proto.collector.logs.v1.logs_service_pb2_grpc import LogsServiceStub
+        except ImportError as err:
+            raise ImportError(self.PROTO_PACKAGE_REQUIRED) from err
+
+        self._exporter = GrpcExporter(
+            addr=addr,
+            max_retries=max_retries,
+            channel_provider=channel_provider,
+            sleep=sleep,
+            stub_class=LogsServiceStub,
+            response_handler=handle_log_response,
+        )
+
+    def export(self, logs: Sequence[LogRecord]) -> GrpcExportResult:
+        req = mk_log_request(logs)
+        return self._exporter.export_request(req)
+
+    def force_flush(self, timeout_millis: Optional[int] = None) -> bool:
+        return self._exporter.force_flush(timeout_millis)
+
+    def shutdown(self, timeout_millis: Optional[int] = None) -> None:
+        self._exporter.shutdown()
 
 
 class Logger(ApiLogger):
