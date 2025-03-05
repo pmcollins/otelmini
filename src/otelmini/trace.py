@@ -7,7 +7,7 @@ import time
 import typing
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Iterator, Mapping, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Iterator, Mapping, Optional, Sequence, TypeVar
 
 from opentelemetry import trace
 from opentelemetry.context import Context
@@ -45,6 +45,8 @@ if TYPE_CHECKING:
 _pylogger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
 
+# Generic type for different signal types
+T = TypeVar('T')
 
 class SpanProcessor(ABC):
 
@@ -58,7 +60,7 @@ class SpanProcessor(ABC):
 
 
 class BatchProcessor(SpanProcessor):
-    def __init__(self, exporter: SpanExporter, batch_size, interval_seconds):
+    def __init__(self, exporter: Exporter[T], batch_size, interval_seconds):
         self.exporter = exporter
         self.batcher = Batcher(batch_size)
         self.stop = threading.Event()
@@ -224,34 +226,6 @@ class InstrumentationScope:
         return self.version
 
 
-class SpanExporter(ABC):
-    @abstractmethod
-    def export(self, spans: Sequence[MiniSpan]) -> GrpcExportResult:
-        pass
-
-
-class GrpcSpanExporter(SpanExporter):
-    def __init__(self, addr="127.0.0.1:4317", max_retries=3, channel_provider=None, sleep=time.sleep):
-        self._exporter = GrpcExporter(
-            addr=addr,
-            max_retries=max_retries,
-            channel_provider=channel_provider,
-            sleep=sleep,
-            stub_class=TraceServiceStub,
-            response_handler=handle_trace_response,
-        )
-
-    def export(self, spans: Sequence[MiniSpan]) -> GrpcExportResult:
-        req = mk_trace_request(spans)
-        return self._exporter.export_request(req)
-
-    def force_flush(self, timeout_millis: int = 30000) -> bool:
-        return self._exporter.force_flush(timeout_millis)
-
-    def shutdown(self) -> None:
-        self._exporter.shutdown()
-
-
 class MiniSpan(ApiSpan):
 
     def __init__(
@@ -323,6 +297,34 @@ class MiniSpan(ApiSpan):
 
     def end(self, end_time: typing.Optional[int] = None) -> None:  # noqa: ARG002
         self._on_end_callback(self)
+
+
+class Exporter(ABC, typing.Generic[T]):
+    @abstractmethod
+    def export(self, items: Sequence[T]) -> GrpcExportResult:
+        pass
+
+
+class GrpcSpanExporter(Exporter[MiniSpan]):
+    def __init__(self, addr="127.0.0.1:4317", max_retries=3, channel_provider=None, sleep=time.sleep):
+        self._exporter = GrpcExporter(
+            addr=addr,
+            max_retries=max_retries,
+            channel_provider=channel_provider,
+            sleep=sleep,
+            stub_class=TraceServiceStub,
+            response_handler=handle_trace_response,
+        )
+
+    def export(self, spans: Sequence[MiniSpan]) -> GrpcExportResult:
+        req = mk_trace_request(spans)
+        return self._exporter.export_request(req)
+
+    def force_flush(self, timeout_millis: int = 30000) -> bool:
+        return self._exporter.force_flush(timeout_millis)
+
+    def shutdown(self) -> None:
+        self._exporter.shutdown()
 
 
 class Resource:
