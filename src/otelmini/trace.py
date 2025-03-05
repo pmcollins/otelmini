@@ -197,11 +197,11 @@ class Tracer(ApiTracer):
     def start_as_current_span(
         self,
         name: str,
-        context: Optional[Context] = None,  # noqa: ARG002
-        kind: SpanKind = SpanKind.INTERNAL,  # noqa: ARG002
-        attributes: types.Attributes = None,  # noqa: ARG002
-        links: _Links = None,  # noqa: ARG002
-        start_time: Optional[int] = None,  # noqa: ARG002
+        context: Optional[Context] = None,
+        kind: SpanKind = SpanKind.INTERNAL,
+        attributes: types.Attributes = None,
+        links: _Links = None,
+        start_time: Optional[int] = None,
         record_exception: bool = True,  # noqa: FBT001, FBT002
         set_status_on_exception: bool = True,  # noqa: FBT001, FBT002
         end_on_exit: bool = True  # noqa: FBT001, FBT002
@@ -245,7 +245,7 @@ class GrpcSpanExporter(SpanExporter):
         req = mk_trace_request(spans)
         return self._exporter.export_request(req)
 
-    def force_flush(self, timeout_millis: int = 30000) -> bool:  # noqa: ARG002
+    def force_flush(self, timeout_millis: int = 30000) -> bool:
         return self._exporter.force_flush(timeout_millis)
 
     def shutdown(self) -> None:

@@ -32,7 +32,7 @@ class LogRecordExporter:
     def force_flush(self, timeout_millis: Optional[int] = None) -> bool:  # noqa: ARG002
         return True
 
-    def shutdown(self, timeout_millis: Optional[int] = None) -> None:  # noqa: ARG002
+    def shutdown(self, timeout_millis: Optional[int] = None) -> None:
         pass
 
 
@@ -53,8 +53,8 @@ class ConsoleLogExporter(LogRecordExporter):
                 }
                 logging.info(json.dumps(log_dict, default=str))
             return LogExportResult.SUCCESS
-        except Exception as e:  # noqa: BLE001
-            logging.error("Error exporting logs: %s", e)
+        except Exception as e:
+            logging.exception("Error exporting logs: %s", e)
             return LogExportResult.FAILURE
 
 
@@ -136,7 +136,7 @@ class GrpcLogExporter(LogRecordExporter):
         req = mk_log_request(logs)
         return self._exporter.export_request(req)
 
-    def force_flush(self, timeout_millis: Optional[int] = None) -> bool:  # noqa: ARG002
+    def force_flush(self, timeout_millis: Optional[int] = None) -> bool:
         """
         Force flush any pending exports.
         
@@ -312,8 +312,8 @@ class OtelBridgeHandler(logging.Handler):
         try:
             logger = self.logger_provider.get_logger(record.name)
             logger.emit(record)
-        except Exception as e:  # noqa: BLE001
-            logging.error("Error emitting log record: %s", e)
+        except Exception as e:
+            logging.exception("Error emitting log record: %s", e)
             self.handleError(record)
 
 

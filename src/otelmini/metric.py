@@ -131,7 +131,7 @@ class GrpcMetricExporter(MetricExporter):
         req = mk_metric_request(metrics)
         return self._exporter.export_request(req)
 
-    def force_flush(self, timeout_millis: float = 10_000) -> bool:  # noqa: ARG002
+    def force_flush(self, timeout_millis: float = 10_000) -> bool:
         """
         Force flush any pending exports.
         
@@ -169,10 +169,10 @@ class ExportingMetricReader(MetricReader):
         super().__init__()
         self.exporter = exporter
 
-    def _receive_metrics(self, metrics_data: MetricsData, timeout_millis: float = 10_000, **kwargs) -> None:  # noqa: ARG002
+    def _receive_metrics(self, metrics_data: MetricsData, timeout_millis: float = 10_000, **kwargs) -> None:
         pass
 
-    def shutdown(self, timeout_millis: float = 30_000, **kwargs) -> None:  # noqa: ARG002
+    def shutdown(self, timeout_millis: float = 30_000, **kwargs) -> None:
         pass
 
 
