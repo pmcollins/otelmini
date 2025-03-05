@@ -37,6 +37,73 @@ _pylogger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
 
 
+class SpanProcessor(ABC):
+
+    @abstractmethod
+    def on_start(self, span: MiniSpan) -> None:
+        pass
+
+    @abstractmethod
+    def on_end(self, span) -> None:
+        pass
+
+
+class BatchProcessor(SpanProcessor):
+    def __init__(self, exporter: SpanExporter, batch_size, interval_seconds):
+        self.exporter = exporter
+        self.batcher = Batcher(batch_size)
+        self.stop = threading.Event()
+
+        self.timer = Timer(self._export, interval_seconds)
+        self.timer.start()
+
+    def on_start(self, span: MiniSpan) -> None:
+        pass
+
+    def on_end(self, span) -> None:
+        if not self.stop.is_set():
+            batched = self.batcher.add(span)
+            if batched:
+                self.timer.notify_sleeper()
+
+    def _export(self):
+        batch = self.batcher.pop()
+        if batch is not None and len(batch) > 0:
+            self.exporter.export(batch)
+
+    def shutdown(self) -> None:
+        self.stop.set()
+        self.timer.stop()
+
+    def force_flush(self, timeout_millis: int = 30000) -> bool:  # noqa: ARG002
+        return False
+
+
+class Batcher:
+    def __init__(self, batch_size):
+        self.lock = threading.RLock()
+        self.batch_size = batch_size
+        self.items = []
+        self.batches = []
+
+    def add(self, item):
+        with self.lock:
+            self.items.append(item)
+            if len(self.items) == self.batch_size:
+                self._batch()
+                return True
+            return False
+
+    def pop(self):
+        with self.lock:
+            self._batch()
+            return self.batches.pop(0) if len(self.batches) > 0 else None
+
+    def _batch(self):
+        self.batches.append(self.items)
+        self.items = []
+
+
 class Timer:
     def __init__(self, target_fcn, interval_seconds):
         self.thread = threading.Thread(target=self._target, daemon=True)
@@ -73,29 +140,194 @@ class Timer:
         self.thread.join()
 
 
-class Batcher:
-    def __init__(self, batch_size):
-        self.lock = threading.RLock()
-        self.batch_size = batch_size
-        self.items = []
-        self.batches = []
+class TracerProvider(ApiTracerProvider):
 
-    def add(self, item):
-        with self.lock:
-            self.items.append(item)
-            if len(self.items) == self.batch_size:
-                self._batch()
-                return True
-            return False
+    def __init__(self, span_processor=None):
+        self.span_processor = span_processor
 
-    def pop(self):
-        with self.lock:
-            self._batch()
-            return self.batches.pop(0) if len(self.batches) > 0 else None
+    def get_tracer(
+        self,
+        instrumenting_module_name: str,
+        instrumenting_library_version: typing.Optional[str] = None,
+        schema_url: typing.Optional[str] = None,
+        attributes: typing.Optional[types.Attributes] = None,
+    ) -> Tracer:
+        return Tracer(self.span_processor)
 
-    def _batch(self):
-        self.batches.append(self.items)
-        self.items = []
+    def shutdown(self):
+        pass
+
+
+class Tracer(ApiTracer):
+
+    def __init__(self, span_processor: SpanProcessor):
+        self.span_processor = span_processor
+
+    def start_span(
+        self,
+        name: str,
+        context: Optional[Context] = None,
+        kind: SpanKind = SpanKind.INTERNAL,
+        attributes: types.Attributes = None,
+        links: _Links = None,
+        start_time: Optional[int] = None,
+        record_exception: bool = True,
+        set_status_on_exception: bool = True
+    ) -> ApiSpan:
+        span = MiniSpan(
+            name,
+            SpanContext(0, 0, False),
+            Resource(""),
+            InstrumentationScope("", ""),
+            self.span_processor.on_end
+        )
+        self.span_processor.on_start(span)
+        return span
+
+    @_agnosticcontextmanager
+    def start_as_current_span(
+        self,
+        name: str,
+        context: Optional[Context] = None,
+        kind: SpanKind = SpanKind.INTERNAL,
+        attributes: types.Attributes = None,
+        links: _Links = None,
+        start_time: Optional[int] = None,
+        record_exception: bool = True,
+        set_status_on_exception: bool = True,
+        end_on_exit: bool = True
+    ) -> Iterator[ApiSpan]:
+        span = self.start_span(name, context, kind, attributes, links, start_time, end_on_exit)
+        with trace.use_span(span, end_on_exit=True) as active_span:
+            yield active_span
+
+
+class InstrumentationScope:
+
+    def __init__(self, name, version):
+        self.name = name
+        self.version = version
+
+    def get_name(self):
+        return self.name
+
+    def get_version(self):
+        return self.version
+
+
+class SpanExporter(ABC):
+    @abstractmethod
+    def export(self, spans: Sequence[MiniSpan]) -> GrpcExportResult:
+        pass
+
+
+class GrpcSpanExporter(SpanExporter):
+    def __init__(self, addr="127.0.0.1:4317", max_retries=3, channel_provider=None, sleep=time.sleep):
+        self._exporter = GrpcExporter(
+            addr=addr,
+            max_retries=max_retries,
+            channel_provider=channel_provider,
+            sleep=sleep,
+            stub_class=TraceServiceStub,
+            response_handler=handle_trace_response,
+        )
+
+    def export(self, spans: Sequence[MiniSpan]) -> GrpcExportResult:
+        req = mk_trace_request(spans)
+        return self._exporter.export_request(req)
+
+    def force_flush(self, timeout_millis: int = 30000) -> bool:
+        return self._exporter.force_flush(timeout_millis)
+
+    def shutdown(self) -> None:
+        self._exporter.shutdown()
+
+
+class MiniSpan(ApiSpan):
+
+    def __init__(
+        self,
+        name,
+        span_context: SpanContext,
+        resource: Resource,
+        instrumentation_scope: InstrumentationScope,
+        on_end_callback: typing.Callable[[MiniSpan], None],
+    ):
+        self.name = name
+        self.span_context = span_context
+        self.resource = resource
+        self.instrumentation_scope = instrumentation_scope
+        self.on_end_callback = on_end_callback
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.end()
+
+    def get_name(self):
+        return self.name
+
+    def get_resource(self):
+        return self.resource
+
+    def get_instrumentation_scope(self):
+        return self.instrumentation_scope
+
+    def get_span_context(self) -> ApiSpanContext:
+        return self.span_context
+
+    def set_attributes(self, attributes: typing.Mapping[str, types.AttributeValue]) -> None:
+        pass
+
+    def set_attribute(self, key: str, value: types.AttributeValue) -> None:
+        pass
+
+    def add_event(self, name: str, attributes: types.Attributes = None, timestamp: typing.Optional[int] = None) -> None:
+        pass
+
+    def update_name(self, name: str) -> None:
+        pass
+
+    def is_recording(self) -> bool:
+        pass
+
+    def set_status(
+        self,
+        status: typing.Union[Status, StatusCode],
+        description: typing.Optional[str] = None
+    ) -> None:
+        pass
+
+    def record_exception(
+        self, exception: BaseException,
+        attributes: types.Attributes = None,
+        timestamp: typing.Optional[int] = None,
+        escaped: bool = False
+    ) -> None:
+        pass
+
+    def end(self, end_time: typing.Optional[int] = None) -> None:
+        self.on_end_callback(self)
+
+
+class Resource:
+
+    def __init__(self, schema_url):
+        self.schema_url = schema_url
+
+    def get_attributes(self):
+        return {}
+
+    def get_schema_url(self):
+        return self.schema_url
+
+
+def handle_trace_response(resp):
+    if resp.HasField("partial_success") and resp.partial_success:
+        ps = resp.partial_success
+        msg = f"partial success: rejected_spans: [{ps.rejected_spans}], error_message: [{ps.error_message}]"
+        _pylogger.warning(msg)
 
 
 def mk_trace_request(spans: Sequence[MiniSpan]) -> PB2ExportTraceServiceRequest:
@@ -287,235 +519,3 @@ def encode_value(value: Any) -> PB2AnyValue:
 class EncodingError(Exception):
     def __init__(self, value):
         super().__init__(f"Invalid type {type(value)} of value {value}")
-
-
-class Resource:
-
-    def __init__(self, schema_url):
-        self.schema_url = schema_url
-
-    def get_attributes(self):
-        return {}
-
-    def get_schema_url(self):
-        return self.schema_url
-
-
-class InstrumentationScope:
-
-    def __init__(self, name, version):
-        self.name = name
-        self.version = version
-
-    def get_name(self):
-        return self.name
-
-    def get_version(self):
-        return self.version
-
-
-class MiniSpan(ApiSpan):
-
-    def __init__(
-        self,
-        name,
-        span_context: SpanContext,
-        resource: Resource,
-        instrumentation_scope: InstrumentationScope,
-        on_end_callback: typing.Callable[[MiniSpan], None],
-    ):
-        self.name = name
-        self.span_context = span_context
-        self.resource = resource
-        self.instrumentation_scope = instrumentation_scope
-        self.on_end_callback = on_end_callback
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.end()
-
-    def get_name(self):
-        return self.name
-
-    def get_resource(self):
-        return self.resource
-
-    def get_instrumentation_scope(self):
-        return self.instrumentation_scope
-
-    def get_span_context(self) -> ApiSpanContext:
-        return self.span_context
-
-    def set_attributes(self, attributes: typing.Mapping[str, types.AttributeValue]) -> None:
-        pass
-
-    def set_attribute(self, key: str, value: types.AttributeValue) -> None:
-        pass
-
-    def add_event(self, name: str, attributes: types.Attributes = None, timestamp: typing.Optional[int] = None) -> None:
-        pass
-
-    def update_name(self, name: str) -> None:
-        pass
-
-    def is_recording(self) -> bool:
-        pass
-
-    def set_status(
-        self,
-        status: typing.Union[Status, StatusCode],
-        description: typing.Optional[str] = None
-    ) -> None:
-        pass
-
-    def record_exception(
-        self, exception: BaseException,
-        attributes: types.Attributes = None,
-        timestamp: typing.Optional[int] = None,
-        escaped: bool = False
-    ) -> None:
-        pass
-
-    def end(self, end_time: typing.Optional[int] = None) -> None:
-        self.on_end_callback(self)
-
-
-class SpanProcessor(ABC):
-
-    @abstractmethod
-    def on_start(self, span: MiniSpan) -> None:
-        pass
-
-    @abstractmethod
-    def on_end(self, span) -> None:
-        pass
-
-
-class BatchProcessor(SpanProcessor):
-    def __init__(self, exporter: SpanExporter, batch_size, interval_seconds):
-        self.exporter = exporter
-        self.batcher = Batcher(batch_size)
-        self.stop = threading.Event()
-
-        self.timer = Timer(self._export, interval_seconds)
-        self.timer.start()
-
-    def on_start(self, span: MiniSpan) -> None:
-        pass
-
-    def on_end(self, span) -> None:
-        if not self.stop.is_set():
-            batched = self.batcher.add(span)
-            if batched:
-                self.timer.notify_sleeper()
-
-    def _export(self):
-        batch = self.batcher.pop()
-        if batch is not None and len(batch) > 0:
-            self.exporter.export(batch)
-
-    def shutdown(self) -> None:
-        self.stop.set()
-        self.timer.stop()
-
-    def force_flush(self, timeout_millis: int = 30000) -> bool:  # noqa: ARG002
-        return False
-
-
-class TracerProvider(ApiTracerProvider):
-
-    def __init__(self, span_processor=None):
-        self.span_processor = span_processor
-
-    def get_tracer(
-        self,
-        instrumenting_module_name: str,
-        instrumenting_library_version: typing.Optional[str] = None,
-        schema_url: typing.Optional[str] = None,
-        attributes: typing.Optional[types.Attributes] = None,
-    ) -> Tracer:
-        return Tracer(self.span_processor)
-
-    def shutdown(self):
-        pass
-
-
-class Tracer(ApiTracer):
-
-    def __init__(self, span_processor: SpanProcessor):
-        self.span_processor = span_processor
-
-    def start_span(
-        self,
-        name: str,
-        context: Optional[Context] = None,
-        kind: SpanKind = SpanKind.INTERNAL,
-        attributes: types.Attributes = None,
-        links: _Links = None,
-        start_time: Optional[int] = None,
-        record_exception: bool = True,
-        set_status_on_exception: bool = True
-    ) -> ApiSpan:
-        span = MiniSpan(
-            name, 
-            SpanContext(0, 0, False), 
-            Resource(""), 
-            InstrumentationScope("", ""), 
-            self.span_processor.on_end
-        )
-        self.span_processor.on_start(span)
-        return span
-
-    @_agnosticcontextmanager
-    def start_as_current_span(
-        self,
-        name: str,
-        context: Optional[Context] = None,
-        kind: SpanKind = SpanKind.INTERNAL,
-        attributes: types.Attributes = None,
-        links: _Links = None,
-        start_time: Optional[int] = None,
-        record_exception: bool = True,
-        set_status_on_exception: bool = True,
-        end_on_exit: bool = True
-    ) -> Iterator[ApiSpan]:
-        span = self.start_span(name, context, kind, attributes, links, start_time, end_on_exit)
-        with trace.use_span(span, end_on_exit=True) as active_span:
-            yield active_span
-
-
-class SpanExporter(ABC):
-    @abstractmethod
-    def export(self, spans: Sequence[MiniSpan]) -> GrpcExportResult:
-        pass
-
-
-class GrpcSpanExporter(SpanExporter):
-    def __init__(self, addr="127.0.0.1:4317", max_retries=3, channel_provider=None, sleep=time.sleep):
-        self._exporter = GrpcExporter(
-            addr=addr,
-            max_retries=max_retries,
-            channel_provider=channel_provider,
-            sleep=sleep,
-            stub_class=TraceServiceStub,
-            response_handler=handle_trace_response,
-        )
-
-    def export(self, spans: Sequence[MiniSpan]) -> GrpcExportResult:
-        req = mk_trace_request(spans)
-        return self._exporter.export_request(req)
-
-    def force_flush(self, timeout_millis: int = 30000) -> bool:
-        return self._exporter.force_flush(timeout_millis)
-
-    def shutdown(self) -> None:
-        self._exporter.shutdown()
-
-
-def handle_trace_response(resp):
-    if resp.HasField("partial_success") and resp.partial_success:
-        ps = resp.partial_success
-        msg = f"partial success: rejected_spans: [{ps.rejected_spans}], error_message: [{ps.error_message}]"
-        _pylogger.warning(msg)
