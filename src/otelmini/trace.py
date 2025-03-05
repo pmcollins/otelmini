@@ -322,7 +322,6 @@ def encode_attributes(
     if attributes:
         pb2_attributes = []
         for key, value in attributes.items():
-            # pylint: disable=broad-exception-caught
             try:
                 pb2_attributes.append(encode_key_value(key, value))
             except Exception:
@@ -421,3 +420,32 @@ def encode_value(value: Any) -> PB2AnyValue:
 class EncodingError(Exception):
     def __init__(self, value):
         super().__init__(f"Invalid type {type(value)} of value {value}")
+
+
+class Span(ApiSpan):
+    def __init__(
+        self,
+        name: str,
+        context: Optional[SpanContext] = None,
+        parent: Optional[SpanContext] = None,
+        kind: Optional[SpanKind] = None,
+        attributes: Optional[Attributes] = None,
+        links: Optional[_Links] = None,
+        start_time: Optional[int] = None,
+        end_time: Optional[int] = None,
+        status: Optional[Status] = None,
+        *,
+        record_exception: bool = False,
+        set_status_on_exception: bool = False,
+    ):
+        super().__init__(
+            name=name,
+            context=context,
+            parent=parent,
+            kind=kind,
+            attributes=attributes,
+            links=links,
+            start_time=start_time,
+            end_time=end_time,
+            status=status,
+        )

@@ -27,15 +27,15 @@ if TYPE_CHECKING:
 
 class MetricExporter(ABC):
     @abstractmethod
-    def export(self, metrics: Sequence[Metric], **kwargs) -> MetricExportResult:  # noqa: ARG002
+    def export(self, metrics: Sequence[Metric]) -> MetricExportResult:
         pass
 
     @abstractmethod
-    def force_flush(self, timeout_millis: float = 10_000) -> bool:  # noqa: ARG002
+    def force_flush(self, timeout_millis: float = 10_000) -> bool:
         pass
 
     @abstractmethod
-    def shutdown(self, timeout_millis: float = 30_000, **kwargs) -> None:  # noqa: ARG002
+    def shutdown(self, timeout_millis: float = 30_000) -> None:
         pass
 
 
@@ -113,8 +113,8 @@ class GrpcMetricExporter(MetricExporter):
         """
         try:
             from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2_grpc import MetricsServiceStub
-        except ImportError:
-            raise ImportError("opentelemetry-proto package is required for GrpcMetricExporter")
+        except ImportError as err:
+            raise ImportError("opentelemetry-proto package is required for GrpcMetricExporter") from err
 
         self._exporter = GrpcExporter(
             addr=addr,
@@ -125,7 +125,7 @@ class GrpcMetricExporter(MetricExporter):
             response_handler=handle_metric_response,
         )
 
-    def export(self, metrics: Sequence[Metric], **kwargs) -> MetricExportResult:  # noqa: ARG002
+    def export(self, metrics: Sequence[Metric]) -> MetricExportResult:
         """
         Export metrics to the gRPC endpoint.
         
@@ -135,7 +135,6 @@ class GrpcMetricExporter(MetricExporter):
         Returns:
             The result of the export operation
         """
-        # Create the request here instead of relying on a request factory
         req = mk_metric_request(metrics)
         return self._exporter.export_request(req)
 
@@ -151,7 +150,7 @@ class GrpcMetricExporter(MetricExporter):
         """
         return self._exporter.force_flush(timeout_millis)
 
-    def shutdown(self, timeout_millis: float = 30_000, **kwargs) -> None:  # noqa: ARG002
+    def shutdown(self, timeout_millis: float = 30_000) -> None:
         """
         Shutdown the exporter.
         
@@ -162,13 +161,13 @@ class GrpcMetricExporter(MetricExporter):
 
 
 class SimpleMetricExporter(MetricExporter):
-    def export(self, metrics: Sequence[Metric], **kwargs) -> MetricExportResult:  # noqa: ARG002
+    def export(self, metrics: Sequence[Metric]) -> MetricExportResult:
         return MetricExportResult.SUCCESS
 
-    def force_flush(self, timeout_millis: float = 10_000) -> bool:  # noqa: ARG002
+    def force_flush(self, timeout_millis: float = 10_000) -> bool:
         return True
 
-    def shutdown(self, timeout_millis: float = 30_000, **kwargs) -> None:  # noqa: ARG002
+    def shutdown(self, timeout_millis: float = 30_000) -> None:
         return None
 
 

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import logging
-import threading
 import time
 from abc import ABC, abstractmethod
 from enum import Enum
@@ -12,14 +11,17 @@ from opentelemetry._logs import Logger as ApiLogger
 from opentelemetry._logs import LoggerProvider as ApiLoggerProvider
 from opentelemetry._logs import LogRecord as ApiLogRecord
 from opentelemetry._logs import SeverityNumber
-from opentelemetry.trace import TraceFlags
-from opentelemetry.util.types import Attributes
 
 from otelmini.grpc import GrpcExporter
-from otelmini.processor import Processor, BatchProcessor
+from otelmini.processor import BatchProcessor, Processor
 
 if TYPE_CHECKING:
     from opentelemetry.proto.collector.logs.v1.logs_service_pb2 import ExportLogsServiceRequest
+    from opentelemetry.trace import TraceFlags
+    from opentelemetry.util.types import Attributes
+else:
+    TraceFlags = Any
+    Attributes = Any
 
 
 class LogExportResult(Enum):
@@ -29,11 +31,11 @@ class LogExportResult(Enum):
 
 class LogRecordExporter(ABC):
     @abstractmethod
-    def export(self, logs: Sequence[LogRecord], **kwargs) -> LogExportResult:  # noqa: ARG002
+    def export(self, logs: Sequence[LogRecord]) -> LogExportResult:
         pass
 
     @abstractmethod
-    def force_flush(self, timeout_millis: Optional[int] = None) -> bool:  # noqa: ARG002
+    def force_flush(self, timeout_millis: Optional[int] = None) -> bool:
         pass
 
     @abstractmethod
@@ -42,7 +44,7 @@ class LogRecordExporter(ABC):
 
 
 class ConsoleLogExporter(LogRecordExporter):
-    def export(self, logs: Sequence[LogRecord], **kwargs) -> LogExportResult:
+    def export(self, logs: Sequence[LogRecord]) -> LogExportResult:
         try:
             for log in logs:
                 log_dict = {
@@ -57,10 +59,11 @@ class ConsoleLogExporter(LogRecordExporter):
                     "attributes": log.attributes,
                 }
                 logging.info(json.dumps(log_dict, default=str))
-            return LogExportResult.SUCCESS
-        except Exception as e:
-            logging.exception("Error exporting logs: %s", e)
+        except Exception:
+            logging.exception("Error exporting logs")
             return LogExportResult.FAILURE
+        else:
+            return LogExportResult.SUCCESS
 
 
 def mk_log_request(logs: Sequence[LogRecord]) -> ExportLogsServiceRequest:  # noqa: ARG001
@@ -100,6 +103,7 @@ class GrpcLogExporter(LogRecordExporter):
     """
     A gRPC exporter for logs that uses composition with the generic GrpcExporter.
     """
+    PROTO_PACKAGE_REQUIRED = "opentelemetry-proto package is required for GrpcLogExporter"
 
     def __init__(self, addr="127.0.0.1:4317", max_retries=3, channel_provider=None, sleep=time.sleep):
         """
@@ -113,8 +117,8 @@ class GrpcLogExporter(LogRecordExporter):
         """
         try:
             from opentelemetry.proto.collector.logs.v1.logs_service_pb2_grpc import LogsServiceStub
-        except ImportError:
-            raise ImportError("opentelemetry-proto package is required for GrpcLogExporter")
+        except ImportError as err:
+            raise ImportError(self.PROTO_PACKAGE_REQUIRED) from err
 
         self._exporter = GrpcExporter(
             addr=addr,
@@ -125,7 +129,7 @@ class GrpcLogExporter(LogRecordExporter):
             response_handler=handle_log_response,
         )
 
-    def export(self, logs: Sequence[LogRecord], **kwargs) -> LogExportResult:  # noqa: ARG002
+    def export(self, logs: Sequence[LogRecord]) -> LogExportResult:
         """
         Export logs to the gRPC endpoint.
         
@@ -135,7 +139,6 @@ class GrpcLogExporter(LogRecordExporter):
         Returns:
             The result of the export operation
         """
-        # Create the request here instead of relying on a request factory
         req = mk_log_request(logs)
         return self._exporter.export_request(req)
 
@@ -276,16 +279,15 @@ class BatchLogRecordProcessor(LogRecordProcessor):
 def _get_severity_number(levelno):
     if levelno >= logging.CRITICAL:
         return SeverityNumber.FATAL
-    elif levelno >= logging.ERROR:
+    if levelno >= logging.ERROR:
         return SeverityNumber.ERROR
-    elif levelno >= logging.WARNING:
+    if levelno >= logging.WARNING:
         return SeverityNumber.WARN
-    elif levelno >= logging.INFO:
+    if levelno >= logging.INFO:
         return SeverityNumber.INFO
-    elif levelno >= logging.DEBUG:
+    if levelno >= logging.DEBUG:
         return SeverityNumber.DEBUG
-    else:
-        return SeverityNumber.TRACE
+    return SeverityNumber.TRACE
 
 
 class OtelBridgeHandler(logging.Handler):
@@ -297,8 +299,8 @@ class OtelBridgeHandler(logging.Handler):
         try:
             logger = self.logger_provider.get_logger(record.name)
             logger.emit(record)
-        except Exception as e:
-            logging.exception("Error emitting log record: %s", e)
+        except Exception:
+            logging.exception("Error emitting log record")
             self.handleError(record)
 
 
