@@ -80,7 +80,7 @@ class GrpcExporter(Generic[R, S]):
         # causes no network transmission
         self.channel.close()
 
-    def force_flush(self, timeout_millis: int = 30000) -> bool:  # noqa: ARG002
+    def force_flush(self, timeout_millis: int = 30000) -> bool:
         return False
 
 

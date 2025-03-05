@@ -93,4 +93,4 @@ markers = ["slow: slow running tests (any test that doesn't feel instantaneous)"
 
 [tool.ruff]
 exclude = ["examples/", "tests/"]
-lint.ignore = ["UP007", "FA100", "EM101"]
+lint.ignore = ["UP007", "FA100", "EM101", "W293", "ARG002"]

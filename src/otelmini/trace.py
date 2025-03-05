@@ -50,10 +50,10 @@ class TracerProvider(ApiTracerProvider):
 
     def get_tracer(
         self,
-        instrumenting_module_name: str,  # noqa: ARG002
-        instrumenting_library_version: typing.Optional[str] = None,  # noqa: ARG002
-        schema_url: typing.Optional[str] = None,  # noqa: ARG002
-        attributes: typing.Optional[types.Attributes] = None,  # noqa: ARG002
+        instrumenting_module_name: str,
+        instrumenting_library_version: typing.Optional[str] = None,
+        schema_url: typing.Optional[str] = None,
+        attributes: typing.Optional[types.Attributes] = None,
     ) -> Tracer:
         return Tracer(self.span_processor)
 
@@ -68,11 +68,11 @@ class Tracer(ApiTracer):
     def start_span(
         self,
         name: str,
-        context: Optional[Context] = None,  # noqa: ARG002
-        kind: SpanKind = SpanKind.INTERNAL,  # noqa: ARG002
-        attributes: types.Attributes = None,  # noqa: ARG002
-        links: _Links = None,  # noqa: ARG002
-        start_time: Optional[int] = None,  # noqa: ARG002
+        context: Optional[Context] = None,
+        kind: SpanKind = SpanKind.INTERNAL,
+        attributes: types.Attributes = None,
+        links: _Links = None,
+        start_time: Optional[int] = None,
         record_exception: bool = True,  # noqa: FBT001, FBT002
         set_status_on_exception: bool = True  # noqa: FBT001, FBT002
     ) -> ApiSpan:
@@ -186,7 +186,7 @@ class MiniSpan(ApiSpan):
     ) -> None:
         self._events.append((exception.__class__.__name__, attributes, timestamp))
 
-    def end(self, end_time: typing.Optional[int] = None) -> None:  # noqa: ARG002
+    def end(self, end_time: typing.Optional[int] = None) -> None:
         self._on_end_callback(self)
 
 

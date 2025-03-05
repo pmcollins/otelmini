@@ -51,7 +51,7 @@ class BatchProcessor(Processor[T]):
         self.stop.set()
         self.timer.stop()
 
-    def force_flush(self, timeout_millis: int = 30000) -> bool:  # noqa: ARG002
+    def force_flush(self, timeout_millis: int = 30000) -> bool:
         return False
 
 

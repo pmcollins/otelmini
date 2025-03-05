@@ -192,7 +192,7 @@ class MeterProvider(ApiMeterProvider):
         name: str,
         version: Optional[str] = None,
         schema_url: Optional[str] = None,
-        attributes: Optional[Attributes] = None,  # noqa: ARG002
+        attributes: Optional[Attributes] = None,
     ) -> ApiMeter:
         return Meter(name, version, schema_url, self.metric_readers)
 
@@ -207,8 +207,8 @@ class Counter(ApiCounter):
     def add(
         self,
         amount: float,
-        attributes: Optional[Attributes] = None,  # noqa: ARG002
-        context: Optional[Context] = None,  # noqa: ARG002
+        attributes: Optional[Attributes] = None,
+        context: Optional[Context] = None,
     ) -> None:
         """Add an amount to the counter."""
         if amount < 0:

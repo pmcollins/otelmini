@@ -154,7 +154,7 @@ class GrpcLogExporter(LogRecordExporter):
         """
         return self._exporter.force_flush(timeout_millis)
 
-    def shutdown(self, timeout_millis: Optional[int] = None) -> None:  # noqa: ARG002
+    def shutdown(self, timeout_millis: Optional[int] = None) -> None:
         """
         Shutdown the exporter.
         
