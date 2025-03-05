@@ -71,9 +71,9 @@ class GrpcExporter(Generic[R, S]):
     def _connect(self) -> None:
         if not self.stub_class:
             raise ValueError("Stub class not provided")
-
-        self.channel = self.channel_provider()
-        self.client = self.stub_class(self.channel)
+        else:
+            self.channel = self.channel_provider()
+            self.client = self.stub_class(self.channel)
 
     def shutdown(self) -> None:
         # causes no network transmission

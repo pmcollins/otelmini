@@ -3,9 +3,8 @@ from __future__ import annotations
 import atexit
 import logging
 import threading
-import time
 from abc import ABC, abstractmethod
-from typing import Generic, Optional, Sequence, TypeVar
+from typing import Generic, Sequence, TypeVar
 
 from otelmini.grpc import GrpcExportResult
 
@@ -120,4 +119,4 @@ class Timer:
 class Exporter(ABC, Generic[T]):
     @abstractmethod
     def export(self, items: Sequence[T]) -> GrpcExportResult:
-        pass 
+        pass
