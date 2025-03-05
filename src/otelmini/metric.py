@@ -113,8 +113,6 @@ class GrpcMetricExporter(MetricExporter):
             sleep=sleep,
             stub_class=MetricsServiceStub,
             response_handler=handle_metric_response,
-            success_result=MetricExportResult.SUCCESS,
-            failure_result=MetricExportResult.FAILURE
         )
 
     def export(self, metrics: Sequence[Metric], **kwargs) -> MetricExportResult:  # noqa: ARG002

@@ -3,7 +3,8 @@ import logging
 from opentelemetry import trace
 
 from otelmini.log import BatchLogRecordProcessor, ConsoleLogExporter, LoggerProvider, OtelBridgeHandler
-from otelmini.trace import BatchProcessor, GrpcSpanExporter, TracerProvider
+from otelmini.processor import BatchProcessor
+from otelmini.trace import GrpcSpanExporter, TracerProvider
 
 
 def set_up_tracing():

@@ -8,7 +8,8 @@ from opentelemetry.sdk.trace import TracerProvider
 from oteltest import OtelTest, Telemetry
 from oteltest.telemetry import count_spans
 
-from otelmini.trace import BatchProcessor, GrpcSpanExporter
+from otelmini.processor import BatchProcessor
+from otelmini.trace import GrpcSpanExporter
 
 if __name__ == '__main__':
     os.environ["OTEL_SERVICE_NAME"] = "manual"
