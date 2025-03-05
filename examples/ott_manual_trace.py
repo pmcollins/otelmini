@@ -30,9 +30,8 @@ class TraceOtelTest:
 
 if __name__ == "__main__":
     set_up_tracing()
-
     tracer = trace.get_tracer(__name__)
-    for i in range(144):
+    for i in range(12):
         with tracer.start_as_current_span("foo"):
             time.sleep(0.1)
             print(i)

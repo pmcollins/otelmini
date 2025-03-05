@@ -28,7 +28,7 @@ class TraceOtelTest:
 
 if __name__ == "__main__":
     tracer = trace.get_tracer(__name__)
-    print(f"tracer: {tracer}")
+    print(f"got tracer: {tracer}")
     for i in range(12):
         with tracer.start_as_current_span("foo"):
             time.sleep(0.1)
