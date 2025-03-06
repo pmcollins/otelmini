@@ -55,7 +55,12 @@ class LogRecord(ApiLogRecord):
 
 
 class LogExportError(Exception):
-    def __init__(self, message: str):
+    def __init__(self, message: str = "Error exporting logs"):
+        super().__init__(message)
+
+
+class LogEmitError(Exception):
+    def __init__(self, message: str = "Error emitting log record"):
         super().__init__(message)
 
 
@@ -79,7 +84,7 @@ class ConsoleLogExporter(LogRecordExporter):
             for log in logs:
                 print(f"log: {log}")  # noqa: T201
         except Exception as e:
-            raise LogExportError("Error exporting logs") from e
+            raise LogExportError from e
         else:
             return GrpcExportResult.SUCCESS
 
@@ -90,13 +95,17 @@ class ConsoleLogExporter(LogRecordExporter):
         pass
 
 
-class GrpcLogExporter(LogRecordExporter):
+class GrpcLogExporterImportError(ImportError):
+    def __init__(self, message: str = "opentelemetry-proto package is required for GrpcLogExporter"):
+        super().__init__(message)
 
+
+class GrpcLogExporter(LogRecordExporter):
     def __init__(self, addr="127.0.0.1:4317", max_retries=3, channel_provider=None, sleep=time.sleep):
         try:
             from opentelemetry.proto.collector.logs.v1.logs_service_pb2_grpc import LogsServiceStub
         except ImportError as err:
-            raise ImportError("opentelemetry-proto package is required for GrpcLogExporter") from err
+            raise GrpcLogExporterImportError from err
 
         self._exporter = GrpcExporter(
             addr=addr,
@@ -231,13 +240,14 @@ class OtelBridgeHandler(logging.Handler):
             logger = self.logger_provider.get_logger(record.name)
             logger.emit(record)
         except Exception:
-            logging.exception("Error emitting log record")
+            logging.exception(LogEmitError())
             self.handleError(record)
 
 
 def mk_log_request(logs: Sequence[LogRecord]) -> ExportLogsServiceRequest:  # noqa: ARG001
     from opentelemetry.proto.collector.logs.v1.logs_service_pb2 import ExportLogsServiceRequest
     from opentelemetry.proto.logs.v1.logs_pb2 import ResourceLogs
+
     return ExportLogsServiceRequest(resource_logs=[ResourceLogs()])
 
 
