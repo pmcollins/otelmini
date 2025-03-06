@@ -19,7 +19,9 @@ def set_up_tracing():
 
 
 def set_up_logging():
-    # exporter = ConsoleLogExporter()
-    exporter = GrpcLogExporter()
-    logger_provider = LoggerProvider([(BatchLogRecordProcessor(exporter))])
-    logging.getLogger().addHandler(OtelBridgeHandler(logger_provider))
+    root_logger = logging.getLogger()
+    root_logger.addHandler(OtelBridgeHandler(LoggerProvider([(BatchLogRecordProcessor(GrpcLogExporter()))])))
+
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(logging.Formatter(logging.BASIC_FORMAT))
+    root_logger.addHandler(stream_handler)

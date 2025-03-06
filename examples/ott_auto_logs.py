@@ -1,10 +1,12 @@
 import logging
-import time
 from pathlib import Path
 from typing import Mapping, Optional, Sequence
 
+MSG = "this is a warning"
+
 
 class LogsOtelTest:
+
     def environment_variables(self) -> Mapping[str, str]:
         return {}
 
@@ -23,13 +25,11 @@ class LogsOtelTest:
 
     def on_stop(self, tel, stdout: str, stderr: str, returncode: int) -> None:
         from oteltest.telemetry import count_logs
-
+        assert MSG in stderr
         assert count_logs(tel)
 
 
 if __name__ == "__main__":
-    logging.basicConfig()
-    logger = logging.getLogger()
-    for i in range(12):
-        logger.warning(f"this is warning {i}")
-        time.sleep(0.1)
+    logging.basicConfig(format=">>>>>> %(asctime)s %(message)s", level=logging.INFO)
+    logger = logging.getLogger("ott")
+    logger.warning(MSG)
