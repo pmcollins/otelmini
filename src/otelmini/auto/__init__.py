@@ -2,7 +2,7 @@ import logging
 
 from opentelemetry import trace
 
-from otelmini.log import BatchLogRecordProcessor, ConsoleLogExporter, GrpcLogExporter, LoggerProvider, OtelBridgeHandler
+from otelmini.log import BatchLogRecordProcessor, GrpcLogExporter, LoggerProvider, OtelBridgeHandler
 from otelmini.processor import BatchProcessor
 from otelmini.trace import GrpcSpanExporter, TracerProvider
 
