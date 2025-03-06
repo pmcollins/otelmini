@@ -31,9 +31,8 @@ class LogsOtelTest:
 
 if __name__ == "__main__":
     set_up_logging()
-
     logger = logging.getLogger()
     for i in range(144):
         logger.warning(f"this is warning {i}")
-        print("x")
-        time.sleep(1)
+        print(i)
+        time.sleep(0.1)

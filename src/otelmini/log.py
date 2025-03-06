@@ -67,8 +67,6 @@ class LogExportError(Exception):
         super().__init__(message)
 
 
-
-
 class LogRecordExporter(Exporter[MiniLogRecord]):
     @abstractmethod
     def export(self, logs: Sequence[MiniLogRecord]) -> GrpcExportResult:
@@ -149,33 +147,36 @@ class Logger(ApiLogger):
 
     def emit(self, pylog_record: logging.LogRecord) -> None:
         try:
-            pylog_mini_log_record = MiniLogRecord(
-                timestamp=int(pylog_record.created * 1e9),  # Convert to nanoseconds
-                observed_timestamp=int(pylog_record.created * 1e9),
-                trace_id=None,  # LogRecord does not have trace_id
-                span_id=None,  # LogRecord does not have span_id
-                trace_flags=None,  # LogRecord does not have trace_flags
-                severity_text=pylog_record.levelname,
-                severity_number=_get_severity_number(pylog_record.levelno),
-                body=pylog_record.getMessage(),
-                attributes={
-                    'filename': pylog_record.filename,
-                    'funcName': pylog_record.funcName,
-                    'lineno': pylog_record.lineno,
-                    'module': pylog_record.module,
-                    'name': pylog_record.name,
-                    'pathname': pylog_record.pathname,
-                    'process': pylog_record.process,
-                    'processName': pylog_record.processName,
-                    'thread': pylog_record.thread,
-                    'threadName': pylog_record.threadName,
-                }
-            )
+            pylog_mini_log_record = _pylog_to_minilog(pylog_record)
             for processor in self._logger_provider.processors:
                 processor.on_end(pylog_mini_log_record)
         except Exception as e:
             print(f"error emitting logs: {e}")
 
+
+def _pylog_to_minilog(pylog_record):
+    return MiniLogRecord(
+        timestamp=int(pylog_record.created * 1e9),  # Convert to nanoseconds
+        observed_timestamp=int(pylog_record.created * 1e9),
+        trace_id=None,  # LogRecord does not have trace_id
+        span_id=None,  # LogRecord does not have span_id
+        trace_flags=None,  # LogRecord does not have trace_flags
+        severity_text=pylog_record.levelname,
+        severity_number=_get_severity_number(pylog_record.levelno),
+        body=pylog_record.getMessage(),
+        attributes={
+            'filename': pylog_record.filename,
+            'funcName': pylog_record.funcName,
+            'lineno': pylog_record.lineno,
+            'module': pylog_record.module,
+            'name': pylog_record.name,
+            'pathname': pylog_record.pathname,
+            'process': pylog_record.process,
+            'processName': pylog_record.processName,
+            'thread': pylog_record.thread,
+            'threadName': pylog_record.threadName,
+        }
+    )
 
 
 class LoggerProvider(ApiLoggerProvider):
