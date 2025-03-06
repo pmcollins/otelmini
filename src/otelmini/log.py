@@ -10,12 +10,20 @@ from opentelemetry._logs import Logger as ApiLogger
 from opentelemetry._logs import LoggerProvider as ApiLoggerProvider
 from opentelemetry._logs import LogRecord as ApiLogRecord
 from opentelemetry._logs import SeverityNumber
+from opentelemetry.proto.collector.logs.v1.logs_service_pb2 import (
+    ExportLogsServiceRequest as PB2ExportLogsServiceRequest,
+)
+from opentelemetry.proto.common.v1.common_pb2 import AnyValue as PB2AnyValue
+from opentelemetry.proto.common.v1.common_pb2 import KeyValue as PB2KeyValue
+from opentelemetry.proto.logs.v1.logs_pb2 import LogRecord as PB2LogRecord
+from opentelemetry.proto.logs.v1.logs_pb2 import ResourceLogs as PB2ResourceLogs
+from opentelemetry.proto.resource.v1.resource_pb2 import Resource as PB2Resource
+from opentelemetry.proto.logs.v1.logs_pb2 import ScopeLogs as PB2ScopeLogs
 
 from otelmini.grpc import GrpcExporter, GrpcExportResult
 from otelmini.processor import BatchProcessor, Exporter, Processor
 
 if TYPE_CHECKING:
-    from opentelemetry.proto.collector.logs.v1.logs_service_pb2 import ExportLogsServiceRequest
     from opentelemetry.trace import TraceFlags
     from opentelemetry.util.types import Attributes
 else:
@@ -28,7 +36,7 @@ class LogExportResult(Enum):
     FAILURE = 1
 
 
-class LogRecord(ApiLogRecord):
+class MiniLogRecord(ApiLogRecord):
     def __init__(
         self,
         timestamp: Optional[int] = None,
@@ -50,7 +58,7 @@ class LogRecord(ApiLogRecord):
             severity_text=severity_text,
             severity_number=severity_number,
             body=body,
-            attributes=attributes,
+            attributes=attributes or {},
         )
 
 
@@ -59,14 +67,11 @@ class LogExportError(Exception):
         super().__init__(message)
 
 
-class LogEmitError(Exception):
-    def __init__(self, message: str = "Error emitting log record"):
-        super().__init__(message)
 
 
-class LogRecordExporter(Exporter[LogRecord]):
+class LogRecordExporter(Exporter[MiniLogRecord]):
     @abstractmethod
-    def export(self, logs: Sequence[LogRecord]) -> GrpcExportResult:
+    def export(self, logs: Sequence[MiniLogRecord]) -> GrpcExportResult:
         pass
 
     @abstractmethod
@@ -79,7 +84,7 @@ class LogRecordExporter(Exporter[LogRecord]):
 
 
 class ConsoleLogExporter(LogRecordExporter):
-    def export(self, logs: Sequence[LogRecord]) -> GrpcExportResult:
+    def export(self, logs: Sequence[MiniLogRecord]) -> GrpcExportResult:
         try:
             for log in logs:
                 print(f"log: {log}")  # noqa: T201
@@ -116,7 +121,7 @@ class GrpcLogExporter(LogRecordExporter):
             response_handler=handle_log_response,
         )
 
-    def export(self, logs: Sequence[LogRecord]) -> GrpcExportResult:
+    def export(self, logs: Sequence[MiniLogRecord]) -> GrpcExportResult:
         req = mk_log_request(logs)
         return self._exporter.export_request(req)
 
@@ -142,9 +147,35 @@ class Logger(ApiLogger):
         self._attributes = attributes
         self._logger_provider = logger_provider
 
-    def emit(self, record: ApiLogRecord) -> None:
-        for processor in self._logger_provider.processors:
-            processor.on_end(record)
+    def emit(self, pylog_record: logging.LogRecord) -> None:
+        try:
+            pylog_mini_log_record = MiniLogRecord(
+                timestamp=int(pylog_record.created * 1e9),  # Convert to nanoseconds
+                observed_timestamp=int(pylog_record.created * 1e9),
+                trace_id=None,  # LogRecord does not have trace_id
+                span_id=None,  # LogRecord does not have span_id
+                trace_flags=None,  # LogRecord does not have trace_flags
+                severity_text=pylog_record.levelname,
+                severity_number=_get_severity_number(pylog_record.levelno),
+                body=pylog_record.getMessage(),
+                attributes={
+                    'filename': pylog_record.filename,
+                    'funcName': pylog_record.funcName,
+                    'lineno': pylog_record.lineno,
+                    'module': pylog_record.module,
+                    'name': pylog_record.name,
+                    'pathname': pylog_record.pathname,
+                    'process': pylog_record.process,
+                    'processName': pylog_record.processName,
+                    'thread': pylog_record.thread,
+                    'threadName': pylog_record.threadName,
+                }
+            )
+            for processor in self._logger_provider.processors:
+                processor.on_end(pylog_mini_log_record)
+        except Exception as e:
+            print(f"error emitting logs: {e}")
+
 
 
 class LoggerProvider(ApiLoggerProvider):
@@ -177,13 +208,13 @@ class LoggerProvider(ApiLoggerProvider):
         return all(processor.force_flush(timeout_millis) for processor in self.processors)
 
 
-class LogRecordProcessor(Processor[LogRecord], ABC):
+class LogRecordProcessor(Processor[MiniLogRecord], ABC):
     @abstractmethod
-    def on_start(self, log_record: LogRecord) -> None:
+    def on_start(self, log_record: MiniLogRecord) -> None:
         pass
 
     @abstractmethod
-    def on_end(self, log_record: LogRecord) -> None:
+    def on_end(self, log_record: MiniLogRecord) -> None:
         pass
 
     @abstractmethod
@@ -203,10 +234,10 @@ class BatchLogRecordProcessor(LogRecordProcessor):
             interval_seconds=export_interval_millis / 1000,
         )
 
-    def on_start(self, log_record: LogRecord) -> None:
+    def on_start(self, log_record: MiniLogRecord) -> None:
         self._processor.on_start(log_record)
 
-    def on_end(self, log_record: LogRecord) -> None:
+    def on_end(self, log_record: MiniLogRecord) -> None:
         self._processor.on_end(log_record)
 
     def shutdown(self) -> None:
@@ -235,20 +266,39 @@ class OtelBridgeHandler(logging.Handler):
         super().__init__(level=level)
         self.logger_provider = logger_provider
 
-    def emit(self, record):
+    def emit(self, record: logging.LogRecord):
         try:
             logger = self.logger_provider.get_logger(record.name)
             logger.emit(record)
-        except Exception:
-            logging.exception(LogEmitError())
+        except Exception as ex:
+            print(f"error emitting log record: {ex}")
             self.handleError(record)
 
 
-def mk_log_request(logs: Sequence[LogRecord]) -> ExportLogsServiceRequest:  # noqa: ARG001
-    from opentelemetry.proto.collector.logs.v1.logs_service_pb2 import ExportLogsServiceRequest
-    from opentelemetry.proto.logs.v1.logs_pb2 import ResourceLogs
-
-    return ExportLogsServiceRequest(resource_logs=[ResourceLogs()])
+def mk_log_request(logs: Sequence[MiniLogRecord]) -> PB2ExportLogsServiceRequest:
+    req = PB2ExportLogsServiceRequest()
+    for log in logs:
+        # Simplified logging: just append the log message as a string
+        log_record = PB2LogRecord(
+            time_unix_nano=log.timestamp or 0,
+            severity_number=log.severity_number.value if log.severity_number else 0,
+            severity_text=log.severity_text or "",
+            body=PB2AnyValue(string_value=str(log.body) if log.body else ""),
+            attributes=[
+                PB2KeyValue(key=key, value=PB2AnyValue(string_value=str(value)))
+                for key, value in (log.attributes or {}).items()
+            ],
+        )
+        req.resource_logs.append(
+            PB2ResourceLogs(
+                scope_logs=[
+                    PB2ScopeLogs(
+                        log_records=[log_record]
+                    )
+                ],
+            )
+        )
+    return req
 
 
 def handle_log_response(resp):
@@ -256,3 +306,17 @@ def handle_log_response(resp):
         ps = resp.partial_success
         msg = f"partial success: rejected_log_records: [{ps.rejected_log_records_count}], error_message: [{ps.error_message}]"
         logging.warning(msg)
+
+
+def encode_log_record(log_record: MiniLogRecord) -> PB2LogRecord:
+    # Basic encoding logic for a log record
+    return PB2LogRecord(
+        time_unix_nano=log_record.timestamp or 0,
+        severity_number=log_record.severity_number.value if log_record.severity_number else 0,
+        severity_text=log_record.severity_text or "",
+        body=PB2AnyValue(string_value=str(log_record.body) if log_record.body else ""),
+        attributes=[
+            PB2KeyValue(key=key, value=PB2AnyValue(string_value=str(value)))
+            for key, value in (log_record.attributes or {}).items()
+        ],
+    )

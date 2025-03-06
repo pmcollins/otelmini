@@ -4,12 +4,14 @@ from io import StringIO
 
 from otelmini.log import (
     ConsoleLogExporter,
-    LogRecord,
+    MiniLogRecord,
     Logger,
     LoggerProvider,
     BatchLogRecordProcessor,
     SeverityNumber,
 )
+from opentelemetry.proto.logs.v1.logs_pb2 import LogRecord as PB2LogRecord
+from otelmini.log import encode_log_record
 
 
 def test_basic_logging(capsys):
@@ -32,7 +34,7 @@ def test_basic_logging(capsys):
     root_logger.addHandler(handler)
 
     # Create a test log record
-    log_record = LogRecord(
+    log_record = MiniLogRecord(
         timestamp=1234567890,
         severity_text="INFO",
         severity_number=SeverityNumber.INFO,
@@ -53,3 +55,27 @@ def test_basic_logging(capsys):
     # Cleanup
     root_logger.removeHandler(handler)
     logger_provider.shutdown()
+
+
+def test_encode_log_record():
+    # Setup: Create a LogRecord with known values
+    log_record = MiniLogRecord(
+        timestamp=1234567890,
+        severity_text="INFO",
+        severity_number=SeverityNumber.INFO,
+        body="Test log message",
+        attributes={"test.attribute": "value"}
+    )
+
+    # Action: Encode the LogRecord
+    encoded_record = encode_log_record(log_record)
+
+    # Assertion: Verify the encoded PB2LogRecord
+    assert isinstance(encoded_record, PB2LogRecord)
+    assert encoded_record.time_unix_nano == 1234567890
+    assert encoded_record.severity_number == SeverityNumber.INFO.value
+    assert encoded_record.severity_text == "INFO"
+    assert encoded_record.body.string_value == "Test log message"
+    assert len(encoded_record.attributes) == 1
+    assert encoded_record.attributes[0].key == "test.attribute"
+    assert encoded_record.attributes[0].value.string_value == "value"
