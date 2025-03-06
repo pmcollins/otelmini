@@ -54,7 +54,7 @@ class LogRecord(ApiLogRecord):
         )
 
 
-class LogExportException(Exception):
+class LogExportError(Exception):
     def __init__(self, message: str):
         super().__init__(message)
 
@@ -79,7 +79,7 @@ class ConsoleLogExporter(LogRecordExporter):
             for log in logs:
                 print(f"log: {log}")  # noqa: T201
         except Exception as e:
-            raise LogExportException("Error exporting logs") from e
+            raise LogExportError("Error exporting logs") from e
         else:
             return GrpcExportResult.SUCCESS
 
