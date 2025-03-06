@@ -1,16 +1,13 @@
 from __future__ import annotations
 
-import json
 import logging
 import time
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Optional, Sequence
+from typing import Any, Optional, Sequence, TYPE_CHECKING
 
-from opentelemetry._logs import Logger as ApiLogger
-from opentelemetry._logs import LoggerProvider as ApiLoggerProvider
-from opentelemetry._logs import LogRecord as ApiLogRecord
-from opentelemetry._logs import SeverityNumber
+from opentelemetry._logs import Logger as ApiLogger, LoggerProvider as ApiLoggerProvider, LogRecord as ApiLogRecord, \
+    SeverityNumber
 
 from otelmini.grpc import GrpcExporter, GrpcExportResult
 from otelmini.processor import BatchProcessor, Exporter, Processor
@@ -89,8 +86,6 @@ class ConsoleLogExporter(LogRecordExporter):
 
     def shutdown(self, timeout_millis: Optional[int] = None) -> None:
         pass
-
-
 
 
 class GrpcLogExporter(LogRecordExporter):
@@ -190,7 +185,7 @@ class LogRecordProcessor(Processor[LogRecord], ABC):
 
 
 class BatchLogRecordProcessor(LogRecordProcessor):
-    def __init__(self, exporter: Exporter, batch_size: int = 512, export_interval_millis: int = 5000):
+    def __init__(self, exporter: LogRecordExporter, batch_size: int = 512, export_interval_millis: int = 5000):
         self._processor = BatchProcessor(
             exporter=exporter,
             batch_size=batch_size,
@@ -237,6 +232,7 @@ class OtelBridgeHandler(logging.Handler):
             logging.exception("Error emitting log record")
             self.handleError(record)
 
+
 def mk_log_request(logs: Sequence[LogRecord]) -> ExportLogsServiceRequest:  # noqa: ARG001
     from opentelemetry.proto.collector.logs.v1.logs_service_pb2 import ExportLogsServiceRequest
     from opentelemetry.proto.logs.v1.logs_pb2 import ResourceLogs
@@ -248,4 +244,3 @@ def handle_log_response(resp):
         ps = resp.partial_success
         msg = f"partial success: rejected_log_records: [{ps.rejected_log_records_count}], error_message: [{ps.error_message}]"
         logging.warning(msg)
-
