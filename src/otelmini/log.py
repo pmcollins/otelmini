@@ -4,10 +4,12 @@ import logging
 import time
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Any, Optional, Sequence, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional, Sequence
 
-from opentelemetry._logs import Logger as ApiLogger, LoggerProvider as ApiLoggerProvider, LogRecord as ApiLogRecord, \
-    SeverityNumber
+from opentelemetry._logs import Logger as ApiLogger
+from opentelemetry._logs import LoggerProvider as ApiLoggerProvider
+from opentelemetry._logs import LogRecord as ApiLogRecord
+from opentelemetry._logs import SeverityNumber
 
 from otelmini.grpc import GrpcExporter, GrpcExportResult
 from otelmini.processor import BatchProcessor, Exporter, Processor
