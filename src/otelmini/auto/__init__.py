@@ -2,7 +2,7 @@ import logging
 
 from opentelemetry import trace
 
-from otelmini.log import BatchLogRecordProcessor, ConsoleLogExporter, LoggerProvider, OtelBridgeHandler
+from otelmini.log import BatchLogRecordProcessor, ConsoleLogExporter, GrpcLogExporter, LoggerProvider, OtelBridgeHandler
 from otelmini.processor import BatchProcessor
 from otelmini.trace import GrpcSpanExporter, TracerProvider
 
@@ -19,5 +19,7 @@ def set_up_tracing():
 
 
 def set_up_logging():
-    logger_provider = LoggerProvider([(BatchLogRecordProcessor(ConsoleLogExporter()))])
+    # exporter = ConsoleLogExporter()
+    exporter = GrpcLogExporter()
+    logger_provider = LoggerProvider([(BatchLogRecordProcessor(exporter))])
     logging.getLogger().addHandler(OtelBridgeHandler(logger_provider))

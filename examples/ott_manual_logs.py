@@ -1,9 +1,6 @@
 import logging
-import time
 from pathlib import Path
 from typing import Mapping, Optional, Sequence
-
-from opentelemetry import trace
 
 from otelmini.auto import set_up_logging
 

@@ -190,7 +190,7 @@ class LogRecordProcessor(Processor[LogRecord], ABC):
 
 
 class BatchLogRecordProcessor(LogRecordProcessor):
-    def __init__(self, exporter: LogRecordExporter, batch_size: int = 512, export_interval_millis: int = 5000):
+    def __init__(self, exporter: Exporter, batch_size: int = 512, export_interval_millis: int = 5000):
         self._processor = BatchProcessor(
             exporter=exporter,
             batch_size=batch_size,
