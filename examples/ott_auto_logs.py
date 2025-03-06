@@ -1,4 +1,5 @@
 import logging
+import time
 from pathlib import Path
 from typing import Mapping, Optional, Sequence
 
@@ -21,9 +22,14 @@ class LogsOtelTest:
         return None
 
     def on_stop(self, tel, stdout: str, stderr: str, returncode: int) -> None:
-        print("stopped")
+        from oteltest.telemetry import count_logs
+
+        assert count_logs(tel)
 
 
 if __name__ == "__main__":
+    logging.basicConfig()
     logger = logging.getLogger()
-    logger.warning("this is a warning")
+    for i in range(12):
+        logger.warning(f"this is warning {i}")
+        time.sleep(0.1)
