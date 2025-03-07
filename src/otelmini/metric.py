@@ -63,22 +63,9 @@ class MetricsData:
 
 
 def mk_metric_request(metrics: Sequence[Metric]) -> ExportMetricsServiceRequest:  # noqa: ARG001
-    """
-    Create a metric request from a sequence of metrics.
-
-    Args:
-        metrics: The metrics to include in the request
-
-    Returns:
-        An ExportMetricsServiceRequest containing the metrics
-    """
-    # This is a placeholder implementation
-    # In a real implementation, you would convert the metrics to protobuf format
     from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import ExportMetricsServiceRequest
     from opentelemetry.proto.metrics.v1.metrics_pb2 import ResourceMetrics
 
-    # Create a request with empty resource metrics
-    # This needs to be implemented properly based on the protobuf definitions
     return ExportMetricsServiceRequest(resource_metrics=[ResourceMetrics()])
 
 
@@ -100,12 +87,6 @@ class GrpcMetricExporterError(Exception):
 
 
 def handle_metric_response(resp):
-    """
-    Handle the response from the gRPC endpoint for metrics.
-
-    Args:
-        resp: The response from the gRPC endpoint
-    """
     if resp.HasField("partial_success") and resp.partial_success:
         ps = resp.partial_success
         import logging
@@ -114,20 +95,7 @@ def handle_metric_response(resp):
 
 
 class GrpcMetricExporter(MetricExporter):
-    """
-    A gRPC exporter for metrics that uses composition with the generic GrpcExporter.
-    """
-
     def __init__(self, addr="127.0.0.1:4317", max_retries=3, channel_provider=None, sleep=time.sleep):
-        """
-        Initialize the gRPC metric exporter.
-
-        Args:
-            addr: The address of the gRPC endpoint
-            max_retries: Maximum number of retry attempts
-            channel_provider: A function that returns a gRPC channel
-            sleep: A function used for sleeping between retries
-        """
         try:
             from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2_grpc import MetricsServiceStub
         except ImportError as err:
@@ -143,37 +111,13 @@ class GrpcMetricExporter(MetricExporter):
         )
 
     def export(self, metrics: Sequence[Metric]) -> MetricExportResult:
-        """
-        Export metrics to the gRPC endpoint.
-
-        Args:
-            metrics: The metrics to export
-
-        Returns:
-            The result of the export operation
-        """
         req = mk_metric_request(metrics)
         return self._exporter.export_request(req)
 
     def force_flush(self, timeout_millis: float = 10_000) -> bool:
-        """
-        Force flush any pending exports.
-
-        Args:
-            timeout_millis: The timeout in milliseconds
-
-        Returns:
-            Whether the flush was successful
-        """
         return self._exporter.force_flush(timeout_millis)
 
     def shutdown(self, timeout_millis: float = 30_000) -> None:
-        """
-        Shutdown the exporter.
-
-        Args:
-            timeout_millis: The timeout in milliseconds
-        """
         self._exporter.shutdown()
 
 
@@ -201,7 +145,7 @@ class ExportingMetricReader(MetricReader):
 
 
 class MeterProvider(ApiMeterProvider):
-    def __init__(self, metric_readers: Sequence[MetricReader] = ()):
+    def __init__(self, metric_readers: Sequence[MetricReader] = ()): 
         self.metric_readers = metric_readers
 
     def get_meter(
@@ -227,7 +171,6 @@ class Counter(ApiCounter):
         attributes: Optional[Attributes] = None,
         context: Optional[Context] = None,
     ) -> None:
-        """Add an amount to the counter."""
         if amount < 0:
             raise CounterError
         self._value += amount
