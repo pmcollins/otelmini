@@ -33,13 +33,15 @@ def test_basic_logging(capsys):
     handler.setLevel(logging.INFO)
     root_logger.addHandler(handler)
 
-    # Create a test log record
-    log_record = MiniLogRecord(
-        timestamp=1234567890,
-        severity_text="INFO",
-        severity_number=SeverityNumber.INFO,
-        body="Test log message",
-        attributes={"test.attribute": "value"}
+    # Create a test log record directly as a LogRecord
+    log_record = logging.LogRecord(
+        name="test_logger",
+        level=logging.INFO,
+        pathname="",
+        lineno=0,
+        msg="Test log message",
+        args=(),
+        exc_info=None,
     )
 
     # Emit the log record
@@ -79,3 +81,15 @@ def test_encode_log_record():
     assert len(encoded_record.attributes) == 1
     assert encoded_record.attributes[0].key == "test.attribute"
     assert encoded_record.attributes[0].value.string_value == "value"
+
+
+def mini_log_record_to_log_record(mini_log_record: MiniLogRecord) -> logging.LogRecord:
+    return logging.LogRecord(
+        name="test_logger",
+        level=mini_log_record.severity_number.value,
+        pathname="",
+        lineno=0,
+        msg=mini_log_record.body,
+        args=(),
+        exc_info=None,
+    )
