@@ -25,7 +25,7 @@ class LogsOtelTest:
 
     def on_stop(self, tel, stdout: str, stderr: str, returncode: int) -> None:
         from oteltest.telemetry import count_logs
-        assert MSG in stderr
+        assert f"WARNING:ott:{MSG}" in stderr
         assert count_logs(tel)
 
 
