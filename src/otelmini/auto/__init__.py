@@ -1,5 +1,4 @@
 import logging
-from dataclasses import dataclass
 from typing import Optional
 
 from opentelemetry import trace
@@ -9,12 +8,13 @@ from otelmini.processor import BatchProcessor
 from otelmini.trace import GrpcSpanExporter, TracerProvider
 
 
-@dataclass
 class OtelMiniManager:
     """Manages the lifecycle of OpenTelemetry components."""
-    tracer_provider: Optional[TracerProvider] = None
-    logger_provider: Optional[LoggerProvider] = None
-    otel_handler: Optional[OtelBridgeHandler] = None
+    
+    def __init__(self):
+        self.tracer_provider: Optional[TracerProvider] = None
+        self.logger_provider: Optional[LoggerProvider] = None
+        self.otel_handler: Optional[OtelBridgeHandler] = None
 
     def shutdown(self):
         """Shut down all OpenTelemetry components."""
@@ -65,10 +65,8 @@ manager = OtelMiniManager()
 
 # Convenience functions that delegate to the global manager
 def set_up_tracing():
-    """Set up OpenTelemetry tracing."""
     manager.set_up_tracing()
 
 
 def set_up_logging(exporter=None):
-    """Set up OpenTelemetry logging."""
     manager.set_up_logging(exporter)
