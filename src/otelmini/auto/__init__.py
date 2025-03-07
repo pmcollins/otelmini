@@ -36,7 +36,6 @@ class OtelMiniManager:
 
         self.logger_provider = LoggerProvider([BatchLogRecordProcessor(exporter)])
         self.otel_handler = OtelBridgeHandler(self.logger_provider)
-
         self.root_logger.addHandler(self.otel_handler)
 
         self.set_up_console_logging()

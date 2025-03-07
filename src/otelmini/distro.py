@@ -1,15 +1,10 @@
-import logging
 import os
 import subprocess
 import sys
 from os.path import abspath, dirname
 
-_pylogger = logging.getLogger(__name__)
-
 
 def auto_instrument():
-    _pylogger.warning("OtelMiniAutoInstrumentor configure running")
-
     cmd = sys.argv[1:]
 
     filedir_path = dirname(abspath(__file__))
