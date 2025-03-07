@@ -81,15 +81,3 @@ def test_encode_log_record():
     assert len(encoded_record.attributes) == 1
     assert encoded_record.attributes[0].key == "test.attribute"
     assert encoded_record.attributes[0].value.string_value == "value"
-
-
-def mini_log_record_to_log_record(mini_log_record: MiniLogRecord) -> logging.LogRecord:
-    return logging.LogRecord(
-        name="test_logger",
-        level=mini_log_record.severity_number.value,
-        pathname="",
-        lineno=0,
-        msg=mini_log_record.body,
-        args=(),
-        exc_info=None,
-    )
