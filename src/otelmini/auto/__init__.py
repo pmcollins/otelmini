@@ -16,18 +16,6 @@ class OtelMiniManager:
         self.logger_provider: Optional[LoggerProvider] = None
         self.otel_handler: Optional[OtelBridgeHandler] = None
 
-    def shutdown(self):
-        """Shut down all OpenTelemetry components."""
-        if self.tracer_provider:
-            self.tracer_provider.shutdown()
-        
-        if self.logger_provider:
-            self.logger_provider.shutdown()
-        
-        if self.otel_handler:
-            root_logger = logging.getLogger()
-            root_logger.removeHandler(self.otel_handler)
-
     def set_up_tracing(self):
         """Set up OpenTelemetry tracing."""
         tracer_provider = TracerProvider(
@@ -45,10 +33,10 @@ class OtelMiniManager:
         root_logger = logging.getLogger()
         if exporter is None:
             exporter = GrpcLogExporter()
-        
+
         logger_provider = LoggerProvider([BatchLogRecordProcessor(exporter)])
         otel_handler = OtelBridgeHandler(logger_provider)
-        
+
         root_logger.addHandler(otel_handler)
 
         stream_handler = logging.StreamHandler()
@@ -58,6 +46,18 @@ class OtelMiniManager:
         # Store references for shutdown
         self.logger_provider = logger_provider
         self.otel_handler = otel_handler
+
+    def shutdown(self):
+        """Shut down all OpenTelemetry components."""
+        if self.tracer_provider:
+            self.tracer_provider.shutdown()
+
+        if self.logger_provider:
+            self.logger_provider.shutdown()
+
+        if self.otel_handler:
+            root_logger = logging.getLogger()
+            root_logger.removeHandler(self.otel_handler)
 
 
 # Global instance to track OpenTelemetry components
