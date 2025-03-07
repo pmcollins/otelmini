@@ -10,6 +10,8 @@ from otelmini.trace import GrpcSpanExporter, TracerProvider
 
 _pylogger = logging.getLogger(__package__)
 
+OTEL_MINI_LOG_FORMAT = "OTEL_MINI_LOG_FORMAT"
+
 
 class Env:
     """
@@ -48,14 +50,23 @@ class Env:
         self.store.setdefault(key, value)
 
 
-class OtelMiniManager:
-    """Manages the lifecycle of OpenTelemetry components."""
+class Config:
 
-    def __init__(self):
+    def __init__(self, env: Env):
+        self.log_format = env.getval(OTEL_MINI_LOG_FORMAT, logging.BASIC_FORMAT)
+
+    def get_log_format(self):
+        return self.log_format
+
+
+class LifecycleManager:
+
+    def __init__(self, env: Env):
         self.tracer_provider: Optional[TracerProvider] = None
         self.logger_provider: Optional[LoggerProvider] = None
         self.otel_handler: Optional[OtelBridgeHandler] = None
         self.root_logger: Optional[logging.Logger] = None
+        self.config = Config(env)
 
     def set_up_tracing(self):
         self.tracer_provider = TracerProvider(
@@ -80,7 +91,7 @@ class OtelMiniManager:
 
     def set_up_console_logging(self):
         stream_handler = logging.StreamHandler()
-        stream_handler.setFormatter(logging.Formatter(logging.BASIC_FORMAT))
+        stream_handler.setFormatter(logging.Formatter(self.config.get_log_format()))
         self.root_logger.addHandler(stream_handler)
 
     def shutdown(self):
@@ -95,7 +106,7 @@ class OtelMiniManager:
 
 
 # Global instance to track OpenTelemetry components
-manager = OtelMiniManager()
+manager = LifecycleManager(Env())
 
 
 # Convenience functions that delegate to the global manager
