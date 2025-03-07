@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import Optional
 
 from opentelemetry import trace
@@ -20,7 +21,8 @@ class Env:
         self.store = os.environ if store is None else store
 
     def is_true(self, key, default=""):
-        return is_true_str(self.getval(key, default))
+        s = self.getval(key, default)
+        return s.strip().lower() == "true"
 
     def list_append(self, key, value):
         curr = self.getval(key)
@@ -44,10 +46,6 @@ class Env:
 
     def setdefault(self, key, value):
         self.store.setdefault(key, value)
-
-
-def is_true_str(s: str) -> bool:
-    return s.strip().lower() == "true"
 
 
 class OtelMiniManager:
