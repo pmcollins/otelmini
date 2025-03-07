@@ -10,7 +10,7 @@ from otelmini.trace import GrpcSpanExporter, TracerProvider
 
 class OtelMiniManager:
     """Manages the lifecycle of OpenTelemetry components."""
-    
+
     def __init__(self):
         self.tracer_provider: Optional[TracerProvider] = None
         self.logger_provider: Optional[LoggerProvider] = None
@@ -18,15 +18,14 @@ class OtelMiniManager:
 
     def set_up_tracing(self):
         """Set up OpenTelemetry tracing."""
-        tracer_provider = TracerProvider(
+        self.tracer_provider = TracerProvider(
             BatchProcessor(
                 GrpcSpanExporter(),
                 batch_size=144,
                 interval_seconds=12,
             )
         )
-        trace.set_tracer_provider(tracer_provider)
-        self.tracer_provider = tracer_provider
+        trace.set_tracer_provider(self.tracer_provider)
 
     def set_up_logging(self, exporter=None):
         """Set up OpenTelemetry logging."""
@@ -34,18 +33,14 @@ class OtelMiniManager:
         if exporter is None:
             exporter = GrpcLogExporter()
 
-        logger_provider = LoggerProvider([BatchLogRecordProcessor(exporter)])
-        otel_handler = OtelBridgeHandler(logger_provider)
+        self.logger_provider = LoggerProvider([BatchLogRecordProcessor(exporter)])
+        self.otel_handler = OtelBridgeHandler(self.logger_provider)
 
-        root_logger.addHandler(otel_handler)
+        root_logger.addHandler(self.otel_handler)
 
         stream_handler = logging.StreamHandler()
         stream_handler.setFormatter(logging.Formatter(logging.BASIC_FORMAT))
         root_logger.addHandler(stream_handler)
-
-        # Store references for shutdown
-        self.logger_provider = logger_provider
-        self.otel_handler = otel_handler
 
     def shutdown(self):
         """Shut down all OpenTelemetry components."""
@@ -62,6 +57,7 @@ class OtelMiniManager:
 
 # Global instance to track OpenTelemetry components
 manager = OtelMiniManager()
+
 
 # Convenience functions that delegate to the global manager
 def set_up_tracing():
