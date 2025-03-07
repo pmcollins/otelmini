@@ -7,6 +7,48 @@ from otelmini.log import BatchLogRecordProcessor, GrpcLogExporter, LoggerProvide
 from otelmini.processor import BatchProcessor
 from otelmini.trace import GrpcSpanExporter, TracerProvider
 
+_pylogger = logging.getLogger(__package__)
+
+
+class Env:
+    """
+    Wrapper around a system's environment variables with convenience methods.
+    Defaults to using os.environ but you can pass in a dictionary for testing.
+    """
+
+    def __init__(self, store=None):
+        self.store = os.environ if store is None else store
+
+    def is_true(self, key, default=""):
+        return is_true_str(self.getval(key, default))
+
+    def list_append(self, key, value):
+        curr = self.getval(key)
+        if curr:
+            curr += ","
+        self.setval(key, curr + value)
+
+    def getval(self, key, default=""):
+        return self.store.get(key, default)
+
+    def getint(self, key, default=0):
+        val = self.getval(key, str(default))
+        try:
+            return int(val)
+        except ValueError:
+            _pylogger.warning("Invalid integer value of '%s' for env var '%s'", val, key)
+            return default
+
+    def setval(self, key, value):
+        self.store[key] = value
+
+    def setdefault(self, key, value):
+        self.store.setdefault(key, value)
+
+
+def is_true_str(s: str) -> bool:
+    return s.strip().lower() == "true"
+
 
 class OtelMiniManager:
     """Manages the lifecycle of OpenTelemetry components."""
@@ -18,7 +60,6 @@ class OtelMiniManager:
         self.root_logger: Optional[logging.Logger] = None
 
     def set_up_tracing(self):
-        """Set up OpenTelemetry tracing."""
         self.tracer_provider = TracerProvider(
             BatchProcessor(
                 GrpcSpanExporter(),
@@ -29,7 +70,6 @@ class OtelMiniManager:
         trace.set_tracer_provider(self.tracer_provider)
 
     def set_up_logging(self, exporter=None):
-        """Set up OpenTelemetry logging."""
         self.root_logger = logging.getLogger()
         if exporter is None:
             exporter = GrpcLogExporter()
@@ -46,7 +86,6 @@ class OtelMiniManager:
         self.root_logger.addHandler(stream_handler)
 
     def shutdown(self):
-        """Shut down all OpenTelemetry components."""
         if self.tracer_provider:
             self.tracer_provider.shutdown()
 

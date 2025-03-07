@@ -40,8 +40,8 @@ if TYPE_CHECKING:
     from opentelemetry.util import types
     from opentelemetry.util.types import Attributes
 
-_pylogger = logging.getLogger(__name__)
-_tracer = trace.get_tracer(__name__)
+_pylogger = logging.getLogger(__package__)
+_tracer = trace.get_tracer(__package__)
 
 
 class TracerProvider(ApiTracerProvider):

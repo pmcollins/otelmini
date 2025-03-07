@@ -14,7 +14,7 @@ from otelmini.trace import GrpcSpanExporter
 
 # run e.g. `pytest --log-cli-level=INFO`
 # to see log statements during tests
-_logger = logging.getLogger(__name__)
+_logger = logging.getLogger(__package__)
 
 
 # `pytest -m "not slow"` to skip these

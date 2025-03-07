@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import time
 
-_pylogger = logging.getLogger(__name__)
+_pylogger = logging.getLogger(__package__)
 
 
 class ExponentialBackoff:

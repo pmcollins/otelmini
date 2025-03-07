@@ -9,7 +9,7 @@ from grpc import RpcError, insecure_channel
 
 from otelmini._tracelib import ExponentialBackoff
 
-_logger = logging.getLogger(__name__)
+_logger = logging.getLogger(__package__)
 
 # Generic type for different request types
 R = TypeVar("R")

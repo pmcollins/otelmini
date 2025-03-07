@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Generic, Sequence, TypeVar
 if TYPE_CHECKING:
     from otelmini.grpc import GrpcExportResult
 
-_pylogger = logging.getLogger(__name__)
+_pylogger = logging.getLogger(__package__)
 
 # Generic type for different signal types
 T = TypeVar("T")
