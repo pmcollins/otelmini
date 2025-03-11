@@ -91,7 +91,8 @@ class LifecycleManager:
 
     def set_up_console_logging(self):
         stream_handler = logging.StreamHandler()
-        stream_handler.setFormatter(logging.Formatter(self.config.get_log_format()))
+        log_format = self.config.get_log_format()
+        stream_handler.setFormatter(logging.Formatter(log_format))
         self.root_logger.addHandler(stream_handler)
 
     def shutdown(self):

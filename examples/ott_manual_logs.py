@@ -3,12 +3,12 @@ import time
 from pathlib import Path
 from typing import Mapping, Optional, Sequence
 
-from otelmini.auto import set_up_logging
+from otelmini.auto import OTEL_MINI_LOG_FORMAT, set_up_logging
 
 
 class LogsOtelTest:
     def environment_variables(self) -> Mapping[str, str]:
-        return {}
+        return {OTEL_MINI_LOG_FORMAT: "%(message)s"}
 
     def requirements(self) -> Sequence[str]:
         return ((str(Path(__file__).resolve().parent.parent)),)

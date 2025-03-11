@@ -2,13 +2,15 @@ import logging
 from pathlib import Path
 from typing import Mapping, Optional, Sequence
 
+from otelmini.auto import OTEL_MINI_LOG_FORMAT
+
 MSG = "this is a warning"
 
 
 class LogsOtelTest:
 
     def environment_variables(self) -> Mapping[str, str]:
-        return {}
+        return {OTEL_MINI_LOG_FORMAT: "%(message)s"}
 
     def requirements(self) -> Sequence[str]:
         return ((str(Path(__file__).resolve().parent.parent)),)
@@ -30,6 +32,6 @@ class LogsOtelTest:
 
 
 if __name__ == "__main__":
-    logging.basicConfig(format=">>>>>> %(asctime)s %(message)s", level=logging.INFO)
+    logging.basicConfig(format="you shouldn't be seeing this: %(asctime)s %(message)s", level=logging.INFO)
     logger = logging.getLogger("ott")
     logger.warning(MSG)
