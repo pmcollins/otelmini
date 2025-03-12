@@ -145,7 +145,7 @@ class ExportingMetricReader(MetricReader):
 
 
 class MeterProvider(ApiMeterProvider):
-    def __init__(self, metric_readers: Sequence[MetricReader] = ()): 
+    def __init__(self, metric_readers: Sequence[MetricReader] = ()):
         self.metric_readers = metric_readers
 
     def get_meter(

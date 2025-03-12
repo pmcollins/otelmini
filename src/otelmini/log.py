@@ -17,7 +17,6 @@ from opentelemetry.proto.common.v1.common_pb2 import AnyValue as PB2AnyValue
 from opentelemetry.proto.common.v1.common_pb2 import KeyValue as PB2KeyValue
 from opentelemetry.proto.logs.v1.logs_pb2 import LogRecord as PB2LogRecord
 from opentelemetry.proto.logs.v1.logs_pb2 import ResourceLogs as PB2ResourceLogs
-from opentelemetry.proto.resource.v1.resource_pb2 import Resource as PB2Resource
 from opentelemetry.proto.logs.v1.logs_pb2 import ScopeLogs as PB2ScopeLogs
 
 from otelmini.grpc import GrpcExporter, GrpcExportResult
