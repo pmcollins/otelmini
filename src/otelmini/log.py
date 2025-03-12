@@ -99,7 +99,7 @@ class ConsoleLogExporter(LogRecordExporter):
 
 
 class GrpcLogExporterImportError(ImportError):
-    def __init__(self, message: str = "opentelemetry-proto package is required for GrpcLogExporter"):
+    def __init__(self, message: str = "The opentelemetry-proto package is required for GrpcLogExporter. Install it with: pip install otelmini[grpc]"):
         super().__init__(message)
 
 
