@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Mapping, Optional, Sequence
 
 from opentelemetry import trace
+from oteltest.telemetry import count_spans
 
 
 class TraceOtelTest:
@@ -10,7 +11,8 @@ class TraceOtelTest:
         return {}
 
     def requirements(self) -> Sequence[str]:
-        return ((str(Path(__file__).resolve().parent.parent)),)
+        dirname = str(Path(__file__).resolve().parent.parent)
+        return (f"{dirname}[grpc]",)
 
     def wrapper_command(self) -> str:
         return "otel"
@@ -23,7 +25,7 @@ class TraceOtelTest:
         return None
 
     def on_stop(self, tel, stdout: str, stderr: str, returncode: int) -> None:
-        print("stopped")
+        assert count_spans(tel)
 
 
 if __name__ == "__main__":
