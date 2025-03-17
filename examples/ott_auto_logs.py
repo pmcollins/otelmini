@@ -1,7 +1,7 @@
 import logging
-from pathlib import Path
 from typing import Mapping, Optional, Sequence
 
+from _lib import package_grpc
 from otelmini.auto import OTEL_MINI_LOG_FORMAT
 
 MSG = "this is a warning"
@@ -13,7 +13,7 @@ class LogsOtelTest:
         return {OTEL_MINI_LOG_FORMAT: "%(message)s"}
 
     def requirements(self) -> Sequence[str]:
-        return ((str(Path(__file__).resolve().parent.parent)),)
+        return (package_grpc(),)
 
     def wrapper_command(self) -> str:
         return "otel"
@@ -27,8 +27,8 @@ class LogsOtelTest:
 
     def on_stop(self, tel, stdout: str, stderr: str, returncode: int) -> None:
         from oteltest.telemetry import count_logs
-        assert f"WARNING:ott:{MSG}" in stderr
-        assert count_logs(tel)
+        assert MSG in stderr, 'MSG in stderr'
+        assert count_logs(tel), "count_logs(tel)"
 
 
 if __name__ == "__main__":

@@ -1,9 +1,9 @@
 import time
-from pathlib import Path
 from typing import Mapping, Optional, Sequence
 
 from opentelemetry import trace
-from oteltest.telemetry import count_spans
+
+from _lib import package_grpc
 
 
 class TraceOtelTest:
@@ -11,8 +11,7 @@ class TraceOtelTest:
         return {}
 
     def requirements(self) -> Sequence[str]:
-        dirname = str(Path(__file__).resolve().parent.parent)
-        return (f"{dirname}[grpc]",)
+        return (package_grpc(),)
 
     def wrapper_command(self) -> str:
         return "otel"
@@ -25,6 +24,8 @@ class TraceOtelTest:
         return None
 
     def on_stop(self, tel, stdout: str, stderr: str, returncode: int) -> None:
+        from oteltest.telemetry import count_spans
+
         assert count_spans(tel)
 
 
