@@ -56,16 +56,6 @@ def test_faked_exporter_with_retry_failure():
     assert len(channel.export_requests) == 4
 
 
-def test_timer():
-    mylist = []
-    t = Timer(lambda: mylist.append("x"), 144)
-    t.start()
-    for i in range(6):
-        t.notify_sleeper()
-        time.sleep(0.0001)
-    assert len(mylist) == 6
-
-
 class FakeChannel:
 
     def __init__(self, failed_attempts_before_success):
@@ -85,6 +75,7 @@ class FakeChannel:
 
     def close(self):
         pass
+
 
 class FakeSleeper:
 

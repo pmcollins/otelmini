@@ -32,7 +32,8 @@ class BatchProcessor(Processor[T]):
         self.stop = threading.Event()
 
         self.timer = Timer(self._export, interval_seconds)
-        self.timer.start()
+        self.thread = threading.Thread(target=self.timer.run, daemon=True)
+        self.thread.start()
 
     def on_start(self, item: T) -> None:
         pass
@@ -84,38 +85,31 @@ class Batcher:
 
 class Timer:
     def __init__(self, target_fcn, interval_seconds):
-        self.thread = threading.Thread(target=self._target, daemon=True)
-        self.target_fcn = target_fcn
-        self.interval_seconds = interval_seconds
-        self.sleeper = threading.Condition()
-        self.stopper = threading.Event()
+        self._target_fcn = target_fcn
+        self._interval_seconds = interval_seconds
+        self._sleeper = threading.Condition()
+        self._stopper = threading.Event()
 
         atexit.register(self.stop)
 
-    def start(self):
-        self.thread.start()
-
-    def _target(self):
-        while not self.stopper.is_set():
+    def run(self):
+        while not self._stopper.is_set():
             self._sleep()
-            if not self.stopper.is_set():
-                self.target_fcn()
+            if not self._stopper.is_set():
+                self._target_fcn()
 
     def _sleep(self):
-        with self.sleeper:
-            self.sleeper.wait(self.interval_seconds)
+        with self._sleeper:
+            self._sleeper.wait(self._interval_seconds)
 
     def notify_sleeper(self):
-        with self.sleeper:
-            self.sleeper.notify()
+        with self._sleeper:
+            self._sleeper.notify()
 
     def stop(self):
-        self.stopper.set()
+        self._stopper.set()
         self.notify_sleeper()
-        self.target_fcn()
-
-    def join(self):
-        self.thread.join()
+        self._target_fcn()
 
 
 class Exporter(ABC, Generic[T]):
