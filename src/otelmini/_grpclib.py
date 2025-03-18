@@ -29,11 +29,13 @@ class GrpcExporter(Generic[R, S]):
         max_retries: int = 3,
         channel_provider: Optional[Callable[[], Any]] = None,
         sleep: Callable[[float], None] = time.sleep,
-        stub_class: Optional[Any] = None,
+        stub_class: Any = None,
         response_handler: Optional[Callable[[S], None]] = None,
     ):
         self.addr = addr
         self.channel_provider = channel_provider if channel_provider else lambda: insecure_channel(addr)
+        if not stub_class:
+            raise ValueError("Stub class not provided")
         self.stub_class = stub_class
         self.response_handler = response_handler if response_handler else lambda _: None
         self._connect()
@@ -69,8 +71,6 @@ class GrpcExporter(Generic[R, S]):
         self._connect()
 
     def _connect(self) -> None:
-        if not self.stub_class:
-            raise ValueError("Stub class not provided")
         self.channel = self.channel_provider()
         self.client = self.stub_class(self.channel)
 
