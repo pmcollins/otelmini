@@ -183,24 +183,48 @@ class MiniSpan(ApiSpan):
 
 class GrpcSpanExporter(Exporter[MiniSpan]):
     def __init__(self, addr="127.0.0.1:4317", max_retries=3, channel_provider=None, sleep=time.sleep):
-        self._exporter = GrpcExporter(
-            addr=addr,
-            max_retries=max_retries,
-            channel_provider=channel_provider,
-            sleep=sleep,
-            stub_class=TraceServiceStub,
-            response_handler=handle_trace_response,
-        )
+        self.addr = addr
+        self.max_retries = max_retries
+        self.channel_provider = channel_provider
+        self.sleep = sleep
+        self._exporter = None
+        self._connect()
+
+    def _connect(self):
+        if self._exporter is None:
+            self._exporter = GrpcExporter(
+                addr=self.addr,
+                max_retries=self.max_retries,
+                channel_provider=self.channel_provider,
+                sleep=self.sleep,
+                stub_class=TraceServiceStub,
+                response_handler=handle_trace_response,
+            )
 
     def export(self, spans: Sequence[MiniSpan]) -> GrpcExportResult:
+        if self._exporter is None:
+            self._connect()
         req = mk_trace_request(spans)
         return self._exporter.export_request(req)
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
+        if self._exporter is None:
+            self._connect()
         return self._exporter.force_flush(timeout_millis)
 
     def shutdown(self) -> None:
-        self._exporter.shutdown()
+        if self._exporter is not None:
+            self._exporter.shutdown()
+            self._exporter = None
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        state['_exporter'] = None
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self._connect()
 
 
 class Resource:

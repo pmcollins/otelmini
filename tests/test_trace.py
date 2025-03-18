@@ -1,4 +1,5 @@
 import time
+import pickle
 
 import pytest
 from _lib import mk_span
@@ -54,6 +55,21 @@ def test_faked_exporter_with_retry_failure():
     resp = exporter.export(spans)
     assert resp == GrpcExportResult.FAILURE
     assert len(channel.export_requests) == 4
+
+
+def test_exporter_pickleable():
+    exporter = GrpcSpanExporter(
+        addr="localhost:4317", 
+        max_retries=5
+    )
+    
+    pickled = pickle.dumps(exporter)
+    unpickled = pickle.loads(pickled)
+    
+    assert unpickled.addr == "localhost:4317"
+    assert unpickled.max_retries == 5
+    
+    unpickled.shutdown()
 
 
 class FakeChannel:

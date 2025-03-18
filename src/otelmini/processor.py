@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import atexit
 import logging
+import multiprocessing
 import threading
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Generic, Sequence, TypeVar
@@ -23,6 +24,28 @@ class Processor(ABC, Generic[T]):
     @abstractmethod
     def on_end(self, item: T) -> None:
         pass
+
+
+def foo():
+    pass
+
+class ForkingBatchProcessor(Processor[T]):
+    def __init__(self, exporter: Exporter[T], batch_size, interval_seconds):
+        self.exporter = exporter
+        self.q = multiprocessing.Queue()
+        self.proc = multiprocessing.Process(target=foo, daemon=True)
+
+    def on_start(self, item: T) -> None:
+        pass
+
+    def on_end(self, item: T) -> None:
+        pass
+
+    def shutdown(self) -> None:
+        pass
+
+    def force_flush(self, timeout_millis: int = 30000) -> bool:
+        return True
 
 
 class BatchProcessor(Processor[T]):
