@@ -23,8 +23,6 @@ class GrpcExportResult(Enum):
 
 
 class GrpcExporter(Generic[R, S]):
-    STUB_CLASS_NOT_PROVIDED = "Stub class not provided"
-
     def __init__(
         self,
         addr: str = "127.0.0.1:4317",
@@ -72,7 +70,7 @@ class GrpcExporter(Generic[R, S]):
 
     def _connect(self) -> None:
         if not self.stub_class:
-            raise ValueError(self.STUB_CLASS_NOT_PROVIDED)
+            raise ValueError("Stub class not provided")
         self.channel = self.channel_provider()
         self.client = self.stub_class(self.channel)
 

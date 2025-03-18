@@ -9,7 +9,7 @@ from oteltest.sink.handler import AccumulatingHandler
 from oteltest.telemetry import count_spans
 
 from _lib import mk_span
-from otelmini.grpc import GrpcExportResult
+from otelmini._grpclib import GrpcExportResult
 from otelmini.trace import GrpcSpanExporter
 
 # run e.g. `pytest --log-cli-level=INFO`

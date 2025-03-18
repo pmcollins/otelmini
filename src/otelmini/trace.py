@@ -32,7 +32,7 @@ from opentelemetry.trace import TracerProvider as ApiTracerProvider
 from opentelemetry.trace.span import SpanContext, Status, TraceState
 from opentelemetry.util._decorator import _agnosticcontextmanager
 
-from otelmini.grpc import GrpcExporter, GrpcExportResult
+from otelmini._grpclib import GrpcExporter, GrpcExportResult
 from otelmini.processor import Exporter, Processor
 
 if TYPE_CHECKING:

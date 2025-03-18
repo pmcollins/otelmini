@@ -13,7 +13,7 @@ from opentelemetry.metrics import ObservableCounter as ApiObservableCounter
 from opentelemetry.metrics import ObservableGauge as ApiObservableGauge
 from opentelemetry.metrics import ObservableUpDownCounter as ApiObservableUpDownCounter
 
-from otelmini.grpc import GrpcExporter
+from otelmini._grpclib import GrpcExporter
 
 if TYPE_CHECKING:
     from opentelemetry.context import Context

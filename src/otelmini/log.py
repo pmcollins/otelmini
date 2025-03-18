@@ -19,7 +19,7 @@ from opentelemetry.proto.logs.v1.logs_pb2 import LogRecord as PB2LogRecord
 from opentelemetry.proto.logs.v1.logs_pb2 import ResourceLogs as PB2ResourceLogs
 from opentelemetry.proto.logs.v1.logs_pb2 import ScopeLogs as PB2ScopeLogs
 
-from otelmini.grpc import GrpcExporter, GrpcExportResult
+from otelmini._grpclib import GrpcExporter, GrpcExportResult
 from otelmini.processor import BatchProcessor, Exporter, Processor
 
 if TYPE_CHECKING:

@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Generic, Sequence, TypeVar
 
 if TYPE_CHECKING:
-    from otelmini.grpc import GrpcExportResult
+    from otelmini._grpclib import GrpcExportResult
 
 _pylogger = logging.getLogger(__package__)
 
