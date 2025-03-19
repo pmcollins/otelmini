@@ -34,12 +34,12 @@ class GrpcExporter(Generic[R, S]):
     ):
         self.addr = addr
         self.channel_provider = channel_provider if channel_provider else lambda: insecure_channel(addr)
-        if not stub_class:
-            raise ValueError("Stub class not provided")
         self.stub_class = stub_class
         self.response_handler = response_handler if response_handler else lambda _: None
-        self._connect()
         self.backoff = ExponentialBackoff(max_retries, exceptions=(RpcError,), sleep=sleep)
+
+        self.channel = None
+        self.client = None
 
     def export_request(self, req: R) -> Any:
         try:
@@ -68,9 +68,9 @@ class GrpcExporter(Generic[R, S]):
         self.shutdown()
         # if the export failed (e.g. because the server is unavailable) reconnect
         # otherwise later attempts will continue to fail even when the server comes back up
-        self._connect()
+        self.connect()
 
-    def _connect(self) -> None:
+    def connect(self) -> None:
         self.channel = self.channel_provider()
         self.client = self.stub_class(self.channel)
 

@@ -98,35 +98,44 @@ class ConsoleLogExporter(LogRecordExporter):
 
 
 class GrpcLogExporterImportError(ImportError):
-    def __init__(self, message: str = "The opentelemetry-proto package is required for GrpcLogExporter. Install it with: pip install otelmini[grpc]"):
+    def __init__(self,
+                 message: str = "The opentelemetry-proto package is required for GrpcLogExporter. Install it with: pip install otelmini[grpc]"):
         super().__init__(message)
 
 
 class GrpcLogExporter(LogRecordExporter):
     def __init__(self, addr="127.0.0.1:4317", max_retries=3, channel_provider=None, sleep=time.sleep):
+        self.exporter = None
+        self.addr = addr
+        self.max_retries = max_retries
+        self.channel_provider = channel_provider
+        self.sleep = sleep
+
+    def init_grpc(self):
         try:
             from opentelemetry.proto.collector.logs.v1.logs_service_pb2_grpc import LogsServiceStub
         except ImportError as err:
             raise GrpcLogExporterImportError from err
 
-        self._exporter = GrpcExporter(
-            addr=addr,
-            max_retries=max_retries,
-            channel_provider=channel_provider,
-            sleep=sleep,
+        self.exporter = GrpcExporter(
+            addr=self.addr,
+            max_retries=self.max_retries,
+            channel_provider=self.channel_provider,
+            sleep=self.sleep,
             stub_class=LogsServiceStub,
             response_handler=handle_log_response,
         )
+        self.exporter.connect()
 
     def export(self, logs: Sequence[MiniLogRecord]) -> GrpcExportResult:
         req = mk_log_request(logs)
-        return self._exporter.export_request(req)
+        return self.exporter.export_request(req)
 
     def force_flush(self, timeout_millis: Optional[int] = None) -> bool:
-        return self._exporter.force_flush(timeout_millis)
+        return self.exporter.force_flush(timeout_millis)
 
     def shutdown(self, timeout_millis: Optional[int] = None) -> None:
-        self._exporter.shutdown()
+        self.exporter.shutdown()
 
 
 class Logger(ApiLogger):

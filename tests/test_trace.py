@@ -10,7 +10,7 @@ from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
 )
 
 from otelmini._tracelib import ExponentialBackoff
-from otelmini._grpclib import GrpcExportResult
+from otelmini._grpclib import GrpcExporter, GrpcExportResult
 from otelmini.processor import Timer
 from otelmini.trace import GrpcSpanExporter
 
@@ -57,19 +57,20 @@ def test_faked_exporter_with_retry_failure():
     assert len(channel.export_requests) == 4
 
 
-def test_exporter_pickleable():
+def test_span_exporter_pickleable():
     exporter = GrpcSpanExporter(
-        addr="localhost:4317", 
+        addr="localhost:4317",
         max_retries=5
     )
-    
+
     pickled = pickle.dumps(exporter)
     unpickled = pickle.loads(pickled)
-    
+
     assert unpickled.addr == "localhost:4317"
     assert unpickled.max_retries == 5
-    
+
     unpickled.shutdown()
+
 
 
 class FakeChannel:

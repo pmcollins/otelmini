@@ -187,44 +187,39 @@ class GrpcSpanExporter(Exporter[MiniSpan]):
         self.max_retries = max_retries
         self.channel_provider = channel_provider
         self.sleep = sleep
-        self._exporter = None
-        self._connect()
+        self.exporter = None
 
-    def _connect(self):
-        if self._exporter is None:
-            self._exporter = GrpcExporter(
-                addr=self.addr,
-                max_retries=self.max_retries,
-                channel_provider=self.channel_provider,
-                sleep=self.sleep,
-                stub_class=TraceServiceStub,
-                response_handler=handle_trace_response,
-            )
+    def init_grpc(self):
+        if self.exporter:
+            return
+        self.exporter = GrpcExporter(
+            addr=self.addr,
+            max_retries=self.max_retries,
+            channel_provider=self.channel_provider,
+            sleep=self.sleep,
+            stub_class=TraceServiceStub,
+            response_handler=handle_trace_response,
+        )
+        self.exporter.connect()
 
     def export(self, spans: Sequence[MiniSpan]) -> GrpcExportResult:
-        if self._exporter is None:
-            self._connect()
+        self.init_grpc()
         req = mk_trace_request(spans)
-        return self._exporter.export_request(req)
+        return self.exporter.export_request(req)
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
-        if self._exporter is None:
-            self._connect()
-        return self._exporter.force_flush(timeout_millis)
+        return self.exporter.force_flush(timeout_millis)
 
     def shutdown(self) -> None:
-        if self._exporter is not None:
-            self._exporter.shutdown()
-            self._exporter = None
+        if self.exporter is not None:
+            self.exporter.shutdown()
+            self.exporter = None
 
     def __getstate__(self):
-        state = self.__dict__.copy()
-        state['_exporter'] = None
-        return state
+        return self.__dict__.copy()
 
     def __setstate__(self, state):
         self.__dict__.update(state)
-        self._connect()
 
 
 class Resource:

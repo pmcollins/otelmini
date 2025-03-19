@@ -96,29 +96,40 @@ def handle_metric_response(resp):
 
 class GrpcMetricExporter(MetricExporter):
     def __init__(self, addr="127.0.0.1:4317", max_retries=3, channel_provider=None, sleep=time.sleep):
+        self.addr = addr
+        self.max_retries = max_retries
+        self.channel_provider = channel_provider
+        self.sleep = sleep
+        self.exporter = None
+
+    def init_grpc(self):
         try:
             from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2_grpc import MetricsServiceStub
         except ImportError as err:
             raise GrpcMetricExporterError from err
 
-        self._exporter = GrpcExporter(
-            addr=addr,
-            max_retries=max_retries,
-            channel_provider=channel_provider,
-            sleep=sleep,
+        if self.exporter:
+            return
+        self.exporter = GrpcExporter(
+            addr=self.addr,
+            max_retries=self.max_retries,
+            channel_provider=self.channel_provider,
+            sleep=self.sleep,
             stub_class=MetricsServiceStub,
             response_handler=handle_metric_response,
         )
+        self.exporter.connect()
 
     def export(self, metrics: Sequence[Metric]) -> MetricExportResult:
+        self.init_grpc()
         req = mk_metric_request(metrics)
-        return self._exporter.export_request(req)
+        return self.exporter.export_request(req)
 
     def force_flush(self, timeout_millis: float = 10_000) -> bool:
-        return self._exporter.force_flush(timeout_millis)
+        return self.exporter.force_flush(timeout_millis)
 
     def shutdown(self, timeout_millis: float = 30_000) -> None:
-        self._exporter.shutdown()
+        self.exporter.shutdown()
 
 
 class SimpleMetricExporter(MetricExporter):
