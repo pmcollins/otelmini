@@ -6,7 +6,7 @@ from opentelemetry import trace
 
 from otelmini.log import BatchLogRecordProcessor, GrpcLogExporter, LoggerProvider, OtelBridgeHandler
 from otelmini.processor import BatchProcessor
-from otelmini.trace import GrpcSpanExporter, TracerProvider
+from otelmini.trace import GrpcSpanExporter, MiniTracerProvider
 
 _pylogger = logging.getLogger(__package__)
 
@@ -62,14 +62,14 @@ class Config:
 class LifecycleManager:
 
     def __init__(self, env: Env):
-        self.tracer_provider: Optional[TracerProvider] = None
+        self.tracer_provider: Optional[MiniTracerProvider] = None
         self.logger_provider: Optional[LoggerProvider] = None
         self.otel_handler: Optional[OtelBridgeHandler] = None
         self.root_logger: Optional[logging.Logger] = None
         self.config = Config(env)
 
     def set_up_tracing(self):
-        self.tracer_provider = TracerProvider(
+        self.tracer_provider = MiniTracerProvider(
             BatchProcessor(
                 GrpcSpanExporter(),
                 batch_size=144,

@@ -4,8 +4,12 @@ import atexit
 import logging
 import multiprocessing
 import threading
+import time
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Generic, Sequence, TypeVar
+
+from otelmini.trace import GrpcSpanExporter, MiniSpan
+from otelmini.exporter import Exporter
 
 if TYPE_CHECKING:
     from otelmini._grpclib import GrpcExportResult
@@ -26,20 +30,25 @@ class Processor(ABC, Generic[T]):
         pass
 
 
-def foo():
-    pass
+def run_remote(exporter: GrpcSpanExporter, queue: multiprocessing.Queue) -> None:
+    print("will init grpc")
+    exporter.init_grpc()
+    print("done")
+    for i in range(12):
+        time.sleep(1)
+        span_dict = queue.get(timeout=1)
 
-class ForkingBatchProcessor(Processor[T]):
-    def __init__(self, exporter: Exporter[T], batch_size, interval_seconds):
-        self.exporter = exporter
+
+class RemoteBatchProcessor(Processor[MiniSpan]):
+    def __init__(self, exporter: GrpcSpanExporter, batch_size, interval_seconds):
         self.q = multiprocessing.Queue()
-        self.proc = multiprocessing.Process(target=foo, daemon=True)
+        multiprocessing.Process(target=run_remote, args=(exporter, self.q)).start()
 
-    def on_start(self, item: T) -> None:
+    def on_start(self, item: MiniSpan) -> None:
         pass
 
-    def on_end(self, item: T) -> None:
-        pass
+    def on_end(self, item: MiniSpan) -> None:
+        self.q.put(item.to_dict())
 
     def shutdown(self) -> None:
         pass
@@ -49,7 +58,7 @@ class ForkingBatchProcessor(Processor[T]):
 
 
 class BatchProcessor(Processor[T]):
-    def __init__(self, exporter: Exporter[T], batch_size, interval_seconds):
+    def __init__(self, exporter: Exporter, batch_size, interval_seconds):
         self.exporter = exporter
         self.batcher = Batcher(batch_size)
         self.stop = threading.Event()

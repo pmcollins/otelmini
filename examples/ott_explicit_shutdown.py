@@ -8,11 +8,11 @@ from oteltest import OtelTest, Telemetry
 from oteltest.telemetry import count_spans
 
 from otelmini.processor import BatchProcessor
-from otelmini.trace import GrpcSpanExporter, TracerProvider
+from otelmini.trace import GrpcSpanExporter, MiniTracerProvider
 
 if __name__ == '__main__':
     os.environ["OTEL_SERVICE_NAME"] = "manual"
-    tp = TracerProvider(BatchProcessor(
+    tp = MiniTracerProvider(BatchProcessor(
         GrpcSpanExporter(),
         batch_size=24,
         interval_seconds=6,

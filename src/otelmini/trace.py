@@ -4,7 +4,7 @@ import logging
 import time
 import typing
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Iterator, Mapping, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Iterator, Mapping, Optional, Sequence, Dict
 
 from opentelemetry import trace
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
@@ -27,15 +27,16 @@ from opentelemetry.proto.trace.v1.trace_pb2 import Status as PB2Status
 from opentelemetry.trace import Link, SpanKind, StatusCode, _Links
 from opentelemetry.trace import Span as ApiSpan
 from opentelemetry.trace import SpanContext as ApiSpanContext
-from opentelemetry.trace import Tracer as ApiTracer
-from opentelemetry.trace import TracerProvider as ApiTracerProvider
+from opentelemetry.trace import Tracer
+from opentelemetry.trace import TracerProvider
 from opentelemetry.trace.span import SpanContext, Status, TraceState
 from opentelemetry.util._decorator import _agnosticcontextmanager
 
+from otelmini.exporter import Exporter
 from otelmini._grpclib import GrpcExporter, GrpcExportResult
-from otelmini.processor import Exporter, Processor
 
 if TYPE_CHECKING:
+    from otelmini.processor import Processor
     from opentelemetry.context import Context
     from opentelemetry.util import types
     from opentelemetry.util.types import Attributes
@@ -44,7 +45,7 @@ _pylogger = logging.getLogger(__package__)
 _tracer = trace.get_tracer(__package__)
 
 
-class TracerProvider(ApiTracerProvider):
+class MiniTracerProvider(TracerProvider):
     def __init__(self, span_processor=None):
         self.span_processor = span_processor
 
@@ -54,14 +55,14 @@ class TracerProvider(ApiTracerProvider):
         instrumenting_library_version: typing.Optional[str] = None,
         schema_url: typing.Optional[str] = None,
         attributes: typing.Optional[types.Attributes] = None,
-    ) -> Tracer:
-        return Tracer(self.span_processor)
+    ) -> MiniTracer:
+        return MiniTracer(self.span_processor)
 
     def shutdown(self):
         pass
 
 
-class Tracer(ApiTracer):
+class MiniTracer(Tracer):
     def __init__(self, span_processor: Processor[MiniSpan]):
         self.span_processor = span_processor
 
@@ -180,6 +181,18 @@ class MiniSpan(ApiSpan):
     def end(self, end_time: typing.Optional[int] = None) -> None:
         self._on_end_callback(self)
 
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert a MiniSpan to a serializable dictionary."""
+        return {
+            "name": self.get_name(),
+            "trace_id": self.get_span_context().trace_id,
+            "span_id": self.get_span_context().span_id,
+            "attributes": self._attributes,
+            "events": self._events,
+            "status": self._status,
+            "status_description": self._status_description
+        }
+
 
 class GrpcSpanExporter(Exporter[MiniSpan]):
     def __init__(self, addr="127.0.0.1:4317", max_retries=3, channel_provider=None, sleep=time.sleep):
@@ -188,6 +201,11 @@ class GrpcSpanExporter(Exporter[MiniSpan]):
         self.channel_provider = channel_provider
         self.sleep = sleep
         self.exporter = None
+
+    def __setstate__(self, state):
+        print("__setstate__")
+        self.__dict__.update(state)
+        # self.init_grpc()
 
     def init_grpc(self):
         if self.exporter:
@@ -215,23 +233,27 @@ class GrpcSpanExporter(Exporter[MiniSpan]):
             self.exporter.shutdown()
             self.exporter = None
 
-    def __getstate__(self):
-        return self.__dict__.copy()
-
-    def __setstate__(self, state):
-        self.__dict__.update(state)
-
 
 class Resource:
-    def __init__(self, schema_url):
-        self.schema_url = schema_url
+    def __init__(self, schema_url: str = ""):
+        self._schema_url = schema_url
         self._attributes = {}
 
     def get_attributes(self):
         return self._attributes
 
     def get_schema_url(self):
-        return self.schema_url
+        return self._schema_url
+
+    def __getstate__(self):
+        return {
+            "schema_url": self._schema_url,
+            "attributes": self._attributes
+        }
+
+    def __setstate__(self, state):
+        self._schema_url = state["schema_url"]
+        self._attributes = state["attributes"]
 
 
 def handle_trace_response(resp):
@@ -427,32 +449,3 @@ def encode_value(value: Any) -> PB2AnyValue:
 class EncodingError(Exception):
     def __init__(self, value):
         super().__init__(f"Invalid type {type(value)} of value {value}")
-
-
-class Span(ApiSpan):
-    def __init__(
-        self,
-        name: str,
-        context: Optional[SpanContext] = None,
-        parent: Optional[SpanContext] = None,
-        kind: Optional[SpanKind] = None,
-        attributes: Optional[Attributes] = None,
-        links: Optional[_Links] = None,
-        start_time: Optional[int] = None,
-        end_time: Optional[int] = None,
-        status: Optional[Status] = None,
-        *,
-        record_exception: bool = False,
-        set_status_on_exception: bool = False,
-    ):
-        super().__init__(
-            name=name,
-            context=context,
-            parent=parent,
-            kind=kind,
-            attributes=attributes,
-            links=links,
-            start_time=start_time,
-            end_time=end_time,
-            status=status,
-        )
