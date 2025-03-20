@@ -35,8 +35,10 @@ def run_remote(exporter: GrpcSpanExporter, queue: multiprocessing.Queue) -> None
     exporter.init_grpc()
     print("done")
     for i in range(12):
-        time.sleep(1)
-        print(queue.get(timeout=1))
+        span_dict = queue.get(timeout=4)
+        span = MiniSpan.from_dict(span_dict, on_end_callback=lambda s: None)
+        print(span)
+        exporter.export([span])
 
 
 class RemoteBatchProcessor(Processor[MiniSpan]):

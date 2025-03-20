@@ -193,6 +193,9 @@ class MiniSpan(ApiSpan):
             "status_description": self._status_description
         }
 
+    def __str__(self) -> str:
+        return f"MiniSpan(name='{self._name}', trace_id={self._span_context.trace_id}, span_id={self._span_context.span_id})"
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any], on_end_callback: typing.Callable[[MiniSpan], None]) -> MiniSpan:
         """Create a MiniSpan instance from a dictionary representation.

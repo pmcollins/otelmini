@@ -33,5 +33,5 @@ if __name__ == "__main__":
     tracer = MiniTracer(processor)
     for i in range(12):
         with tracer.start_as_current_span("foo"):
-            time.sleep(0.1)
+            time.sleep(1)
             print(i)
