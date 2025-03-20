@@ -73,7 +73,6 @@ def test_span_exporter_pickleable():
 
 
 def test_span_dict_serialization():
-    # Create a simple span
     span = MiniSpan(
         name="test",
         span_context=SpanContext(trace_id=1, span_id=2, is_remote=False),
@@ -82,11 +81,9 @@ def test_span_dict_serialization():
         on_end_callback=lambda s: None
     )
     
-    # Test round trip
     span_dict = span.to_dict()
     new_span = MiniSpan.from_dict(span_dict, on_end_callback=lambda s: None)
     
-    # Verify basic properties
     assert new_span.get_name() == "test"
     assert new_span.get_span_context().trace_id == 1
     assert new_span.get_span_context().span_id == 2
