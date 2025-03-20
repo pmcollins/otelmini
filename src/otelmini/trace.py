@@ -193,6 +193,35 @@ class MiniSpan(ApiSpan):
             "status_description": self._status_description
         }
 
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any], on_end_callback: typing.Callable[[MiniSpan], None]) -> MiniSpan:
+        """Create a MiniSpan instance from a dictionary representation.
+        
+        Args:
+            data: Dictionary containing span data
+            on_end_callback: Callback function to be called when the span ends
+            
+        Returns:
+            A new MiniSpan instance
+        """
+        span_context = SpanContext(
+            trace_id=data["trace_id"],
+            span_id=data["span_id"],
+            is_remote=False
+        )
+        span = cls(
+            name=data["name"],
+            span_context=span_context,
+            resource=Resource(""),  # Default empty resource
+            instrumentation_scope=InstrumentationScope("", ""),  # Default empty scope
+            on_end_callback=on_end_callback
+        )
+        span._attributes = data.get("attributes", {})
+        span._events = data.get("events", [])
+        span._status = data.get("status")
+        span._status_description = data.get("status_description")
+        return span
+
 
 class GrpcSpanExporter(Exporter[MiniSpan]):
     def __init__(self, addr="127.0.0.1:4317", max_retries=3, channel_provider=None, sleep=time.sleep):
