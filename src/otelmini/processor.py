@@ -4,12 +4,11 @@ import atexit
 import logging
 import multiprocessing
 import threading
-import time
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Generic, Sequence, TypeVar
+from typing import Generic, Sequence, TYPE_CHECKING, TypeVar
 
-from otelmini.trace import GrpcSpanExporter, MiniSpan
 from otelmini._lib import Exporter
+from otelmini.trace import GrpcSpanExporter, MiniSpan
 
 if TYPE_CHECKING:
     from otelmini._lib import ExportResult
@@ -31,13 +30,10 @@ class Processor(ABC, Generic[T]):
 
 
 def run_remote(exporter: GrpcSpanExporter, queue: multiprocessing.Queue) -> None:
-    print("will init grpc")
     exporter.init_grpc()
-    print("done")
     for i in range(12):
         span_dict = queue.get(timeout=4)
         span = MiniSpan.from_dict(span_dict, on_end_callback=lambda s: None)
-        print(span)
         exporter.export([span])
 
 
