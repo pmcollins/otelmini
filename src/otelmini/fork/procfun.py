@@ -2,7 +2,7 @@ import multiprocessing
 import time
 from typing import Sequence, Dict, Any
 
-from otelmini._grpclib import GrpcExportResult
+from otelmini._lib import ExportResult
 from otelmini.processor import Exporter, Processor, T
 from otelmini.trace import MiniSpan, MiniTracer
 
@@ -24,12 +24,12 @@ class FunExporter(Exporter[MiniSpan]):
         self.__dict__.update(state)
         self.connect()
 
-    def export(self, items: Sequence[T]) -> GrpcExportResult:
+    def export(self, items: Sequence[T]) -> ExportResult:
         if not self.connected:
             print("not connected, skipping export")
-            return GrpcExportResult.FAILURE
+            return ExportResult.FAILURE
         print(f"exporting: {items}")
-        return GrpcExportResult.SUCCESS
+        return ExportResult.SUCCESS
 
 
 def run_remote(q: multiprocessing.Queue, exporter: FunExporter):

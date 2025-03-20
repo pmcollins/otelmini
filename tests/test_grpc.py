@@ -9,7 +9,7 @@ from oteltest.sink.handler import AccumulatingHandler
 from oteltest.telemetry import count_spans
 
 from _lib import mk_span
-from otelmini._grpclib import GrpcExportResult
+from otelmini._lib import ExportResult
 from otelmini.trace import GrpcSpanExporter
 
 # run e.g. `pytest --log-cli-level=INFO`
@@ -39,7 +39,7 @@ def test_exporter_w_server_unavailable():
     # attempt (1s) retry1 (2s) retry2 (4s) retry3
     exporter = GrpcSpanExporter()
     result = exporter.export([mk_span("my-span")])
-    assert result == GrpcExportResult.FAILURE
+    assert result == ExportResult.FAILURE
 
 
 @pytest.mark.slow
@@ -53,7 +53,7 @@ def test_exporter_w_server_initially_unavailable():
     sink.start()
 
     result = export.wait_for_result()
-    assert result == GrpcExportResult.SUCCESS
+    assert result == ExportResult.SUCCESS
 
     sink.stop()
 
@@ -71,7 +71,7 @@ def test_exporter_w_alternating_server_availability():
     export_runner.start()
     result = export_runner.wait_for_result()
     _logger.info(f"Expect success: {result}")
-    assert result == GrpcExportResult.SUCCESS
+    assert result == ExportResult.SUCCESS
 
     sink_runner.stop()
     _logger.info("Sink OFF")
@@ -82,7 +82,7 @@ def test_exporter_w_alternating_server_availability():
     export_runner.start()
     result = export_runner.wait_for_result()
     _logger.info(f"Expect failure: {result}")
-    assert result == GrpcExportResult.FAILURE
+    assert result == ExportResult.FAILURE
 
     _logger.info("Start export with sink OFF")
     export_runner = ExportAsyncRunner()
@@ -96,7 +96,7 @@ def test_exporter_w_alternating_server_availability():
 
     result = export_runner.wait_for_result()
     _logger.info(f"Expect success: {result}")
-    assert result == GrpcExportResult.SUCCESS
+    assert result == ExportResult.SUCCESS
 
     sink_runner.stop()
     _logger.info("Sink OFF")

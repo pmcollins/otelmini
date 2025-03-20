@@ -2,8 +2,23 @@ from __future__ import annotations
 
 import logging
 import time
+from abc import ABC, abstractmethod
+from enum import Enum
+from typing import Generic, Sequence, TypeVar
 
+T = TypeVar("T")
 _pylogger = logging.getLogger(__package__)
+
+
+class Exporter(ABC, Generic[T]):
+    @abstractmethod
+    def export(self, items: Sequence[T]) -> ExportResult:
+        pass
+
+
+class ExportResult(Enum):
+    FAILURE = 0
+    SUCCESS = 1
 
 
 class ExponentialBackoff:
@@ -20,7 +35,7 @@ class ExponentialBackoff:
                 return func()
             except self.exceptions as e:
                 if attempt < self.max_retries:
-                    seconds = (2**attempt) * self.base_seconds
+                    seconds = (2 ** attempt) * self.base_seconds
                     _pylogger.warning("Retry will sleep %d seconds", seconds)
                     self.sleep(seconds)
                 else:

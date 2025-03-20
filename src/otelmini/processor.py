@@ -9,10 +9,10 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Generic, Sequence, TypeVar
 
 from otelmini.trace import GrpcSpanExporter, MiniSpan
-from otelmini.exporter import Exporter
+from otelmini._lib import Exporter
 
 if TYPE_CHECKING:
-    from otelmini._grpclib import GrpcExportResult
+    from otelmini._lib import ExportResult
 
 _pylogger = logging.getLogger(__package__)
 
@@ -146,5 +146,5 @@ class Timer:
 
 class Exporter(ABC, Generic[T]):
     @abstractmethod
-    def export(self, items: Sequence[T]) -> GrpcExportResult:
+    def export(self, items: Sequence[T]) -> ExportResult:
         pass

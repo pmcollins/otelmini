@@ -19,7 +19,8 @@ from opentelemetry.proto.logs.v1.logs_pb2 import LogRecord as PB2LogRecord
 from opentelemetry.proto.logs.v1.logs_pb2 import ResourceLogs as PB2ResourceLogs
 from opentelemetry.proto.logs.v1.logs_pb2 import ScopeLogs as PB2ScopeLogs
 
-from otelmini._grpclib import GrpcExporter, GrpcExportResult
+from otelmini._grpclib import GrpcExporter
+from otelmini._lib import ExportResult
 from otelmini.processor import BatchProcessor, Exporter, Processor
 
 if TYPE_CHECKING:
@@ -68,7 +69,7 @@ class LogExportError(Exception):
 
 class LogRecordExporter(Exporter[MiniLogRecord]):
     @abstractmethod
-    def export(self, logs: Sequence[MiniLogRecord]) -> GrpcExportResult:
+    def export(self, logs: Sequence[MiniLogRecord]) -> ExportResult:
         pass
 
     @abstractmethod
@@ -81,14 +82,14 @@ class LogRecordExporter(Exporter[MiniLogRecord]):
 
 
 class ConsoleLogExporter(LogRecordExporter):
-    def export(self, logs: Sequence[MiniLogRecord]) -> GrpcExportResult:
+    def export(self, logs: Sequence[MiniLogRecord]) -> ExportResult:
         try:
             for log in logs:
                 print(f"log: {log}")  # noqa: T201
         except Exception as e:
             raise LogExportError from e
         else:
-            return GrpcExportResult.SUCCESS
+            return ExportResult.SUCCESS
 
     def force_flush(self, timeout_millis: Optional[int] = None) -> bool:
         pass
@@ -127,7 +128,7 @@ class GrpcLogExporter(LogRecordExporter):
         )
         self.exporter.connect()
 
-    def export(self, logs: Sequence[MiniLogRecord]) -> GrpcExportResult:
+    def export(self, logs: Sequence[MiniLogRecord]) -> ExportResult:
         req = mk_log_request(logs)
         return self.exporter.export_request(req)
 

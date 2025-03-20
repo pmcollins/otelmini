@@ -32,8 +32,8 @@ from opentelemetry.trace import TracerProvider
 from opentelemetry.trace.span import SpanContext, Status, TraceState
 from opentelemetry.util._decorator import _agnosticcontextmanager
 
-from otelmini.exporter import Exporter
-from otelmini._grpclib import GrpcExporter, GrpcExportResult
+from otelmini._lib import Exporter, ExportResult
+from otelmini._grpclib import GrpcExporter
 
 if TYPE_CHECKING:
     from otelmini.processor import Processor
@@ -220,7 +220,7 @@ class GrpcSpanExporter(Exporter[MiniSpan]):
         )
         self.exporter.connect()
 
-    def export(self, spans: Sequence[MiniSpan]) -> GrpcExportResult:
+    def export(self, spans: Sequence[MiniSpan]) -> ExportResult:
         self.init_grpc()
         req = mk_trace_request(spans)
         return self.exporter.export_request(req)

@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import logging
 import time
-from enum import Enum
 from typing import Any, Callable, Generic, Optional, TypeVar
 
 from grpc import RpcError, insecure_channel
 
-from otelmini._tracelib import ExponentialBackoff
+from otelmini._lib import ExponentialBackoff, ExportResult
 
 _logger = logging.getLogger(__package__)
 
@@ -15,11 +14,6 @@ _logger = logging.getLogger(__package__)
 R = TypeVar("R")
 # Generic type for different response types
 S = TypeVar("S")
-
-
-class GrpcExportResult(Enum):
-    FAILURE = 0
-    SUCCESS = 1
 
 
 class GrpcExporter(Generic[R, S]):
@@ -47,9 +41,9 @@ class GrpcExporter(Generic[R, S]):
             if self.response_handler:
                 self.response_handler(resp)
         except ExponentialBackoff.MaxAttemptsError:
-            return GrpcExportResult.FAILURE
+            return ExportResult.FAILURE
         else:
-            return GrpcExportResult.SUCCESS
+            return ExportResult.SUCCESS
 
     def export_single_request(self, req: R) -> S:
         try:
