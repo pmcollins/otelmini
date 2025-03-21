@@ -1,6 +1,9 @@
 import logging
 import os
 from typing import Optional
+import signal
+import threading
+from abc import ABC, abstractmethod
 
 from opentelemetry import trace
 
@@ -59,9 +62,25 @@ class Config:
         return self.log_format
 
 
-class LifecycleManager:
+class ProcessLifecycleManager(ABC):
+    def __init__(self):
+        signal.signal(signal.SIGTERM, self._handle_shutdown)
+        signal.signal(signal.SIGINT, self._handle_shutdown)
+        
+    def _handle_shutdown(self, signum, frame):
+        """Handle shutdown signals gracefully."""
+        self.shutdown()
+        signal.signal(signum, signal.SIG_DFL)
+        os.kill(os.getpid(), signum)
+        
+    @abstractmethod
+    def shutdown(self):
+        pass
 
+
+class AutoInstrumentationManager(ProcessLifecycleManager):
     def __init__(self, env: Env):
+        super().__init__()
         self.tracer_provider: Optional[MiniTracerProvider] = None
         self.logger_provider: Optional[LoggerProvider] = None
         self.otel_handler: Optional[OtelBridgeHandler] = None
@@ -107,7 +126,7 @@ class LifecycleManager:
 
 
 # Global instance to track OpenTelemetry components
-manager = LifecycleManager(Env())
+manager = AutoInstrumentationManager(Env())
 
 
 # Convenience functions that delegate to the global manager

@@ -35,6 +35,12 @@ class GrpcExporter(Generic[R, S]):
         self.channel = None
         self.client = None
 
+    def _handle_fork(self):
+        """Handle cleanup and reinitialization after a fork in the child process."""
+        # Close existing channel if any
+        if self.channel:
+            self.shutdown()
+
     def export_request(self, req: R) -> Any:
         try:
             resp = self.backoff.retry(SingleReqExporter(self, req).export)
@@ -70,7 +76,10 @@ class GrpcExporter(Generic[R, S]):
 
     def shutdown(self) -> None:
         # causes no network transmission
-        self.channel.close()
+        if self.channel:
+            self.channel.close()
+        self.channel = None
+        self.client = None
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
         return False

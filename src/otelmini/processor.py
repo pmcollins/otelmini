@@ -3,6 +3,7 @@ from __future__ import annotations
 import atexit
 import logging
 import threading
+import os
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Generic, Sequence, TypeVar
 
@@ -13,8 +14,16 @@ if TYPE_CHECKING:
 
 _pylogger = logging.getLogger(__package__)
 
-# Generic type for different signal types
 T = TypeVar("T")
+
+
+class ForkAware(ABC):
+    def register_at_fork(self):
+        os.register_at_fork(after_in_child=self.reinitialize)
+
+    @abstractmethod
+    def reinitialize(self):
+        pass
 
 
 class Processor(ABC, Generic[T]):
@@ -27,13 +36,25 @@ class Processor(ABC, Generic[T]):
         pass
 
 
-class BatchProcessor(Processor[T]):
+class BatchProcessor(Processor[T], ForkAware):
     def __init__(self, exporter: Exporter, batch_size, interval_seconds):
         self.exporter = exporter
         self.batcher = Batcher(batch_size)
         self.stop = threading.Event()
 
         self.timer = Timer(self._export, interval_seconds)
+        self.thread = threading.Thread(target=self.timer.run, daemon=True)
+        self.thread.start()
+
+        self.register_at_fork()
+
+    def reinitialize(self):
+        self.shutdown()
+
+        self.stop.clear()
+        self.batcher = Batcher(self.batcher.batch_size)
+
+        self.timer = Timer(self._export, self.timer._interval_seconds)
         self.thread = threading.Thread(target=self.timer.run, daemon=True)
         self.thread.start()
 
