@@ -2,13 +2,11 @@ from __future__ import annotations
 
 import atexit
 import logging
-import multiprocessing
 import threading
 from abc import ABC, abstractmethod
-from typing import Generic, Sequence, TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, Generic, Sequence, TypeVar
 
 from otelmini._lib import Exporter
-from otelmini.trace import GrpcSpanExporter, MiniSpan
 
 if TYPE_CHECKING:
     from otelmini._lib import ExportResult
@@ -27,8 +25,6 @@ class Processor(ABC, Generic[T]):
     @abstractmethod
     def on_end(self, item: T) -> None:
         pass
-
-
 
 
 class BatchProcessor(Processor[T]):

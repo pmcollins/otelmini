@@ -4,7 +4,7 @@ import logging
 import time
 import typing
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Iterator, Mapping, Optional, Sequence, Dict
+from typing import TYPE_CHECKING, Any, Dict, Iterator, Mapping, Optional, Sequence
 
 from opentelemetry import trace
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
@@ -24,22 +24,21 @@ from opentelemetry.proto.trace.v1.trace_pb2 import ScopeSpans as PB2ScopeSpans
 from opentelemetry.proto.trace.v1.trace_pb2 import Span as PB2SPan
 from opentelemetry.proto.trace.v1.trace_pb2 import SpanFlags as PB2SpanFlags
 from opentelemetry.proto.trace.v1.trace_pb2 import Status as PB2Status
-from opentelemetry.trace import Link, SpanKind, StatusCode, _Links
+from opentelemetry.trace import Link, SpanKind, StatusCode, Tracer, TracerProvider, _Links
 from opentelemetry.trace import Span as ApiSpan
 from opentelemetry.trace import SpanContext as ApiSpanContext
-from opentelemetry.trace import Tracer
-from opentelemetry.trace import TracerProvider
 from opentelemetry.trace.span import SpanContext, Status, TraceState
 from opentelemetry.util._decorator import _agnosticcontextmanager
 
-from otelmini._lib import Exporter, ExportResult
 from otelmini._grpclib import GrpcExporter
+from otelmini._lib import Exporter, ExportResult
 
 if TYPE_CHECKING:
-    from otelmini.processor import Processor
     from opentelemetry.context import Context
     from opentelemetry.util import types
     from opentelemetry.util.types import Attributes
+
+    from otelmini.processor import Processor
 
 _pylogger = logging.getLogger(__package__)
 _tracer = trace.get_tracer(__package__)
