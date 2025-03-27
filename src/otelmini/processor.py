@@ -2,15 +2,13 @@ from __future__ import annotations
 
 import atexit
 import logging
-import threading
 import os
+import threading
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Generic, Sequence, TypeVar
+from typing import Generic, TYPE_CHECKING, TypeVar
 
 from otelmini._lib import Exporter
 
-if TYPE_CHECKING:
-    from otelmini._lib import ExportResult
 
 _pylogger = logging.getLogger(__package__)
 
@@ -133,9 +131,3 @@ class Timer:
         self._stopper.set()
         self.notify_sleeper()
         self._target_fcn()
-
-
-class Exporter(ABC, Generic[T]):
-    @abstractmethod
-    def export(self, items: Sequence[T]) -> ExportResult:
-        pass

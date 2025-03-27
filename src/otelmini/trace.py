@@ -232,11 +232,7 @@ class GrpcSpanExporter(Exporter[MiniSpan]):
         self.channel_provider = channel_provider
         self.sleep = sleep
         self.exporter = None
-
-    def __setstate__(self, state):
-        print("__setstate__")
-        self.__dict__.update(state)
-        # self.init_grpc()
+        self.init_grpc()  # this would need to be called lazily for this class to be serializable for multiprocessing
 
     def init_grpc(self):
         if self.exporter:
@@ -252,7 +248,6 @@ class GrpcSpanExporter(Exporter[MiniSpan]):
         self.exporter.connect()
 
     def export(self, spans: Sequence[MiniSpan]) -> ExportResult:
-        self.init_grpc()
         req = mk_trace_request(spans)
         return self.exporter.export_request(req)
 
@@ -263,6 +258,10 @@ class GrpcSpanExporter(Exporter[MiniSpan]):
         if self.exporter is not None:
             self.exporter.shutdown()
             self.exporter = None
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        # self.init_grpc()
 
 
 class Resource:

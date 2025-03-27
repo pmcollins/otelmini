@@ -14,6 +14,7 @@ from opentelemetry.metrics import ObservableGauge as ApiObservableGauge
 from opentelemetry.metrics import ObservableUpDownCounter as ApiObservableUpDownCounter
 
 from otelmini._grpclib import GrpcExporter
+from otelmini._lib import Exporter
 
 if TYPE_CHECKING:
     from opentelemetry.context import Context
@@ -24,19 +25,6 @@ if TYPE_CHECKING:
     )
     from opentelemetry.util.types import Attributes
 
-
-class MetricExporter(ABC):
-    @abstractmethod
-    def export(self, metrics: Sequence[Metric]) -> MetricExportResult:
-        pass
-
-    @abstractmethod
-    def force_flush(self, timeout_millis: float = 10_000) -> bool:
-        pass
-
-    @abstractmethod
-    def shutdown(self, timeout_millis: float = 30_000) -> None:
-        pass
 
 
 class MetricExportResult(Enum):
@@ -94,13 +82,14 @@ def handle_metric_response(resp):
         logging.warning(str(MetricResponseError(ps.rejected_data_points, ps.error_message)))
 
 
-class GrpcMetricExporter(MetricExporter):
+class GrpcMetricExporter(Exporter):
     def __init__(self, addr="127.0.0.1:4317", max_retries=3, channel_provider=None, sleep=time.sleep):
         self.addr = addr
         self.max_retries = max_retries
         self.channel_provider = channel_provider
         self.sleep = sleep
         self.exporter = None
+        self.init_grpc()
 
     def init_grpc(self):
         try:
@@ -121,7 +110,6 @@ class GrpcMetricExporter(MetricExporter):
         self.exporter.connect()
 
     def export(self, metrics: Sequence[Metric]) -> MetricExportResult:
-        self.init_grpc()
         req = mk_metric_request(metrics)
         return self.exporter.export_request(req)
 
@@ -132,7 +120,7 @@ class GrpcMetricExporter(MetricExporter):
         self.exporter.shutdown()
 
 
-class SimpleMetricExporter(MetricExporter):
+class SimpleMetricExporter(Exporter[Metric]):
     def export(self, metrics: Sequence[Metric]) -> MetricExportResult:
         return MetricExportResult.SUCCESS
 
@@ -144,7 +132,7 @@ class SimpleMetricExporter(MetricExporter):
 
 
 class ExportingMetricReader(MetricReader):
-    def __init__(self, exporter: MetricExporter):
+    def __init__(self, exporter: Exporter[Metric]):
         super().__init__()
         self.exporter = exporter
 
