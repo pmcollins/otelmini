@@ -17,10 +17,10 @@ T = TypeVar("T")
 
 class ForkAware(ABC):
     def register_at_fork(self):
-        os.register_at_fork(after_in_child=self.reinitialize)
+        os.register_at_fork(after_in_child=self.reinitialize_at_fork)
 
     @abstractmethod
-    def reinitialize(self):
+    def reinitialize_at_fork(self):
         pass
 
 
@@ -46,7 +46,7 @@ class BatchProcessor(Processor[T], ForkAware):
 
         self.register_at_fork()
 
-    def reinitialize(self):
+    def reinitialize_at_fork(self):
         self.shutdown()
 
         self.stop.clear()
