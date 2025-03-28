@@ -3,7 +3,6 @@ import threading
 import time
 
 import pytest
-from oteltest import sink as sink_lib
 from oteltest.sink import GrpcSink
 from oteltest.sink.handler import AccumulatingHandler
 from oteltest.telemetry import count_spans
@@ -44,12 +43,13 @@ def test_exporter_w_server_unavailable():
 
 @pytest.mark.slow
 def test_exporter_w_server_initially_unavailable():
-    export = ExportAsyncRunner()
+    export = SingleExportAsyncRunner()
     export.start()
 
     time.sleep(3)
 
-    sink = SinkAsyncRunner()
+    handler = AccumulatingHandler()
+    sink = GrpcSink(handler, logger)
     sink.start()
 
     result = export.wait_for_result()
@@ -61,48 +61,50 @@ def test_exporter_w_server_initially_unavailable():
 @pytest.mark.slow
 def test_exporter_w_alternating_server_availability():
     logger.info("Sink ON")
-    sink_runner = SinkAsyncRunner()
-    sink_runner.start()
+    handler = AccumulatingHandler()
+    sink = GrpcSink(handler, logger)
+    sink.start()
 
     time.sleep(1)
 
     logger.info("Export")
-    export_runner = ExportAsyncRunner()
+    export_runner = SingleExportAsyncRunner()
     export_runner.start()
     result = export_runner.wait_for_result()
     logger.info(f"Expect success: {result}")
     assert result == ExportResult.SUCCESS
 
-    sink_runner.stop()
+    sink.stop()
     logger.info("Sink OFF")
     time.sleep(1)
 
     logger.info("Export")
-    export_runner = ExportAsyncRunner()
+    export_runner = SingleExportAsyncRunner()
     export_runner.start()
     result = export_runner.wait_for_result()
     logger.info(f"Expect failure: {result}")
     assert result == ExportResult.FAILURE
 
     logger.info("Start export with sink OFF")
-    export_runner = ExportAsyncRunner()
+    export_runner = SingleExportAsyncRunner()
     export_runner.start()
 
     time.sleep(5)
 
     logger.info("Sink ON after sleep")
-    sink_runner = SinkAsyncRunner()
-    sink_runner.start()
+    handler = AccumulatingHandler()
+    sink = GrpcSink(handler, logger)
+    sink.start()
 
     result = export_runner.wait_for_result()
     logger.info(f"Expect success: {result}")
     assert result == ExportResult.SUCCESS
 
-    sink_runner.stop()
+    sink.stop()
     logger.info("Sink OFF")
 
 
-class ExportAsyncRunner:
+class SingleExportAsyncRunner:
 
     def __init__(self):
         self.result = None
@@ -119,24 +121,3 @@ class ExportAsyncRunner:
         self.thread.join()
         return self.result
 
-
-class SinkAsyncRunner:
-
-    def __init__(self):
-        self.thread = threading.Thread(target=self._run, daemon=True)
-        self.handler = AccumulatingHandler()
-        self.sink = sink_lib.GrpcSink(self.handler, logger)
-
-    def start(self):
-        self.thread.start()
-
-    def _run(self):
-        self.sink.start()
-        self.sink.wait_for_termination()
-
-    def get_telemetry(self):
-        return self.handler.telemetry
-
-    def stop(self):
-        self.sink.stop()
-        self.thread.join()
