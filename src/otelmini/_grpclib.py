@@ -17,6 +17,14 @@ S = TypeVar("S")
 
 
 class GrpcExporter(Generic[R, S]):
+    class SingleReqExporter:
+        def __init__(self, exporter: GrpcExporter, req: Any):
+            self.exporter = exporter
+            self.req = req
+
+        def export(self) -> Any:
+            return self.exporter.export_single_request(self.req)
+
     def __init__(
         self,
         addr: str = "127.0.0.1:4317",
@@ -37,9 +45,8 @@ class GrpcExporter(Generic[R, S]):
 
     def export_request(self, req: R) -> Any:
         try:
-            resp = self.backoff.retry(SingleReqExporter(self, req).export)
-            if self.response_handler:
-                self.response_handler(resp)
+            resp = self.backoff.retry(GrpcExporter.SingleReqExporter(self, req).export)
+            self.response_handler(resp)
         except ExponentialBackoff.MaxAttemptsError:
             return ExportResult.FAILURE
         else:
@@ -71,24 +78,9 @@ class GrpcExporter(Generic[R, S]):
         self.channel = self.channel_provider()
         self.client = self.stub_class(self.channel)
 
-    def _handle_fork(self):
-        """Handle cleanup and reinitialization after a fork in the child process."""
-        # Close existing channel if any
-        if self.channel:
-            self.shutdown()
-
     def shutdown(self) -> None:
         # causes no network transmission
         if self.channel:
             self.channel.close()
         self.channel = None
         self.client = None
-
-
-class SingleReqExporter:
-    def __init__(self, exporter: GrpcExporter, req: Any):
-        self.exporter = exporter
-        self.req = req
-
-    def export(self) -> Any:
-        return self.exporter.export_single_request(self.req)
