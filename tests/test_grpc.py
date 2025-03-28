@@ -14,14 +14,14 @@ from otelmini.trace import GrpcSpanExporter
 
 # run e.g. `pytest --log-cli-level=INFO`
 # to see log statements during tests
-_logger = logging.getLogger(__package__)
+logger = logging.getLogger(__name__)
 
 
 # `pytest -m "not slow"` to skip these
 @pytest.mark.slow
 def test_exporter_single_grpc_request():
     handler = AccumulatingHandler()
-    sink = GrpcSink(handler, _logger)
+    sink = GrpcSink(handler, logger)
     sink.start()
 
     exporter = GrpcSpanExporter()
@@ -60,46 +60,46 @@ def test_exporter_w_server_initially_unavailable():
 
 @pytest.mark.slow
 def test_exporter_w_alternating_server_availability():
-    _logger.info("Sink ON")
+    logger.info("Sink ON")
     sink_runner = SinkAsyncRunner()
     sink_runner.start()
 
     time.sleep(1)
 
-    _logger.info("Export")
+    logger.info("Export")
     export_runner = ExportAsyncRunner()
     export_runner.start()
     result = export_runner.wait_for_result()
-    _logger.info(f"Expect success: {result}")
+    logger.info(f"Expect success: {result}")
     assert result == ExportResult.SUCCESS
 
     sink_runner.stop()
-    _logger.info("Sink OFF")
+    logger.info("Sink OFF")
     time.sleep(1)
 
-    _logger.info("Export")
+    logger.info("Export")
     export_runner = ExportAsyncRunner()
     export_runner.start()
     result = export_runner.wait_for_result()
-    _logger.info(f"Expect failure: {result}")
+    logger.info(f"Expect failure: {result}")
     assert result == ExportResult.FAILURE
 
-    _logger.info("Start export with sink OFF")
+    logger.info("Start export with sink OFF")
     export_runner = ExportAsyncRunner()
     export_runner.start()
 
     time.sleep(5)
 
-    _logger.info("Sink ON after sleep")
+    logger.info("Sink ON after sleep")
     sink_runner = SinkAsyncRunner()
     sink_runner.start()
 
     result = export_runner.wait_for_result()
-    _logger.info(f"Expect success: {result}")
+    logger.info(f"Expect success: {result}")
     assert result == ExportResult.SUCCESS
 
     sink_runner.stop()
-    _logger.info("Sink OFF")
+    logger.info("Sink OFF")
 
 
 class ExportAsyncRunner:
@@ -125,7 +125,7 @@ class SinkAsyncRunner:
     def __init__(self):
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.handler = AccumulatingHandler()
-        self.sink = sink_lib.GrpcSink(self.handler, _logger)
+        self.sink = sink_lib.GrpcSink(self.handler, logger)
 
     def start(self):
         self.thread.start()

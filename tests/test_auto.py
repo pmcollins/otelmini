@@ -1,5 +1,6 @@
 import logging
 import pytest
+import os
 
 from otelmini.auto import set_up_logging, manager
 from otelmini.log import BatchLogRecordProcessor, ConsoleLogExporter, LoggerProvider, OtelBridgeHandler

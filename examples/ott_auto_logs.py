@@ -2,7 +2,7 @@ import logging
 from typing import Mapping, Optional, Sequence
 
 from _lib import package_grpc
-from otelmini.auto import OTEL_MINI_LOG_FORMAT
+from otelmini.auto._lib import OTEL_MINI_LOG_FORMAT
 
 MSG = "this is a warning"
 
