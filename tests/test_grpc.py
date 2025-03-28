@@ -99,6 +99,7 @@ def test_exporter_w_alternating_server_availability():
     result = export_runner.wait_for_result()
     logger.info(f"Expect success: {result}")
     assert result == ExportResult.SUCCESS
+    assert count_spans(handler.telemetry) == 1
 
     sink.stop()
     logger.info("Sink OFF")
