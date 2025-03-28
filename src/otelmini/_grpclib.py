@@ -58,7 +58,7 @@ class GrpcExporter(Generic[R, S]):
     def _handle_export_failure(self, e: RpcError) -> None:
         if hasattr(e, "code") and e.code:
             status = e.code().name  # e.g. "UNAVAILABLE"
-            _logger.warning("Rpc error during export: %s", status)
+            _logger.warning("Rpc error during export: status: %s", status)
         else:
             _logger.warning("Rpc error during export: %s", e)
         # close the channel, even if not strictly necessary
