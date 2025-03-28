@@ -261,7 +261,7 @@ class GrpcSpanExporter(Exporter[MiniSpan]):
 
     def __setstate__(self, state):
         self.__dict__.update(state)
-        # self.init_grpc()
+        # self.init_grpc()  # this would have to be commented out for this class to wake up after being deserialized
 
 
 class Resource:
