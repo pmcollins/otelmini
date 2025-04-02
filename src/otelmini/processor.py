@@ -5,10 +5,9 @@ import logging
 import os
 import threading
 from abc import ABC, abstractmethod
-from typing import Generic, TYPE_CHECKING, TypeVar
+from typing import Generic, TypeVar
 
 from otelmini._lib import Exporter
-
 
 _pylogger = logging.getLogger(__package__)
 
