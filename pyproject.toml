@@ -25,13 +25,9 @@ classifiers = [
 ]
 dependencies = [
   "opentelemetry-api",
-]
-
-[project.optional-dependencies]
-grpc = [
   "opentelemetry-proto",
-  "googleapis-common-protos",
   "grpcio",
+  "googleapis-common-protos",
 ]
 
 [project.urls]
@@ -48,6 +44,7 @@ path = "src/otelmini/__about__.py"
 [tool.hatch.envs.default]
 dependencies = [
   "coverage[toml]>=6.5",
+  "oteltest",
   "pytest",
 ]
 [tool.hatch.envs.default.scripts]
@@ -93,6 +90,8 @@ exclude_lines = [
 
 [tool.pytest.ini_options]
 markers = ["slow: slow running tests (any test that doesn't feel instantaneous)"]
+testpaths = ["tests"]
+pythonpath = ["."]
 
 [tool.ruff]
 exclude = ["examples/", "tests/"]

@@ -155,12 +155,9 @@ class Logger(ApiLogger):
         self._logger_provider = logger_provider
 
     def emit(self, pylog_record: logging.LogRecord) -> None:
-        try:
-            pylog_mini_log_record = _pylog_to_minilog(pylog_record)
-            for processor in self._logger_provider.processors:
-                processor.on_end(pylog_mini_log_record)
-        except Exception as e:
-            print(f"error emitting logs: {e}")
+        pylog_mini_log_record = _pylog_to_minilog(pylog_record)
+        for processor in self._logger_provider.processors:
+            processor.on_end(pylog_mini_log_record)
 
 
 def _pylog_to_minilog(pylog_record):

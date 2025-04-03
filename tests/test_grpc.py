@@ -7,7 +7,7 @@ from oteltest.sink import GrpcSink
 from oteltest.sink.handler import AccumulatingHandler
 from oteltest.telemetry import count_spans
 
-from _lib import mk_span
+from tests._lib import mk_span
 from otelmini._lib import ExportResult
 from otelmini.trace import GrpcSpanExporter
 
