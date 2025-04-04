@@ -20,8 +20,8 @@ from opentelemetry.proto.logs.v1.logs_pb2 import ResourceLogs as PB2ResourceLogs
 from opentelemetry.proto.logs.v1.logs_pb2 import ScopeLogs as PB2ScopeLogs
 
 from otelmini._grpclib import GrpcExporter
-from otelmini._lib import ExportResult
-from otelmini.processor import BatchProcessor, Exporter, Processor
+from otelmini._lib import ExportResult, Exporter
+from otelmini.processor import BatchProcessor, Processor
 
 if TYPE_CHECKING:
     from opentelemetry.trace import TraceFlags
@@ -277,8 +277,8 @@ class OtelBridgeHandler(logging.Handler):
         try:
             logger = self.logger_provider.get_logger(record.name)
             logger.emit(record)
-        except Exception as ex:
-            print(f"error emitting log record: {ex}")
+        except (AttributeError, TypeError) as ex:
+            logging.exception("error emitting log record")
             self.handleError(record)
 
 

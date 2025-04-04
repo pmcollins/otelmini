@@ -5,9 +5,10 @@ import logging
 import os
 import threading
 from abc import ABC, abstractmethod
-from typing import Generic, TypeVar
+from typing import TYPE_CHECKING, Generic, TypeVar
 
-from otelmini._lib import Exporter
+if TYPE_CHECKING:
+    from otelmini._lib import Exporter
 
 _pylogger = logging.getLogger(__package__)
 
@@ -51,7 +52,7 @@ class BatchProcessor(Processor[T], ForkAware):
         self.stop.clear()
         self.batcher = Batcher(self.batcher.batch_size)
 
-        self.timer = Timer(self._export, self.timer._interval_seconds)
+        self.timer = Timer(self._export, self.timer._interval_seconds)  # noqa: SLF001
         self.thread = threading.Thread(target=self.timer.run, daemon=True)
         self.thread.start()
 

@@ -4,7 +4,7 @@ import logging
 import time
 import typing
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Dict, Iterator, Mapping, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Iterator, Mapping, Optional, Sequence
 
 from opentelemetry import trace
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
@@ -26,7 +26,6 @@ from opentelemetry.proto.trace.v1.trace_pb2 import SpanFlags as PB2SpanFlags
 from opentelemetry.proto.trace.v1.trace_pb2 import Status as PB2Status
 from opentelemetry.trace import Link, SpanKind, StatusCode, Tracer, TracerProvider, _Links
 from opentelemetry.trace import Span as ApiSpan
-from opentelemetry.trace import SpanContext as ApiSpanContext
 from opentelemetry.trace.span import SpanContext, Status, TraceState
 from opentelemetry.util._decorator import _agnosticcontextmanager
 
@@ -115,7 +114,7 @@ class InstrumentationScope:
 class MiniSpan(ApiSpan):
     def __init__(
         self,
-        name,
+        name: str,
         span_context: SpanContext,
         resource: Resource,
         instrumentation_scope: InstrumentationScope,
@@ -125,17 +124,20 @@ class MiniSpan(ApiSpan):
         self._span_context = span_context
         self._resource = resource
         self._instrumentation_scope = instrumentation_scope
-        self._on_end_callback = on_end_callback
         self._attributes = {}
         self._events = []
         self._status = None
         self._status_description = None
+        self._on_end_callback = on_end_callback
 
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.end()
+
+    def get_span_context(self) -> SpanContext:
+        return self._span_context
 
     def get_name(self):
         return self._name
@@ -146,8 +148,17 @@ class MiniSpan(ApiSpan):
     def get_instrumentation_scope(self):
         return self._instrumentation_scope
 
-    def get_span_context(self) -> ApiSpanContext:
-        return self._span_context
+    def get_attributes(self):
+        return self._attributes
+
+    def get_events(self):
+        return self._events
+
+    def get_status(self):
+        return self._status
+
+    def get_status_description(self):
+        return self._status_description
 
     def set_attributes(self, attributes: typing.Mapping[str, types.AttributeValue]) -> None:
         self._attributes.update(attributes)
@@ -180,12 +191,13 @@ class MiniSpan(ApiSpan):
     def end(self, end_time: typing.Optional[int] = None) -> None:
         self._on_end_callback(self)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert a MiniSpan to a serializable dictionary."""
         return {
             "name": self.get_name(),
-            "trace_id": self.get_span_context().trace_id,
-            "span_id": self.get_span_context().span_id,
+            "span_context": self.get_span_context(),
+            "resource": self.get_resource(),
+            "instrumentation_scope": self.get_instrumentation_scope(),
             "attributes": self._attributes,
             "events": self._events,
             "status": self._status,
@@ -193,10 +205,10 @@ class MiniSpan(ApiSpan):
         }
 
     def __str__(self) -> str:
-        return f"MiniSpan(name='{self._name}', trace_id={self._span_context.trace_id}, span_id={self._span_context.span_id})"
+        return f"MiniSpan(name='{self._name}', span_context={self._span_context})"
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any], on_end_callback: typing.Callable[[MiniSpan], None]) -> MiniSpan:
+    def from_dict(cls, data: dict[str, Any], on_end_callback: typing.Callable[[MiniSpan], None]) -> MiniSpan:
         """Create a MiniSpan instance from a dictionary representation.
         
         Args:
@@ -206,23 +218,13 @@ class MiniSpan(ApiSpan):
         Returns:
             A new MiniSpan instance
         """
-        span_context = SpanContext(
-            trace_id=data["trace_id"],
-            span_id=data["span_id"],
-            is_remote=False
-        )
-        span = cls(
+        return cls(
             name=data["name"],
-            span_context=span_context,
-            resource=Resource(""),  # Default empty resource
-            instrumentation_scope=InstrumentationScope("", ""),  # Default empty scope
+            span_context=data["span_context"],
+            resource=data["resource"],
+            instrumentation_scope=data["instrumentation_scope"],
             on_end_callback=on_end_callback
         )
-        span._attributes = data.get("attributes", {})
-        span._events = data.get("events", [])
-        span._status = data.get("status")
-        span._status_description = data.get("status_description")
-        return span
 
 
 class GrpcSpanExporter(Exporter[MiniSpan]):
