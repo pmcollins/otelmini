@@ -1,3 +1,3 @@
 # otelmini
 
-This is a toy implementation of the OTel Python sdk for learning.
+This is a toy implementation of the OTel Python SDK for learning.
