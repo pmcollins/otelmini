@@ -38,15 +38,15 @@ def test_backoff_eventual_failure():
 
 
 def test_backoff_abort_retry():
-    def abort_retry(e: RpcError):
+    def should_retry(e: RpcError):
         if hasattr(e, "code") and e.code:
-            return e.code() != StatusCode.UNAVAILABLE
+            return e.code() in [StatusCode.UNAVAILABLE]
         return True
 
     def my_function():
         raise RpcError()
 
-    backoff = ExponentialBackoff(max_retries=1, sleep=FakeSleeper().sleep, abort_retry=abort_retry)
+    backoff = ExponentialBackoff(max_retries=1, sleep=FakeSleeper().sleep, should_retry=should_retry)
     backoff.retry(my_function)
 
 
