@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import time
 import typing
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any, Iterator, Mapping, Optional, Sequence
@@ -10,7 +9,6 @@ from opentelemetry import trace
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest as PB2ExportTraceServiceRequest,
 )
-from opentelemetry.proto.collector.trace.v1.trace_service_pb2_grpc import TraceServiceStub
 from opentelemetry.proto.common.v1.common_pb2 import AnyValue as PB2AnyValue
 from opentelemetry.proto.common.v1.common_pb2 import ArrayValue as PB2ArrayValue
 from opentelemetry.proto.common.v1.common_pb2 import InstrumentationScope as PB2InstrumentationScope
@@ -29,7 +27,6 @@ from opentelemetry.trace import Span as ApiSpan
 from opentelemetry.trace.span import SpanContext, Status, TraceState
 from opentelemetry.util._decorator import _agnosticcontextmanager
 
-from otelmini._grpclib import GrpcExporter
 from otelmini._lib import Exporter, ExportResult, T
 
 if TYPE_CHECKING:
@@ -237,10 +234,10 @@ class HttpSpanExporter(Exporter[MiniSpan]):
         from urllib.parse import urlparse
 
         parsed_url = urlparse(self.endpoint)
-        conn = HTTPConnection(parsed_url.netloc, timeout=self.timeout)
         request = mk_trace_request(items)
         data = request.SerializeToString()
 
+        conn = HTTPConnection(parsed_url.netloc, timeout=self.timeout)
         conn.request("POST", parsed_url.path, data, {"Content-Type": "application/x-protobuf"})
         response = conn.getresponse()
         response.read()
@@ -249,45 +246,6 @@ class HttpSpanExporter(Exporter[MiniSpan]):
         if response.status == 200:
             return ExportResult.SUCCESS
         return ExportResult.FAILURE
-
-
-class GrpcSpanExporter(Exporter[MiniSpan]):
-    def __init__(self, addr="127.0.0.1:4317", max_retries=3, channel_provider=None, sleep=time.sleep):
-        self.addr = addr
-        self.max_retries = max_retries
-        self.channel_provider = channel_provider
-        self.sleep = sleep
-        self.exporter = None
-        self.init_grpc()  # this would need to be called lazily for this class to be serializable for multiprocessing
-
-    def init_grpc(self):
-        if self.exporter:
-            return
-        self.exporter = GrpcExporter(
-            addr=self.addr,
-            max_retries=self.max_retries,
-            channel_provider=self.channel_provider,
-            sleep=self.sleep,
-            stub_class=TraceServiceStub,
-            response_handler=handle_trace_response,
-        )
-        self.exporter.connect()
-
-    def export(self, spans: Sequence[MiniSpan]) -> ExportResult:
-        req = mk_trace_request(spans)
-        return self.exporter.export_request(req)
-
-    def force_flush(self, timeout_millis: int = 30000) -> bool:
-        return self.exporter.force_flush(timeout_millis)
-
-    def shutdown(self) -> None:
-        if self.exporter is not None:
-            self.exporter.shutdown()
-            self.exporter = None
-
-    def __setstate__(self, state):
-        self.__dict__.update(state)
-        # self.init_grpc()  # this would have to be called for this class to wake up after being deserialized
 
 
 class Resource:

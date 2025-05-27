@@ -6,8 +6,6 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Generic, Sequence, TypeVar
 
-from grpc import StatusCode
-
 T = TypeVar("T")
 _pylogger = logging.getLogger(__package__)
 
@@ -51,15 +49,3 @@ class ExponentialBackoff:
         def __init__(self, last_exception):
             super().__init__("Maximum retries reached")
             self.last_exception = last_exception
-
-
-def _is_retryable(status_code: StatusCode):
-    return status_code in [
-        StatusCode.CANCELLED,
-        StatusCode.DEADLINE_EXCEEDED,
-        StatusCode.RESOURCE_EXHAUSTED,
-        StatusCode.ABORTED,
-        StatusCode.OUT_OF_RANGE,
-        StatusCode.UNAVAILABLE,
-        StatusCode.DATA_LOSS,
-    ]
