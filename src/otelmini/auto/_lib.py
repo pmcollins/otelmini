@@ -4,7 +4,7 @@ from typing import Optional
 
 from opentelemetry import trace
 
-from otelmini.log import BatchLogRecordProcessor, GrpcLogExporter, LoggerProvider, OtelBridgeHandler
+from otelmini.log import BatchLogRecordProcessor, GrpcLogExporter, LoggerProvider, OtelBridgeLoggingHandler
 from otelmini.processor import BatchProcessor
 from otelmini.trace import GrpcSpanExporter, MiniTracerProvider
 
@@ -62,7 +62,7 @@ class AutoInstrumentationManager:
     def __init__(self, env: Env):
         self.tracer_provider: Optional[MiniTracerProvider] = None
         self.logger_provider: Optional[LoggerProvider] = None
-        self.otel_handler: Optional[OtelBridgeHandler] = None
+        self.otel_logging_handler: Optional[OtelBridgeLoggingHandler] = None
         self.root_logger: Optional[logging.Logger] = None
         self.config = Config(env)
 
@@ -82,8 +82,8 @@ class AutoInstrumentationManager:
             exporter = GrpcLogExporter()
 
         self.logger_provider = LoggerProvider([BatchLogRecordProcessor(exporter)])
-        self.otel_handler = OtelBridgeHandler(self.logger_provider)
-        self.root_logger.addHandler(self.otel_handler)
+        self.otel_logging_handler = OtelBridgeLoggingHandler(self.logger_provider)
+        self.root_logger.addHandler(self.otel_logging_handler)
 
         self.set_up_console_logging()
 
@@ -100,5 +100,5 @@ class AutoInstrumentationManager:
         if self.logger_provider:
             self.logger_provider.shutdown()
 
-        if self.otel_handler and self.root_logger:
-            self.root_logger.removeHandler(self.otel_handler)
+        if self.otel_logging_handler and self.root_logger:
+            self.root_logger.removeHandler(self.otel_logging_handler)

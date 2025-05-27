@@ -268,7 +268,7 @@ def _get_severity_number(levelno):
     return SeverityNumber.TRACE
 
 
-class OtelBridgeHandler(logging.Handler):
+class OtelBridgeLoggingHandler(logging.Handler):
     def __init__(self, logger_provider, level=logging.NOTSET):
         super().__init__(level=level)
         self.logger_provider = logger_provider

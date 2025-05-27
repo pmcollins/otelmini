@@ -3,7 +3,7 @@ import pytest
 import os
 
 from otelmini.auto import set_up_logging, manager
-from otelmini.log import BatchLogRecordProcessor, ConsoleLogExporter, LoggerProvider, OtelBridgeHandler
+from otelmini.log import BatchLogRecordProcessor, ConsoleLogExporter, LoggerProvider, OtelBridgeLoggingHandler
 
 
 @pytest.fixture(autouse=True)
@@ -34,7 +34,7 @@ def test_set_up_logging(root_logger):
     otel_handler = None
     stream_handler = None
     for handler in root_logger.handlers:
-        if isinstance(handler, OtelBridgeHandler):
+        if isinstance(handler, OtelBridgeLoggingHandler):
             otel_handler = handler
         elif isinstance(handler, logging.StreamHandler):
             stream_handler = handler
@@ -64,6 +64,6 @@ def test_set_up_logging_with_existing_handlers(root_logger):
 
     # Verify our handlers exist
     assert existing_handler in root_logger.handlers
-    assert any(isinstance(h, OtelBridgeHandler) for h in root_logger.handlers)
+    assert any(isinstance(h, OtelBridgeLoggingHandler) for h in root_logger.handlers)
     assert any(isinstance(h, logging.StreamHandler) and h != existing_handler for h in root_logger.handlers)
 
