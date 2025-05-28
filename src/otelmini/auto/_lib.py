@@ -6,7 +6,7 @@ from opentelemetry import trace
 
 from otelmini.log import BatchLogRecordProcessor, GrpcLogExporter, LoggerProvider, OtelBridgeLoggingHandler
 from otelmini.processor import BatchProcessor
-from otelmini.trace import GrpcSpanExporter, MiniTracerProvider
+from otelmini.trace import MiniTracerProvider, HttpSpanExporter
 
 pylogger = logging.getLogger(__package__)
 OTEL_MINI_LOG_FORMAT = "OTEL_MINI_LOG_FORMAT"
@@ -69,7 +69,7 @@ class AutoInstrumentationManager:
     def set_up_tracing(self):
         self.tracer_provider = MiniTracerProvider(
             BatchProcessor(
-                GrpcSpanExporter(),
+                HttpSpanExporter(),
                 batch_size=144,
                 interval_seconds=12,
             )

@@ -4,7 +4,9 @@ from typing import Mapping, Optional, Sequence
 
 from opentelemetry import trace
 
-from otelmini.auto import set_up_tracing
+from otelmini._grpclib import GrpcSpanExporter
+from otelmini.processor import BatchProcessor
+from otelmini.trace import MiniTracerProvider
 
 
 class TraceOtelTest:
@@ -12,7 +14,7 @@ class TraceOtelTest:
         return {}
 
     def requirements(self) -> Sequence[str]:
-        return ((str(Path(__file__).resolve().parent.parent)),)
+        return ((str(Path(__file__).resolve().parent.parent)) + "[grpc]",)
 
     def wrapper_command(self) -> str:
         return ""
@@ -29,7 +31,14 @@ class TraceOtelTest:
 
 
 if __name__ == "__main__":
-    set_up_tracing()
+    tracer_provider = MiniTracerProvider(
+        BatchProcessor(
+            GrpcSpanExporter(),
+            batch_size=144,
+            interval_seconds=12,
+        )
+    )
+    trace.set_tracer_provider(tracer_provider)
     tracer = trace.get_tracer(__name__)
     for i in range(12):
         with tracer.start_as_current_span("foo"):

@@ -26,8 +26,12 @@ classifiers = [
 dependencies = [
   "opentelemetry-api",
   "opentelemetry-proto",
-#  "grpcio",
   "googleapis-common-protos",
+]
+
+[project.optional-dependencies]
+grpc = [
+  "grpcio",
 ]
 
 [project.urls]

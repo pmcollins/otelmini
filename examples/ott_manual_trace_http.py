@@ -13,7 +13,7 @@ class OtelTest:
         return {}
 
     def requirements(self) -> Sequence[str]:
-        return ((str(Path(__file__).resolve().parent.parent)),)
+        return (str(Path(__file__).resolve().parent.parent) + "[grpc]",)
 
     def wrapper_command(self) -> str:
         return ""
@@ -26,7 +26,9 @@ class OtelTest:
         return None
 
     def on_stop(self, tel, stdout: str, stderr: str, returncode: int) -> None:
-        print("stopped")
+        from oteltest.telemetry import count_spans
+
+        assert count_spans(tel)
 
 
 if __name__ == "__main__":
