@@ -9,7 +9,7 @@ from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceResponse,
 )
 
-from otelmini._lib import ExponentialBackoff, ExportResult
+from otelmini._lib import Retrier, ExportResult
 from otelmini._grpclib import GrpcExporter
 from otelmini.processor import Timer
 from otelmini.trace import GrpcSpanExporter, MiniSpan, Resource, InstrumentationScope, SpanContext
@@ -25,14 +25,14 @@ def test_stubborn_runner():
 def test_backoff_eventual_success():
     greeter = StubbornRunner(2, lambda: "hello")
     f = FakeSleeper()
-    backoff = ExponentialBackoff(max_retries=2, sleep=f.sleep)
+    backoff = Retrier(max_retries=2, sleep=f.sleep)
     assert backoff.retry(lambda: greeter.attempt()) == "hello"
     assert f.sleeps == [1, 2]
 
 
 def test_backoff_eventual_failure():
-    backoff = ExponentialBackoff(max_retries=1, sleep=FakeSleeper().sleep)
-    with pytest.raises(ExponentialBackoff.MaxAttemptsError):
+    backoff = Retrier(max_retries=1, sleep=FakeSleeper().sleep)
+    with pytest.raises(Retrier.MaxAttemptsError):
         greeter = StubbornRunner(2, lambda: "hello")
         backoff.retry(lambda: greeter.attempt())
 
@@ -46,7 +46,7 @@ def test_backoff_should_retry():
             return self.status_code
 
     sleeper = FakeSleeper()
-    backoff = ExponentialBackoff(
+    backoff = Retrier(
         max_retries=2,
         sleep=sleeper.sleep,
         should_retry=lambda e: e.code() in [StatusCode.UNAVAILABLE],

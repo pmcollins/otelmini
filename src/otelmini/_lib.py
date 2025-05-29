@@ -21,7 +21,7 @@ class ExportResult(Enum):
     SUCCESS = 1
 
 
-class ExponentialBackoff:
+class Retrier:
     def __init__(self, max_retries, base_seconds=1, sleep=time.sleep, exceptions=(Exception,), should_retry=lambda _: True):
         self.max_retries = max_retries
         self.base_seconds = base_seconds
@@ -42,7 +42,7 @@ class ExponentialBackoff:
                     _pylogger.warning("Retry will sleep %d seconds", seconds)
                     self.sleep(seconds)
                 else:
-                    raise ExponentialBackoff.MaxAttemptsError(e) from e
+                    raise Retrier.MaxAttemptsError(e) from e
         return None
 
     class MaxAttemptsError(Exception):

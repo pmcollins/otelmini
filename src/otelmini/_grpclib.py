@@ -7,7 +7,7 @@ from typing import Any, Callable, Generic, Optional, TypeVar, Sequence
 from grpc import insecure_channel, RpcError, StatusCode
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2_grpc import TraceServiceStub
 
-from otelmini._lib import ExponentialBackoff, ExportResult, Exporter
+from otelmini._lib import Retrier, ExportResult, Exporter
 from otelmini.trace import MiniSpan, handle_trace_response, mk_trace_request
 
 _logger = logging.getLogger(__package__)
@@ -41,16 +41,16 @@ class GrpcExporter(Generic[R, S]):
         self.channel_provider = channel_provider if channel_provider else lambda: insecure_channel(addr)
         self.stub_class = stub_class
         self.response_handler = response_handler if response_handler else lambda _: None
-        self.backoff = ExponentialBackoff(max_retries, exceptions=(RpcError,), sleep=sleep)
+        self.retrier = Retrier(max_retries, exceptions=(RpcError,), sleep=sleep)
 
         self.channel = None
         self.client = None
 
     def export_request(self, req: R) -> Any:
         try:
-            resp = self.backoff.retry(GrpcExporter.SingleReqExporter(self, req).export)
+            resp = self.retrier.retry(GrpcExporter.SingleReqExporter(self, req).export)
             self.response_handler(resp)
-        except ExponentialBackoff.MaxAttemptsError:
+        except Retrier.MaxAttemptsError:
             return ExportResult.FAILURE
         else:
             return ExportResult.SUCCESS
