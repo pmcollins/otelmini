@@ -4,9 +4,8 @@ from typing import Mapping, Optional, Sequence
 
 from opentelemetry import trace
 
-from otelmini._grpclib import GrpcSpanExporter
 from otelmini.processor import BatchProcessor
-from otelmini.trace import MiniTracerProvider
+from otelmini.trace import MiniTracerProvider, GrpcSpanExporter
 
 
 class TraceOtelTest:
@@ -27,7 +26,9 @@ class TraceOtelTest:
         return None
 
     def on_stop(self, tel, stdout: str, stderr: str, returncode: int) -> None:
-        print("stopped")
+        from oteltest.telemetry import count_spans
+
+        assert count_spans(tel)
 
 
 if __name__ == "__main__":

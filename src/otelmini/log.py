@@ -124,7 +124,6 @@ class GrpcLogExporter(LogRecordExporter):
             channel_provider=self.channel_provider,
             sleep=self.sleep,
             stub_class=LogsServiceStub,
-            response_handler=handle_log_response,
         )
         self.exporter.connect()
 
@@ -306,13 +305,6 @@ def mk_log_request(logs: Sequence[MiniLogRecord]) -> PB2ExportLogsServiceRequest
             )
         )
     return req
-
-
-def handle_log_response(resp):
-    if resp.HasField("partial_success") and resp.partial_success:
-        ps = resp.partial_success
-        msg = f"partial success: rejected_log_records: [{ps.rejected_log_records_count}], error_message: [{ps.error_message}]"
-        logging.warning(msg)
 
 
 def encode_log_record(log_record: MiniLogRecord) -> PB2LogRecord:

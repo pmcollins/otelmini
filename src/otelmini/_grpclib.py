@@ -12,13 +12,8 @@ from otelmini.trace import MiniSpan, handle_trace_response, mk_trace_request
 
 _logger = logging.getLogger(__package__)
 
-# Generic type for different request types
-R = TypeVar("R")
-# Generic type for different response types
-S = TypeVar("S")
 
-
-class GrpcExporter(Generic[R, S]):
+class GrpcExporter:
     class SingleReqExporter:
         def __init__(self, exporter: GrpcExporter, req: Any):
             self.exporter = exporter
@@ -34,28 +29,24 @@ class GrpcExporter(Generic[R, S]):
         channel_provider: Optional[Callable[[], Any]] = None,
         sleep: Callable[[float], None] = time.sleep,
         stub_class: Any = None,
-        response_handler: Optional[Callable[[S], None]] = None,
     ):
-
         self.addr = addr
         self.channel_provider = channel_provider if channel_provider else lambda: insecure_channel(addr)
         self.stub_class = stub_class
-        self.response_handler = response_handler if response_handler else lambda _: None
         self.retrier = Retrier(max_retries, exceptions=(RpcError,), sleep=sleep)
 
         self.channel = None
         self.client = None
 
-    def export_request(self, req: R) -> Any:
+    def export_request(self, req) -> Any:
         try:
             resp = self.retrier.retry(GrpcExporter.SingleReqExporter(self, req).export)
-            self.response_handler(resp)
         except Retrier.MaxAttemptsError:
             return ExportResult.FAILURE
         else:
             return ExportResult.SUCCESS
 
-    def export_single_request(self, req: R) -> S:
+    def export_single_request(self, req):
         try:
             return self.client.Export(req)
         except RpcError as e:

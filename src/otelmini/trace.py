@@ -225,21 +225,20 @@ class MiniSpan(ApiSpan):
         )
 
 
-class HttpSpanExporter(Exporter[MiniSpan]):
-    def __init__(self, endpoint="http://localhost:4318/v1/traces", timeout=30):
-        self.endpoint = endpoint
-        self.timeout = timeout
-
-    def export(self, items: Sequence[MiniSpan]) -> ExportResult:
-        from http.client import HTTPConnection
+class HttpExporter:
+    def __init__(self, endpoint, timeout):
         from urllib.parse import urlparse
 
-        parsed_url = urlparse(self.endpoint)
-        request = mk_trace_request(items)
+        self.parsed_url = urlparse(endpoint)
+        self.timeout = timeout
+
+    def export(self, request):
+        from http.client import HTTPConnection
+
         data = request.SerializeToString()
 
-        conn = HTTPConnection(parsed_url.netloc, timeout=self.timeout)
-        conn.request("POST", parsed_url.path, data, {"Content-Type": "application/x-protobuf"})
+        conn = HTTPConnection(self.parsed_url.netloc, timeout=self.timeout)
+        conn.request("POST", self.parsed_url.path, data, {"Content-Type": "application/x-protobuf"})
         response = conn.getresponse()
         response.read()
         conn.close()
@@ -247,6 +246,15 @@ class HttpSpanExporter(Exporter[MiniSpan]):
         if response.status == 200:
             return ExportResult.SUCCESS
         return ExportResult.FAILURE
+
+
+class HttpSpanExporter(Exporter[MiniSpan]):
+    def __init__(self, endpoint="http://localhost:4318/v1/traces", timeout=30):
+        self._exporter = HttpExporter(endpoint, timeout)
+
+    def export(self, items: Sequence[MiniSpan]) -> ExportResult:
+        request = mk_trace_request(items)
+        return self._exporter.export(request)
 
 
 class GrpcSpanExporter(Exporter[MiniSpan]):
@@ -270,7 +278,6 @@ class GrpcSpanExporter(Exporter[MiniSpan]):
             channel_provider=self.channel_provider,
             sleep=self.sleep,
             stub_class=TraceServiceStub,
-            response_handler=handle_trace_response,
         )
         self.exporter.connect()
 
