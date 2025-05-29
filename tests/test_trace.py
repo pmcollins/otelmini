@@ -37,17 +37,25 @@ def test_backoff_eventual_failure():
         backoff.retry(lambda: greeter.attempt())
 
 
-def test_backoff_abort_retry():
-    def should_retry(e: RpcError):
-        if hasattr(e, "code") and e.code:
-            return e.code() in [StatusCode.UNAVAILABLE]
-        return True
+def test_backoff_should_retry():
+    class FakeRpcError(RpcError):
+        def __init__(self, status_code):
+            self.status_code = status_code
 
-    def my_function():
-        raise RpcError()
+        def code(self):
+            return self.status_code
 
-    backoff = ExponentialBackoff(max_retries=1, sleep=FakeSleeper().sleep, should_retry=should_retry)
-    backoff.retry(my_function)
+    sleeper = FakeSleeper()
+    backoff = ExponentialBackoff(
+        max_retries=2,
+        sleep=sleeper.sleep,
+        should_retry=lambda e: e.code() in [StatusCode.UNAVAILABLE],
+        exceptions=(RpcError,)
+    )
+
+    r = StubbornRunner(1, lambda: print("request"), FakeRpcError(StatusCode.UNAVAILABLE))
+    backoff.retry(r.attempt)
+    assert sleeper.sleeps == [1]
 
 
 def test_faked_exporter_with_retry_then_success():
