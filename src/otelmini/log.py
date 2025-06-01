@@ -129,7 +129,7 @@ class GrpcLogExporter(LogRecordExporter):
 
     def export(self, logs: Sequence[MiniLogRecord]) -> ExportResult:
         req = mk_log_request(logs)
-        return self.exporter.export_request(req)
+        return self.exporter.export(req)
 
     def force_flush(self, timeout_millis: Optional[int] = None) -> bool:
         return self.exporter.force_flush(timeout_millis)

@@ -1,15 +1,19 @@
 import logging
+import pickle
 import threading
 import time
 
 import pytest
+from grpc import RpcError, StatusCode
+from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest, \
+    ExportTraceServiceResponse
 from oteltest.sink import GrpcSink
 from oteltest.sink.handler import AccumulatingHandler
 from oteltest.telemetry import count_spans
 
-from tests._lib import mk_span
-from otelmini._lib import ExportResult
+from otelmini._lib import ExportResult, Retrier
 from otelmini.trace import GrpcSpanExporter
+from tests._lib import mk_span, FakeSleeper, StubbornRunner
 
 # run e.g. `pytest --log-cli-level=INFO`
 # to see log statements during tests
@@ -105,8 +109,71 @@ def test_exporter_w_alternating_server_availability():
     logger.info("Sink OFF")
 
 
-class SingleExportAsyncRunner:
+def test_backoff_should_retry():
+    sleeper = FakeSleeper()
+    retrier = Retrier(max_retries=2, sleep=sleeper.sleep)
 
+    r = StubbornRunner(1, lambda: print("request"))
+    retrier.retry(r.attempt)
+    assert sleeper.sleeps == [1]
+
+
+def test_faked_exporter_with_retry_then_success():
+    sleeper = FakeSleeper()
+    channel = FakeChannel(3)
+    exporter = GrpcSpanExporter(channel_provider=lambda: channel, sleep=sleeper.sleep)
+    spans = [mk_span("my-span")]
+    resp = exporter.export(spans)
+    assert resp == ExportResult.SUCCESS
+    assert len(channel.export_requests) == 4
+
+
+def test_faked_exporter_with_retry_failure():
+    sleeper = FakeSleeper()
+    channel = FakeChannel(4)
+    exporter = GrpcSpanExporter(channel_provider=lambda: channel, sleep=sleeper.sleep)
+    spans = [mk_span("my-span")]
+    resp = exporter.export(spans)
+    assert resp == ExportResult.FAILURE
+    assert len(channel.export_requests) == 4
+
+
+def disabled_test_span_exporter_pickleable():
+    exporter = GrpcSpanExporter(
+        addr="localhost:4317",
+        max_retries=5
+    )
+
+    pickled = pickle.dumps(exporter)
+    unpickled = pickle.loads(pickled)
+
+    assert unpickled.addr == "localhost:4317"
+    assert unpickled.max_retries == 5
+
+    unpickled.shutdown()
+
+
+class FakeChannel:
+    def __init__(self, failed_attempts_before_success):
+        self.failed_attempts_before_success = failed_attempts_before_success
+        self.attempts = 0
+        self.export_requests = []
+
+    def unary_unary(self, *args, **kwargs):
+        def export_func(req: ExportTraceServiceRequest):
+            self.export_requests.append(req)
+            self.attempts += 1
+            if self.attempts <= self.failed_attempts_before_success:
+                raise FakeRpcError(StatusCode.UNAVAILABLE)
+            return ExportTraceServiceResponse()
+
+        return export_func
+
+    def close(self):
+        pass
+
+
+class SingleExportAsyncRunner:
     def __init__(self):
         self.result = None
         self.thread = threading.Thread(target=self._run)
@@ -122,3 +189,10 @@ class SingleExportAsyncRunner:
         self.thread.join()
         return self.result
 
+
+class FakeRpcError(RpcError):
+    def __init__(self, status_code):
+        self.status_code = status_code
+
+    def code(self):
+        return self.status_code

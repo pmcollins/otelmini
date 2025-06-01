@@ -4,7 +4,9 @@ import logging
 import time
 import typing
 from collections import defaultdict
+from http.client import HTTPConnection, TOO_MANY_REQUESTS, BAD_GATEWAY, SERVICE_UNAVAILABLE, GATEWAY_TIMEOUT, OK
 from typing import TYPE_CHECKING, Any, Iterator, Mapping, Optional, Sequence
+from urllib.parse import urlparse
 
 from opentelemetry import trace
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
@@ -28,7 +30,7 @@ from opentelemetry.trace import Span as ApiSpan
 from opentelemetry.trace.span import SpanContext, Status, TraceState
 from opentelemetry.util._decorator import _agnosticcontextmanager
 
-from otelmini._lib import Exporter, ExportResult, T
+from otelmini._lib import Exporter, ExportResult, Retrier, SingleAttemptResult, RetrierResult
 
 if TYPE_CHECKING:
     from opentelemetry.context import Context
@@ -225,32 +227,43 @@ class MiniSpan(ApiSpan):
         )
 
 
-class HttpExporter:
-    def __init__(self, endpoint, timeout):
-        from urllib.parse import urlparse
+class _HttpExporter:
+    class SingleHttpAttempt:
+        def __init__(self, request, parsed_url, timeout):
+            self.request = request
+            self.parsed_url = parsed_url
+            self.timeout = timeout
 
+        def export(self):
+            data = self.request.SerializeToString()
+
+            conn = HTTPConnection(self.parsed_url.netloc, timeout=self.timeout)
+            conn.request("POST", self.parsed_url.path, data, {"Content-Type": "application/x-protobuf"})
+            response = conn.getresponse()
+            response.read()
+            conn.close()
+
+            if response.status == OK:
+                return SingleAttemptResult.SUCCESS
+            elif response.status in [TOO_MANY_REQUESTS, BAD_GATEWAY, SERVICE_UNAVAILABLE, GATEWAY_TIMEOUT]:
+                return SingleAttemptResult.RETRY
+            else:
+                return SingleAttemptResult.FAILURE
+
+    def __init__(self, endpoint, timeout):
         self.parsed_url = urlparse(endpoint)
         self.timeout = timeout
+        self.retrier = Retrier(4)
 
     def export(self, request):
-        from http.client import HTTPConnection
-
-        data = request.SerializeToString()
-
-        conn = HTTPConnection(self.parsed_url.netloc, timeout=self.timeout)
-        conn.request("POST", self.parsed_url.path, data, {"Content-Type": "application/x-protobuf"})
-        response = conn.getresponse()
-        response.read()
-        conn.close()
-
-        if response.status == 200:
-            return ExportResult.SUCCESS
-        return ExportResult.FAILURE
+        attempt = _HttpExporter.SingleHttpAttempt(request, self.parsed_url, self.timeout)
+        retry_result = self.retrier.retry(attempt.export)
+        return ExportResult.SUCCESS if retry_result == RetrierResult.SUCCESS else ExportResult.FAILURE
 
 
 class HttpSpanExporter(Exporter[MiniSpan]):
     def __init__(self, endpoint="http://localhost:4318/v1/traces", timeout=30):
-        self._exporter = HttpExporter(endpoint, timeout)
+        self._exporter = _HttpExporter(endpoint, timeout)
 
     def export(self, items: Sequence[MiniSpan]) -> ExportResult:
         request = mk_trace_request(items)
@@ -282,8 +295,9 @@ class GrpcSpanExporter(Exporter[MiniSpan]):
         self.exporter.connect()
 
     def export(self, spans: Sequence[MiniSpan]) -> ExportResult:
+        self.init_grpc()
         req = mk_trace_request(spans)
-        return self.exporter.export_request(req)
+        return self.exporter.export(req)
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
         return self.exporter.force_flush(timeout_millis)
@@ -319,12 +333,6 @@ class Resource:
         self._schema_url = state["schema_url"]
         self._attributes = state["attributes"]
 
-
-def handle_trace_response(resp):
-    if resp.HasField("partial_success") and resp.partial_success:
-        ps = resp.partial_success
-        msg = f"partial success: rejected_spans: [{ps.rejected_spans}], error_message: [{ps.error_message}]"
-        _pylogger.warning(msg)
 
 
 def mk_trace_request(spans: Sequence[MiniSpan]) -> PB2ExportTraceServiceRequest:

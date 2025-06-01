@@ -2,82 +2,110 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any, Callable, Generic, Optional, TypeVar, Sequence
+from typing import Any, Callable, Optional
 
 from grpc import insecure_channel, RpcError, StatusCode
-from opentelemetry.proto.collector.trace.v1.trace_service_pb2_grpc import TraceServiceStub
 
-from otelmini._lib import Retrier, ExportResult, Exporter
-from otelmini.trace import MiniSpan, handle_trace_response, mk_trace_request
+from otelmini._lib import Retrier, ExportResult, SingleAttemptResult, RetrierResult
 
 _logger = logging.getLogger(__package__)
 
 
-class GrpcExporter:
-    class SingleReqExporter:
-        def __init__(self, exporter: GrpcExporter, req: Any):
-            self.exporter = exporter
-            self.req = req
-
-        def export(self) -> Any:
-            return self.exporter.export_single_request(self.req)
-
+class GrpcConnectionManager:
     def __init__(
         self,
         addr: str = "127.0.0.1:4317",
-        max_retries: int = 3,
         channel_provider: Optional[Callable[[], Any]] = None,
-        sleep: Callable[[float], None] = time.sleep,
-        stub_class: Any = None,
     ):
         self.addr = addr
         self.channel_provider = channel_provider if channel_provider else lambda: insecure_channel(addr)
-        self.stub_class = stub_class
-        self.retrier = Retrier(max_retries, exceptions=(RpcError,), sleep=sleep)
-
         self.channel = None
         self.client = None
+        self.stub_class = None
 
-    def export_request(self, req) -> Any:
-        try:
-            resp = self.retrier.retry(GrpcExporter.SingleReqExporter(self, req).export)
-        except Retrier.MaxAttemptsError:
-            return ExportResult.FAILURE
-        else:
-            return ExportResult.SUCCESS
-
-    def export_single_request(self, req):
-        try:
-            return self.client.Export(req)
-        except RpcError as e:
-            self._handle_export_failure(e)
-            raise
-
-    def force_flush(self, timeout_millis: int = 30000) -> bool:
-        return False
-
-    def _handle_export_failure(self, e: RpcError) -> None:
-        if hasattr(e, "code") and e.code:
-            status = e.code().name  # e.g. "UNAVAILABLE"
-            _logger.warning("Rpc error during export: status: %s", status)
-        else:
-            _logger.warning("Rpc error during export: %s", e)
-        # close the channel, even if not strictly necessary
-        self.shutdown()
-        # if the export failed (e.g. because the server is unavailable) reconnect
-        # otherwise later attempts will continue to fail even when the server comes back up
-        self.connect()
-
-    def connect(self) -> None:
-        self.channel = self.channel_provider()
+    def connect(self, stub_class: Any = None) -> None:
+        if stub_class is not None:
+            self.stub_class = stub_class
+        if self.channel is None:
+            self.channel = self.channel_provider()
+        if self.stub_class is None:
+            raise ValueError("stub_class must be provided for the first connection")
         self.client = self.stub_class(self.channel)
 
     def shutdown(self) -> None:
-        # causes no network transmission
         if self.channel:
             self.channel.close()
         self.channel = None
         self.client = None
+
+    def export(self, req: Any) -> Any:
+        return self.client.Export(req)
+
+    def handle_retryable_error(self):
+        self.shutdown()
+        self.connect()
+
+
+class GrpcExporter:
+    class SingleGrpcAttempt:
+        def __init__(self, connection_manager: GrpcConnectionManager, req: Any):
+            self.connection_manager = connection_manager
+            self.req = req
+
+        def export(self) -> Any:
+            try:
+                response = self.connection_manager.export(self.req)
+                return self._handle_response(response)
+            except RpcError as e:
+                if _is_retryable(e.code()):
+                    return self._handle_retryable_error(e)
+                return SingleAttemptResult.FAILURE
+
+        def _handle_response(self, response: Any) -> SingleAttemptResult:
+            from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceResponse
+            if isinstance(response, ExportTraceServiceResponse):
+                return SingleAttemptResult.SUCCESS
+            return SingleAttemptResult.FAILURE
+
+        def _handle_retryable_error(self, e: RpcError) -> SingleAttemptResult:
+            self.connection_manager.handle_retryable_error()
+            return SingleAttemptResult.RETRY
+
+    def __init__(
+            self,
+            addr: str = "127.0.0.1:4317",
+            max_retries: int = 3,
+            channel_provider: Optional[Callable[[], Any]] = None,
+            sleep: Callable[[float], None] = time.sleep,
+            stub_class: Any = None,
+    ):
+        self.addr = addr
+        self.connection_manager = GrpcConnectionManager(addr, channel_provider)
+        self.stub_class = stub_class
+        if stub_class is not None:
+            self.connection_manager.stub_class = stub_class
+        self.retrier = Retrier(max_retries, sleep=sleep)
+
+    def connect(self) -> None:
+        self.connection_manager.connect(self.stub_class)
+
+    def export(self, req) -> Any:
+        # Ensure connection is established with stub_class before exporting
+        if self.connection_manager.stub_class is None:
+            self.connect()
+        single_req_exporter = GrpcExporter.SingleGrpcAttempt(self.connection_manager, req)
+        retry_result = self.retrier.retry(single_req_exporter.export)
+        return ExportResult.SUCCESS if retry_result == RetrierResult.SUCCESS else ExportResult.FAILURE
+
+    def force_flush(self, timeout_millis: int = 30000) -> bool:
+        return False
+
+    def reconnect(self, e: RpcError) -> None:
+        self.connection_manager.shutdown()
+        self.connect()
+
+    def shutdown(self) -> None:
+        self.connection_manager.shutdown()
 
 
 def _is_retryable(status_code: StatusCode):
@@ -90,4 +118,3 @@ def _is_retryable(status_code: StatusCode):
         StatusCode.UNAVAILABLE,
         StatusCode.DATA_LOSS,
     ]
-

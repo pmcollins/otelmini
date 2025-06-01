@@ -111,7 +111,7 @@ class GrpcMetricExporter(Exporter):
 
     def export(self, metrics: Sequence[Metric]) -> MetricExportResult:
         req = mk_metric_request(metrics)
-        return self.exporter.export_request(req)
+        return self.exporter.export(req)
 
     def force_flush(self, timeout_millis: float = 10_000) -> bool:
         return self.exporter.force_flush(timeout_millis)
