@@ -9,5 +9,5 @@ def set_up_tracing():
     manager.set_up_tracing()
 
 
-def set_up_logging(exporter=None):
-    manager.set_up_logging(exporter)
+def set_up_logging():
+    manager.set_up_logging()

@@ -4,7 +4,8 @@ from typing import Optional
 
 from opentelemetry import trace
 
-from otelmini.log import BatchLogRecordProcessor, GrpcLogExporter, LoggerProvider, OtelBridgeLoggingHandler
+from otelmini.log import BatchLogRecordProcessor, GrpcLogExporter, LoggerProvider, OtelBridgeLoggingHandler, \
+    HttpLogExporter
 from otelmini.processor import BatchProcessor
 from otelmini.trace import HttpSpanExporter, MiniTracerProvider
 
@@ -77,7 +78,7 @@ class AutoInstrumentationManager:
 
     def set_up_logging(self):
         self.root_logger = logging.getLogger()
-        self.logger_provider = LoggerProvider([BatchLogRecordProcessor(GrpcLogExporter())])
+        self.logger_provider = LoggerProvider([BatchLogRecordProcessor(HttpLogExporter())])
         self.otel_logging_handler = OtelBridgeLoggingHandler(self.logger_provider)
         self.root_logger.addHandler(self.otel_logging_handler)
 

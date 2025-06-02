@@ -6,9 +6,9 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Optional, Sequence
 
+from opentelemetry._logs import LogRecord as ApiLogRecord
 from opentelemetry._logs import Logger as ApiLogger
 from opentelemetry._logs import LoggerProvider as ApiLoggerProvider
-from opentelemetry._logs import LogRecord as ApiLogRecord
 from opentelemetry._logs import SeverityNumber
 from opentelemetry.proto.collector.logs.v1.logs_service_pb2 import (
     ExportLogsServiceRequest as PB2ExportLogsServiceRequest,
@@ -19,11 +19,8 @@ from opentelemetry.proto.logs.v1.logs_pb2 import LogRecord as PB2LogRecord
 from opentelemetry.proto.logs.v1.logs_pb2 import ResourceLogs as PB2ResourceLogs
 from opentelemetry.proto.logs.v1.logs_pb2 import ScopeLogs as PB2ScopeLogs
 
-from otelmini._grpclib import GrpcExporter
-from otelmini._lib import Exporter, ExportResult, Retrier, RetrierResult, SingleAttemptResult, _HttpExporter
+from otelmini._lib import Exporter, ExportResult, _HttpExporter
 from otelmini.processor import BatchProcessor, Processor
-from http.client import BAD_GATEWAY, GATEWAY_TIMEOUT, OK, SERVICE_UNAVAILABLE, TOO_MANY_REQUESTS, HTTPConnection
-from urllib.parse import urlparse
 
 if TYPE_CHECKING:
     from opentelemetry.trace import TraceFlags
@@ -119,6 +116,7 @@ class GrpcLogExporter(LogRecordExporter):
     def init_grpc(self):
         try:
             from opentelemetry.proto.collector.logs.v1.logs_service_pb2_grpc import LogsServiceStub
+            from otelmini._grpclib import GrpcExporter
         except ImportError as err:
             raise GrpcLogExporterImportError from err
 
