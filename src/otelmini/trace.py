@@ -192,7 +192,6 @@ class MiniSpan(ApiSpan):
         self._on_end_callback(self)
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert a MiniSpan to a serializable dictionary."""
         return {
             "name": self.get_name(),
             "span_context": self.get_span_context(),
@@ -209,15 +208,6 @@ class MiniSpan(ApiSpan):
 
     @classmethod
     def from_dict(cls, data: dict[str, Any], on_end_callback: typing.Callable[[MiniSpan], None]) -> MiniSpan:
-        """Create a MiniSpan instance from a dictionary representation.
-        
-        Args:
-            data: Dictionary containing span data
-            on_end_callback: Callback function to be called when the span ends
-            
-        Returns:
-            A new MiniSpan instance
-        """
         return cls(
             name=data["name"],
             span_context=data["span_context"],
@@ -334,7 +324,6 @@ class Resource:
         self._attributes = state["attributes"]
 
 
-
 def mk_trace_request(spans: Sequence[MiniSpan]) -> PB2ExportTraceServiceRequest:
     return PB2ExportTraceServiceRequest(resource_spans=encode_resource_spans(spans))
 
@@ -432,21 +421,6 @@ def encode_attributes(
     else:
         pb2_attributes = None
     return pb2_attributes
-
-
-# def encode_events(events: Sequence[Event],) -> Optional[list[PB2SPan.Event]]:
-#     pb2_events = None
-#     if events:
-#         pb2_events = []
-#         for event in events:
-#             encoded_event = PB2SPan.Event(
-#                 name=event.name,
-#                 time_unix_nano=event.timestamp,
-#                 attributes=encode_attributes(event.attributes),
-#                 dropped_attributes_count=event.dropped_attributes,
-#             )
-#             pb2_events.append(encoded_event)
-#     return pb2_events
 
 
 def encode_links(links: Sequence[Link]) -> Sequence[PB2SPan.Link]:

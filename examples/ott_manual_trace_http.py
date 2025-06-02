@@ -28,7 +28,7 @@ class OtelTest:
     def on_stop(self, tel, stdout: str, stderr: str, returncode: int) -> None:
         from oteltest.telemetry import count_spans
 
-        assert count_spans(tel)
+        assert count_spans(tel) == 12
 
 
 if __name__ == "__main__":
