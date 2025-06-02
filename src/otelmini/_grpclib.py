@@ -5,6 +5,7 @@ import time
 from typing import Any, Callable, Optional
 
 from grpc import RpcError, StatusCode, insecure_channel
+from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceResponse
 
 from otelmini._lib import ExportResult, Retrier, RetrierResult, SingleAttemptResult
 
@@ -47,22 +48,15 @@ class GrpcExporter:
         def export(self) -> Any:
             try:
                 response = self.connection_manager.export(self.req)
-                return self._handle_response(response)
+
+                if isinstance(response, ExportTraceServiceResponse):
+                    return SingleAttemptResult.SUCCESS
+                return SingleAttemptResult.FAILURE
             except RpcError as e:
                 if _is_retryable(e.code()):
-                    return self._handle_retryable_error(e)
+                    self.connection_manager.handle_retryable_error()
+                    return SingleAttemptResult.RETRY
                 return SingleAttemptResult.FAILURE
-
-        def _handle_response(self, response: Any) -> SingleAttemptResult:
-            from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceResponse
-
-            if isinstance(response, ExportTraceServiceResponse):
-                return SingleAttemptResult.SUCCESS
-            return SingleAttemptResult.FAILURE
-
-        def _handle_retryable_error(self, e: RpcError) -> SingleAttemptResult:
-            self.connection_manager.handle_retryable_error()
-            return SingleAttemptResult.RETRY
 
     def __init__(
         self,
