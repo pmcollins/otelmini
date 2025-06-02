@@ -106,7 +106,6 @@ class GrpcMetricExporter(Exporter):
             stub_class=MetricsServiceStub,
             response_handler=handle_metric_response,
         )
-        self.exporter.connect()
 
     def export(self, metrics: Sequence[Metric]) -> MetricExportResult:
         req = mk_metric_request(metrics)

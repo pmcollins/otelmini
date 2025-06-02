@@ -283,7 +283,6 @@ class GrpcSpanExporter(Exporter[MiniSpan]):
             sleep=self.sleep,
             stub_class=TraceServiceStub,
         )
-        self.exporter.connect()
 
     def export(self, spans: Sequence[MiniSpan]) -> ExportResult:
         self.init_grpc()

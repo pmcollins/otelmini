@@ -21,27 +21,22 @@ class GrpcConnectionManager:
         self.addr = addr
         self.channel_provider = channel_provider if channel_provider else lambda: insecure_channel(addr)
         self.stub_class = stub_class
-        self.channel = None
-        self.client = None
-
-    def connect(self):
-        if self.channel is None:
-            self.channel = self.channel_provider()
+        self.channel = self.channel_provider()
         self.client = self.stub_class(self.channel)
 
-    def shutdown(self) -> None:
-        if self.channel:
-            self.channel.close()
-        self.channel = None
-        self.client = None
+    def reconnect(self):
+        self.channel = self.channel_provider()
+        self.client = self.stub_class(self.channel)
 
     def export(self, req: Any) -> Any:
         return self.client.Export(req)
 
     def handle_retryable_error(self):
-        self.shutdown()
-        self.connect()
+        self.disconnect()
+        self.reconnect()
 
+    def disconnect(self):
+        self.channel.close()
 
 class GrpcExporter:
     class SingleGrpcAttempt:
@@ -81,9 +76,6 @@ class GrpcExporter:
         self.connection_manager = GrpcConnectionManager(stub_class, addr, channel_provider)
         self.retrier = Retrier(max_retries, sleep=sleep)
 
-    def connect(self) -> None:
-        self.connection_manager.connect()
-
     def export(self, req) -> Any:
         single_req_exporter = GrpcExporter.SingleGrpcAttempt(self.connection_manager, req)
         retry_result = self.retrier.retry(single_req_exporter.export)
@@ -92,12 +84,8 @@ class GrpcExporter:
     def force_flush(self, timeout_millis: int = 30000) -> bool:
         return False
 
-    def reconnect(self, e: RpcError) -> None:
-        self.connection_manager.shutdown()
-        self.connect()
-
     def shutdown(self) -> None:
-        self.connection_manager.shutdown()
+        self.connection_manager.disconnect()
 
 
 def _is_retryable(status_code: StatusCode):

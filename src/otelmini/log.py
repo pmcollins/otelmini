@@ -127,7 +127,6 @@ class GrpcLogExporter(LogRecordExporter):
             sleep=self.sleep,
             stub_class=LogsServiceStub,
         )
-        self.exporter.connect()
 
     def export(self, logs: Sequence[MiniLogRecord]) -> ExportResult:
         req = mk_log_request(logs)
