@@ -18,7 +18,6 @@ class GrpcConnectionManager:
         addr: str = "127.0.0.1:4317",
         channel_provider: Optional[Callable[[], Any]] = None,
     ):
-        self.addr = addr
         self.channel_provider = channel_provider if channel_provider else lambda: insecure_channel(addr)
         self.stub_class = stub_class
         self.channel = self.channel_provider()
