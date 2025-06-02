@@ -75,12 +75,9 @@ class AutoInstrumentationManager:
         )
         trace.set_tracer_provider(self.tracer_provider)
 
-    def set_up_logging(self, exporter=None):
+    def set_up_logging(self):
         self.root_logger = logging.getLogger()
-        if exporter is None:
-            exporter = GrpcLogExporter()
-
-        self.logger_provider = LoggerProvider([BatchLogRecordProcessor(exporter)])
+        self.logger_provider = LoggerProvider([BatchLogRecordProcessor(GrpcLogExporter())])
         self.otel_logging_handler = OtelBridgeLoggingHandler(self.logger_provider)
         self.root_logger.addHandler(self.otel_logging_handler)
 
