@@ -27,13 +27,13 @@ class LogsOtelTest:
     def on_stop(self, tel, stdout: str, stderr: str, returncode: int) -> None:
         from oteltest.telemetry import count_logs
 
-        assert count_logs(tel)
+        assert count_logs(tel) == 12
 
 
 if __name__ == "__main__":
     set_up_logging()
     logger = logging.getLogger()
-    for i in range(144):
+    for i in range(12):
         logger.warning(f"this is warning {i}")
         print(i)
-        time.sleep(0.1)
+        time.sleep(0.2)
