@@ -13,7 +13,7 @@ class OtelTest:
         return {}
 
     def requirements(self) -> Sequence[str]:
-        return (str(Path(__file__).resolve().parent.parent) + "[grpc]",)
+        return (str(Path(__file__).resolve().parent.parent),)
 
     def wrapper_command(self) -> str:
         return ""
