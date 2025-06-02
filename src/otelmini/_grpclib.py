@@ -12,27 +12,21 @@ _logger = logging.getLogger(__package__)
 
 
 class GrpcConnectionManager:
-    class StubClassRequiredError(ValueError):
-        """stub_class must be provided for the first connection"""
-
     def __init__(
-        self,
-        addr: str = "127.0.0.1:4317",
-        channel_provider: Optional[Callable[[], Any]] = None,
+            self,
+            stub_class,
+            addr: str = "127.0.0.1:4317",
+            channel_provider: Optional[Callable[[], Any]] = None,
     ):
         self.addr = addr
         self.channel_provider = channel_provider if channel_provider else lambda: insecure_channel(addr)
+        self.stub_class = stub_class
         self.channel = None
         self.client = None
-        self.stub_class = None
 
-    def connect(self, stub_class: Any = None) -> None:
-        if stub_class is not None:
-            self.stub_class = stub_class
+    def connect(self):
         if self.channel is None:
             self.channel = self.channel_provider()
-        if self.stub_class is None:
-            raise GrpcConnectionManager.StubClassRequiredError()
         self.client = self.stub_class(self.channel)
 
     def shutdown(self) -> None:
@@ -83,19 +77,13 @@ class GrpcExporter:
             stub_class: Any = None,
     ):
         self.addr = addr
-        self.connection_manager = GrpcConnectionManager(addr, channel_provider)
-        self.stub_class = stub_class
-        if stub_class is not None:
-            self.connection_manager.stub_class = stub_class
+        self.connection_manager = GrpcConnectionManager(stub_class, addr, channel_provider)
         self.retrier = Retrier(max_retries, sleep=sleep)
 
     def connect(self) -> None:
-        self.connection_manager.connect(self.stub_class)
+        self.connection_manager.connect()
 
     def export(self, req) -> Any:
-        # Ensure connection is established with stub_class before exporting
-        if self.connection_manager.stub_class is None:
-            self.connect()
         single_req_exporter = GrpcExporter.SingleGrpcAttempt(self.connection_manager, req)
         retry_result = self.retrier.retry(single_req_exporter.export)
         return ExportResult.SUCCESS if retry_result == RetrierResult.SUCCESS else ExportResult.FAILURE
