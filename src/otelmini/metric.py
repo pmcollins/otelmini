@@ -26,7 +26,6 @@ if TYPE_CHECKING:
     from opentelemetry.util.types import Attributes
 
 
-
 class MetricExportResult(Enum):
     SUCCESS = 0
     FAILURE = 1

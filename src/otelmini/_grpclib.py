@@ -13,10 +13,10 @@ _logger = logging.getLogger(__package__)
 
 class GrpcConnectionManager:
     def __init__(
-            self,
-            stub_class,
-            addr: str = "127.0.0.1:4317",
-            channel_provider: Optional[Callable[[], Any]] = None,
+        self,
+        stub_class,
+        addr: str = "127.0.0.1:4317",
+        channel_provider: Optional[Callable[[], Any]] = None,
     ):
         self.addr = addr
         self.channel_provider = channel_provider if channel_provider else lambda: insecure_channel(addr)
@@ -60,6 +60,7 @@ class GrpcExporter:
 
         def _handle_response(self, response: Any) -> SingleAttemptResult:
             from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceResponse
+
             if isinstance(response, ExportTraceServiceResponse):
                 return SingleAttemptResult.SUCCESS
             return SingleAttemptResult.FAILURE
@@ -69,12 +70,12 @@ class GrpcExporter:
             return SingleAttemptResult.RETRY
 
     def __init__(
-            self,
-            addr: str = "127.0.0.1:4317",
-            max_retries: int = 3,
-            channel_provider: Optional[Callable[[], Any]] = None,
-            sleep: Callable[[float], None] = time.sleep,
-            stub_class: Any = None,
+        self,
+        addr: str = "127.0.0.1:4317",
+        max_retries: int = 3,
+        channel_provider: Optional[Callable[[], Any]] = None,
+        sleep: Callable[[float], None] = time.sleep,
+        stub_class: Any = None,
     ):
         self.addr = addr
         self.connection_manager = GrpcConnectionManager(stub_class, addr, channel_provider)

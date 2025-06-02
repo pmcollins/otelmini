@@ -50,7 +50,6 @@ class Env:
 
 
 class Config:
-
     def __init__(self, env: Env):
         self.log_format = env.getval(OTEL_MINI_LOG_FORMAT, logging.BASIC_FORMAT)
 

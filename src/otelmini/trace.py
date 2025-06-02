@@ -48,11 +48,11 @@ class MiniTracerProvider(TracerProvider):
         self.span_processor = span_processor
 
     def get_tracer(
-            self,
-            instrumenting_module_name: str,
-            instrumenting_library_version: typing.Optional[str] = None,
-            schema_url: typing.Optional[str] = None,
-            attributes: typing.Optional[types.Attributes] = None,
+        self,
+        instrumenting_module_name: str,
+        instrumenting_library_version: typing.Optional[str] = None,
+        schema_url: typing.Optional[str] = None,
+        attributes: typing.Optional[types.Attributes] = None,
     ) -> MiniTracer:
         return MiniTracer(self.span_processor)
 
@@ -65,15 +65,15 @@ class MiniTracer(Tracer):
         self.span_processor = span_processor
 
     def start_span(
-            self,
-            name: str,
-            context: Optional[Context] = None,
-            kind: SpanKind = SpanKind.INTERNAL,
-            attributes: types.Attributes = None,
-            links: _Links = None,
-            start_time: Optional[int] = None,
-            record_exception: bool = True,  # noqa: FBT001, FBT002
-            set_status_on_exception: bool = True,  # noqa: FBT001, FBT002
+        self,
+        name: str,
+        context: Optional[Context] = None,
+        kind: SpanKind = SpanKind.INTERNAL,
+        attributes: types.Attributes = None,
+        links: _Links = None,
+        start_time: Optional[int] = None,
+        record_exception: bool = True,  # noqa: FBT001, FBT002
+        set_status_on_exception: bool = True,  # noqa: FBT001, FBT002
     ) -> ApiSpan:
         span = MiniSpan(
             name, SpanContext(0, 0, False), Resource(""), InstrumentationScope("", ""), self.span_processor.on_end
@@ -83,16 +83,16 @@ class MiniTracer(Tracer):
 
     @_agnosticcontextmanager
     def start_as_current_span(
-            self,
-            name: str,
-            context: Optional[Context] = None,
-            kind: SpanKind = SpanKind.INTERNAL,
-            attributes: types.Attributes = None,
-            links: _Links = None,
-            start_time: Optional[int] = None,
-            record_exception: bool = True,  # noqa: FBT001, FBT002
-            set_status_on_exception: bool = True,  # noqa: FBT001, FBT002
-            end_on_exit: bool = True,  # noqa: FBT001, FBT002
+        self,
+        name: str,
+        context: Optional[Context] = None,
+        kind: SpanKind = SpanKind.INTERNAL,
+        attributes: types.Attributes = None,
+        links: _Links = None,
+        start_time: Optional[int] = None,
+        record_exception: bool = True,  # noqa: FBT001, FBT002
+        set_status_on_exception: bool = True,  # noqa: FBT001, FBT002
+        end_on_exit: bool = True,  # noqa: FBT001, FBT002
     ) -> Iterator[ApiSpan]:
         span = self.start_span(name, context, kind, attributes, links, start_time, end_on_exit)
         with trace.use_span(span, end_on_exit=True) as active_span:
@@ -113,12 +113,12 @@ class InstrumentationScope:
 
 class MiniSpan(ApiSpan):
     def __init__(
-            self,
-            name: str,
-            span_context: SpanContext,
-            resource: Resource,
-            instrumentation_scope: InstrumentationScope,
-            on_end_callback: typing.Callable[[MiniSpan], None],
+        self,
+        name: str,
+        span_context: SpanContext,
+        resource: Resource,
+        instrumentation_scope: InstrumentationScope,
+        on_end_callback: typing.Callable[[MiniSpan], None],
     ):
         self._name = name
         self._span_context = span_context
@@ -180,11 +180,11 @@ class MiniSpan(ApiSpan):
         self._status_description = description
 
     def record_exception(
-            self,
-            exception: BaseException,
-            attributes: types.Attributes = None,
-            timestamp: typing.Optional[int] = None,
-            escaped: bool = False,  # noqa: FBT001, FBT002
+        self,
+        exception: BaseException,
+        attributes: types.Attributes = None,
+        timestamp: typing.Optional[int] = None,
+        escaped: bool = False,  # noqa: FBT001, FBT002
     ) -> None:
         self._events.append((exception.__class__.__name__, attributes, timestamp))
 
@@ -200,7 +200,7 @@ class MiniSpan(ApiSpan):
             "attributes": self._attributes,
             "events": self._events,
             "status": self._status,
-            "status_description": self._status_description
+            "status_description": self._status_description,
         }
 
     def __str__(self) -> str:
@@ -213,7 +213,7 @@ class MiniSpan(ApiSpan):
             span_context=data["span_context"],
             resource=data["resource"],
             instrumentation_scope=data["instrumentation_scope"],
-            on_end_callback=on_end_callback
+            on_end_callback=on_end_callback,
         )
 
 
@@ -275,6 +275,7 @@ class GrpcSpanExporter(Exporter[MiniSpan]):
         from opentelemetry.proto.collector.trace.v1.trace_service_pb2_grpc import TraceServiceStub
 
         from otelmini._grpclib import GrpcExporter
+
         self.exporter = GrpcExporter(
             addr=self.addr,
             max_retries=self.max_retries,
@@ -314,10 +315,7 @@ class Resource:
         return self._schema_url
 
     def __getstate__(self):
-        return {
-            "schema_url": self._schema_url,
-            "attributes": self._attributes
-        }
+        return {"schema_url": self._schema_url, "attributes": self._attributes}
 
     def __setstate__(self, state):
         self._schema_url = state["schema_url"]
@@ -409,7 +407,7 @@ def encode_span(span: MiniSpan) -> PB2SPan:
 
 
 def encode_attributes(
-        attributes: Attributes,
+    attributes: Attributes,
 ) -> Optional[list[PB2KeyValue]]:
     if attributes:
         pb2_attributes = []

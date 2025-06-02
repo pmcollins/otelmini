@@ -99,8 +99,10 @@ class ConsoleLogExporter(LogRecordExporter):
 
 
 class GrpcLogExporterImportError(ImportError):
-    def __init__(self,
-                 message: str = "The opentelemetry-proto package is required for GrpcLogExporter. Install it with: pip install otelmini[grpc]"):
+    def __init__(
+        self,
+        message: str = "The opentelemetry-proto package is required for GrpcLogExporter. Install it with: pip install otelmini[grpc]",
+    ):
         super().__init__(message)
 
 
@@ -170,17 +172,17 @@ def _pylog_to_minilog(pylog_record):
         severity_number=_get_severity_number(pylog_record.levelno),
         body=pylog_record.getMessage(),
         attributes={
-            'filename': pylog_record.filename,
-            'funcName': pylog_record.funcName,
-            'lineno': pylog_record.lineno,
-            'module': pylog_record.module,
-            'name': pylog_record.name,
-            'pathname': pylog_record.pathname,
-            'process': pylog_record.process,
-            'processName': pylog_record.processName,
-            'thread': pylog_record.thread,
-            'threadName': pylog_record.threadName,
-        }
+            "filename": pylog_record.filename,
+            "funcName": pylog_record.funcName,
+            "lineno": pylog_record.lineno,
+            "module": pylog_record.module,
+            "name": pylog_record.name,
+            "pathname": pylog_record.pathname,
+            "process": pylog_record.process,
+            "processName": pylog_record.processName,
+            "thread": pylog_record.thread,
+            "threadName": pylog_record.threadName,
+        },
     )
 
 
@@ -297,11 +299,7 @@ def mk_log_request(logs: Sequence[MiniLogRecord]) -> PB2ExportLogsServiceRequest
         )
         req.resource_logs.append(
             PB2ResourceLogs(
-                scope_logs=[
-                    PB2ScopeLogs(
-                        log_records=[log_record]
-                    )
-                ],
+                scope_logs=[PB2ScopeLogs(log_records=[log_record])],
             )
         )
     return req

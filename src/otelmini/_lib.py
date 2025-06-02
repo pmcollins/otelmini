@@ -45,6 +45,6 @@ class Retrier:
             if resp == SingleAttemptResult.FAILURE:
                 return RetrierResult.FAILURE
             if resp == SingleAttemptResult.RETRY and attempt < self.max_retries:
-                seconds = (2 ** attempt) * self.base_seconds
+                seconds = (2**attempt) * self.base_seconds
                 self.sleep(seconds)
         return RetrierResult.MAX_ATTEMPTS_REACHED
