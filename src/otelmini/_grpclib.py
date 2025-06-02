@@ -23,19 +23,19 @@ class GrpcConnectionManager:
         self.channel = self.channel_provider()
         self.client = self.stub_class(self.channel)
 
-    def reconnect(self):
-        self.channel = self.channel_provider()
-        self.client = self.stub_class(self.channel)
-
     def export(self, req: Any) -> Any:
         return self.client.Export(req)
 
     def handle_retryable_error(self):
-        self.disconnect()
+        self.close_channel()
         self.reconnect()
 
-    def disconnect(self):
+    def close_channel(self):
         self.channel.close()
+
+    def reconnect(self):
+        self.channel = self.channel_provider()
+        self.client = self.stub_class(self.channel)
 
 
 class GrpcExporter:
@@ -85,7 +85,7 @@ class GrpcExporter:
         return False
 
     def shutdown(self) -> None:
-        self.connection_manager.disconnect()
+        self.connection_manager.close_channel()
 
 
 def _is_retryable(status_code: StatusCode):
