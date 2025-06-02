@@ -37,6 +37,7 @@ class GrpcConnectionManager:
     def disconnect(self):
         self.channel.close()
 
+
 class GrpcExporter:
     class SingleGrpcAttempt:
         def __init__(self, connection_manager: GrpcConnectionManager, req: Any):
