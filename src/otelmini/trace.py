@@ -4,7 +4,7 @@ import logging
 import time
 import typing
 from collections import defaultdict
-from http.client import HTTPConnection, TOO_MANY_REQUESTS, BAD_GATEWAY, SERVICE_UNAVAILABLE, GATEWAY_TIMEOUT, OK
+from http.client import BAD_GATEWAY, GATEWAY_TIMEOUT, OK, SERVICE_UNAVAILABLE, TOO_MANY_REQUESTS, HTTPConnection
 from typing import TYPE_CHECKING, Any, Iterator, Mapping, Optional, Sequence
 from urllib.parse import urlparse
 
@@ -30,7 +30,7 @@ from opentelemetry.trace import Span as ApiSpan
 from opentelemetry.trace.span import SpanContext, Status, TraceState
 from opentelemetry.util._decorator import _agnosticcontextmanager
 
-from otelmini._lib import Exporter, ExportResult, Retrier, SingleAttemptResult, RetrierResult
+from otelmini._lib import Exporter, ExportResult, Retrier, RetrierResult, SingleAttemptResult
 
 if TYPE_CHECKING:
     from opentelemetry.context import Context
@@ -235,10 +235,9 @@ class _HttpExporter:
 
             if response.status == OK:
                 return SingleAttemptResult.SUCCESS
-            elif response.status in [TOO_MANY_REQUESTS, BAD_GATEWAY, SERVICE_UNAVAILABLE, GATEWAY_TIMEOUT]:
+            if response.status in [TOO_MANY_REQUESTS, BAD_GATEWAY, SERVICE_UNAVAILABLE, GATEWAY_TIMEOUT]:
                 return SingleAttemptResult.RETRY
-            else:
-                return SingleAttemptResult.FAILURE
+            return SingleAttemptResult.FAILURE
 
     def __init__(self, endpoint, timeout):
         self.parsed_url = urlparse(endpoint)
@@ -273,8 +272,9 @@ class GrpcSpanExporter(Exporter[MiniSpan]):
         if self.exporter:
             return
 
-        from otelmini._grpclib import GrpcExporter
         from opentelemetry.proto.collector.trace.v1.trace_service_pb2_grpc import TraceServiceStub
+
+        from otelmini._grpclib import GrpcExporter
         self.exporter = GrpcExporter(
             addr=self.addr,
             max_retries=self.max_retries,

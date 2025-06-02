@@ -4,14 +4,17 @@ import logging
 import time
 from typing import Any, Callable, Optional
 
-from grpc import insecure_channel, RpcError, StatusCode
+from grpc import RpcError, StatusCode, insecure_channel
 
-from otelmini._lib import Retrier, ExportResult, SingleAttemptResult, RetrierResult
+from otelmini._lib import ExportResult, Retrier, RetrierResult, SingleAttemptResult
 
 _logger = logging.getLogger(__package__)
 
 
 class GrpcConnectionManager:
+    class StubClassRequiredError(ValueError):
+        """stub_class must be provided for the first connection"""
+
     def __init__(
         self,
         addr: str = "127.0.0.1:4317",
@@ -29,7 +32,7 @@ class GrpcConnectionManager:
         if self.channel is None:
             self.channel = self.channel_provider()
         if self.stub_class is None:
-            raise ValueError("stub_class must be provided for the first connection")
+            raise GrpcConnectionManager.StubClassRequiredError()
         self.client = self.stub_class(self.channel)
 
     def shutdown(self) -> None:

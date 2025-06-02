@@ -39,16 +39,12 @@ class Retrier:
 
     def retry(self, single_attempt_func):
         for attempt in range(self.max_retries + 1):
-            print("Retrying", attempt)
             resp = single_attempt_func()
-            print("resp: ", resp)
             if resp == SingleAttemptResult.SUCCESS:
                 return RetrierResult.SUCCESS
-            elif resp == SingleAttemptResult.FAILURE:
+            if resp == SingleAttemptResult.FAILURE:
                 return RetrierResult.FAILURE
-            elif resp == SingleAttemptResult.RETRY:
-                if attempt < self.max_retries:
-                    seconds = (2 ** attempt) * self.base_seconds
-                    print("will sleep {} seconds".format(seconds))
-                    self.sleep(seconds)
+            if resp == SingleAttemptResult.RETRY and attempt < self.max_retries:
+                seconds = (2 ** attempt) * self.base_seconds
+                self.sleep(seconds)
         return RetrierResult.MAX_ATTEMPTS_REACHED
