@@ -20,8 +20,10 @@ from opentelemetry.proto.logs.v1.logs_pb2 import ResourceLogs as PB2ResourceLogs
 from opentelemetry.proto.logs.v1.logs_pb2 import ScopeLogs as PB2ScopeLogs
 
 from otelmini._grpclib import GrpcExporter
-from otelmini._lib import Exporter, ExportResult
+from otelmini._lib import Exporter, ExportResult, Retrier, RetrierResult, SingleAttemptResult, _HttpExporter
 from otelmini.processor import BatchProcessor, Processor
+from http.client import BAD_GATEWAY, GATEWAY_TIMEOUT, OK, SERVICE_UNAVAILABLE, TOO_MANY_REQUESTS, HTTPConnection
+from urllib.parse import urlparse
 
 if TYPE_CHECKING:
     from opentelemetry.trace import TraceFlags
@@ -137,6 +139,21 @@ class GrpcLogExporter(LogRecordExporter):
 
     def shutdown(self, timeout_millis: Optional[int] = None) -> None:
         self.exporter.shutdown()
+
+
+class HttpLogExporter(LogRecordExporter):
+    def __init__(self, endpoint="http://localhost:4318/v1/logs", timeout=30):
+        self._exporter = _HttpExporter(endpoint, timeout)
+
+    def export(self, logs: Sequence[MiniLogRecord]) -> ExportResult:
+        request = mk_log_request(logs)
+        return self._exporter.export(request)
+
+    def force_flush(self, timeout_millis: Optional[int] = None) -> bool:
+        pass
+
+    def shutdown(self, timeout_millis: Optional[int] = None) -> None:
+        pass
 
 
 class Logger(ApiLogger):

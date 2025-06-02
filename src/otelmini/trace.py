@@ -30,7 +30,7 @@ from opentelemetry.trace import Span as ApiSpan
 from opentelemetry.trace.span import SpanContext, Status, TraceState
 from opentelemetry.util._decorator import _agnosticcontextmanager
 
-from otelmini._lib import Exporter, ExportResult, Retrier, RetrierResult, SingleAttemptResult
+from otelmini._lib import Exporter, ExportResult, Retrier, RetrierResult, SingleAttemptResult, _HttpExporter
 
 if TYPE_CHECKING:
     from opentelemetry.context import Context
@@ -215,39 +215,6 @@ class MiniSpan(ApiSpan):
             instrumentation_scope=data["instrumentation_scope"],
             on_end_callback=on_end_callback,
         )
-
-
-class _HttpExporter:
-    class SingleHttpAttempt:
-        def __init__(self, request, parsed_url, timeout):
-            self.request = request
-            self.parsed_url = parsed_url
-            self.timeout = timeout
-
-        def export(self):
-            data = self.request.SerializeToString()
-
-            conn = HTTPConnection(self.parsed_url.netloc, timeout=self.timeout)
-            conn.request("POST", self.parsed_url.path, data, {"Content-Type": "application/x-protobuf"})
-            response = conn.getresponse()
-            response.read()
-            conn.close()
-
-            if response.status == OK:
-                return SingleAttemptResult.SUCCESS
-            if response.status in [TOO_MANY_REQUESTS, BAD_GATEWAY, SERVICE_UNAVAILABLE, GATEWAY_TIMEOUT]:
-                return SingleAttemptResult.RETRY
-            return SingleAttemptResult.FAILURE
-
-    def __init__(self, endpoint, timeout):
-        self.parsed_url = urlparse(endpoint)
-        self.timeout = timeout
-        self.retrier = Retrier(4)
-
-    def export(self, request):
-        attempt = _HttpExporter.SingleHttpAttempt(request, self.parsed_url, self.timeout)
-        retry_result = self.retrier.retry(attempt.export)
-        return ExportResult.SUCCESS if retry_result == RetrierResult.SUCCESS else ExportResult.FAILURE
 
 
 class HttpSpanExporter(Exporter[MiniSpan]):
