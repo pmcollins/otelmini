@@ -22,7 +22,6 @@ class LogsOtelTest:
 
     def on_start(self) -> Optional[float]:
         print("started")
-        return None
 
     def on_stop(self, tel, stdout: str, stderr: str, returncode: int) -> None:
         from oteltest.telemetry import count_logs
