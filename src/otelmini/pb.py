@@ -19,14 +19,7 @@ from opentelemetry.proto.trace.v1.trace_pb2 import SpanFlags as PB2SpanFlags
 from opentelemetry.proto.trace.v1.trace_pb2 import Status as PB2Status
 from opentelemetry.trace import Link, SpanKind
 
-# These types are referenced in the encoding functions
 from otelmini.types import MiniSpan, InstrumentationScope, Resource
-
-# Type alias for attributes
-try:
-    from opentelemetry.util.types import Attributes
-except ImportError:
-    Attributes = dict
 
 def mk_trace_request(spans: Sequence[MiniSpan]) -> PB2ExportTraceServiceRequest:
     return PB2ExportTraceServiceRequest(resource_spans=encode_resource_spans(spans))
@@ -102,7 +95,7 @@ def encode_span(span: MiniSpan) -> PB2SPan:
     )
 
 def encode_attributes(
-    attributes: Attributes,
+    attributes: dict,
 ) -> Optional[list[PB2KeyValue]]:
     if attributes:
         pb2_attributes = []
