@@ -1,19 +1,18 @@
+from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
 from opentelemetry.trace import Span as ApiSpan
 from opentelemetry.trace.span import SpanContext
+from opentelemetry.util.types import Attributes
 
 
+@dataclass(frozen=True)
 class InstrumentationScope:
-    def __init__(self, name, version):
-        self.name = name
-        self.version = version
+    name: str
+    version: Optional[str] = None
+    schema_url: Optional[str] = None
+    attributes: Optional[Attributes] = None
 
-    def get_name(self):
-        return self.name
-
-    def get_version(self):
-        return self.version
 
 class Resource:
     def __init__(self, schema_url: str = ""):
@@ -32,6 +31,7 @@ class Resource:
     def __setstate__(self, state):
         self._schema_url = state["schema_url"]
         self._attributes = state["attributes"]
+
 
 class MiniSpan(ApiSpan):
     def __init__(
@@ -88,7 +88,7 @@ class MiniSpan(ApiSpan):
     def set_attribute(self, key: str, value):
         self._attributes[key] = value
 
-    def add_event(self, name: str, attributes = None, timestamp: Optional[int] = None) -> None:
+    def add_event(self, name: str, attributes=None, timestamp: Optional[int] = None) -> None:
         self._events.append((name, attributes, timestamp))
 
     def update_name(self, name: str) -> None:
@@ -104,7 +104,7 @@ class MiniSpan(ApiSpan):
     def record_exception(
         self,
         exception: BaseException,
-        attributes = None,
+        attributes=None,
         timestamp: Optional[int] = None,
         escaped: bool = False,  # noqa: FBT001, FBT002
     ) -> None:

@@ -4,11 +4,11 @@ import logging
 import time
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Optional, Sequence
+from typing import Any, Optional, Sequence
 
+from opentelemetry._logs import LogRecord as ApiLogRecord
 from opentelemetry._logs import Logger as ApiLogger
 from opentelemetry._logs import LoggerProvider as ApiLoggerProvider
-from opentelemetry._logs import LogRecord as ApiLogRecord
 from opentelemetry._logs import SeverityNumber
 from opentelemetry.proto.collector.logs.v1.logs_service_pb2 import (
     ExportLogsServiceRequest as PB2ExportLogsServiceRequest,
@@ -18,16 +18,11 @@ from opentelemetry.proto.common.v1.common_pb2 import KeyValue as PB2KeyValue
 from opentelemetry.proto.logs.v1.logs_pb2 import LogRecord as PB2LogRecord
 from opentelemetry.proto.logs.v1.logs_pb2 import ResourceLogs as PB2ResourceLogs
 from opentelemetry.proto.logs.v1.logs_pb2 import ScopeLogs as PB2ScopeLogs
+from opentelemetry.trace import TraceFlags
+from opentelemetry.util.types import Attributes
 
 from otelmini._lib import Exporter, ExportResult, _HttpExporter
 from otelmini.processor import BatchProcessor, Processor
-
-if TYPE_CHECKING:
-    from opentelemetry.trace import TraceFlags
-    from opentelemetry.util.types import Attributes
-else:
-    TraceFlags = Any
-    Attributes = Any
 
 
 class LogExportResult(Enum):

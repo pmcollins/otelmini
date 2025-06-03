@@ -56,8 +56,8 @@ def encode_resource(resource: Resource) -> PB2Resource:
 
 def encode_instrumentation_scope(instrumentation_scope: InstrumentationScope) -> PB2InstrumentationScope:
     return PB2InstrumentationScope(
-        name=instrumentation_scope.get_name(),
-        version=instrumentation_scope.get_version(),
+        name=instrumentation_scope.name,
+        version=instrumentation_scope.version,
     )
 
 def span_flags(parent_span_context: Optional[Any]) -> int:
