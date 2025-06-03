@@ -163,11 +163,21 @@ class MiniSpan(ApiSpan):
             trace_flags=span_context_dict.get("trace_flags", 0),
             trace_state=span_context_dict.get("tracestate", ""),
         )
+        resource_dict = data["resource"]
+        resource = Resource(schema_url=resource_dict.get("schema_url", ""))
+        resource._attributes = resource_dict.get("attributes", {})
+        instr_scope_dict = data["instrumentation_scope"]
+        instrumentation_scope = InstrumentationScope(
+            name=instr_scope_dict["name"],
+            version=instr_scope_dict.get("version"),
+            schema_url=instr_scope_dict.get("schema_url"),
+            attributes=instr_scope_dict.get("attributes"),
+        )
         return cls(
             name=data["name"],
             span_context=span_context,
-            resource=data["resource"],
-            instrumentation_scope=data["instrumentation_scope"],
+            resource=resource,
+            instrumentation_scope=instrumentation_scope,
             on_end_callback=on_end_callback,
         )
 
