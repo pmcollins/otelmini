@@ -22,6 +22,9 @@ class InstrumentationScope:
             "attributes": self.attributes,
         }
 
+    def to_json(self, indent: int = 4) -> str:
+        return json.dumps(self.to_dict(), indent=indent)
+
 
 class Resource:
     def __init__(self, schema_url: str = ""):
@@ -39,6 +42,9 @@ class Resource:
             "schema_url": self._schema_url,
             "attributes": self._attributes,
         }
+
+    def to_json(self, indent: int = 4) -> str:
+        return json.dumps(self.to_dict(), indent=indent)
 
     def __getstate__(self):
         return {"schema_url": self._schema_url, "attributes": self._attributes}

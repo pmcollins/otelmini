@@ -1,15 +1,18 @@
+import time
 from pathlib import Path
 from typing import Mapping, Optional, Sequence
 
-from otelmini.metric import ConsoleMetricExporter, PeriodicExportingMetricReader, MeterProvider
+from otelmini.metric import ConsoleMetricExporter, SimpleMetricReader, MeterProvider, GrpcMetricExporter
 
 if __name__ == '__main__':
-    exporter = ConsoleMetricExporter()
-    reader = PeriodicExportingMetricReader(exporter=exporter)
+    exporter = GrpcMetricExporter()
+    reader = SimpleMetricReader(exporter=exporter)
     meter_provider = MeterProvider(metric_readers=(reader,))
     meter = meter_provider.get_meter("my-meter")
     counter = meter.create_counter("x")
-    print(f"counter: {counter}")
+    counter.add(42)
+    reader.collect()
+    time.sleep(1)
 
 
 class MetricsOtelTest:
@@ -17,7 +20,7 @@ class MetricsOtelTest:
         return {}
 
     def requirements(self) -> Sequence[str]:
-        parent = str(Path(__file__).resolve().parent.parent)
+        parent = str(Path(__file__).resolve().parent.parent) + "[grpc]"
         return (parent,)
 
     def wrapper_command(self) -> str:

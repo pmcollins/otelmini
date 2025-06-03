@@ -14,6 +14,13 @@ from opentelemetry.metrics import ObservableUpDownCounter as ApiObservableUpDown
 
 from otelmini._grpclib import GrpcExporter
 from otelmini._lib import Exporter
+from otelmini.point import MetricsData, Metric, ResourceMetrics, ScopeMetrics, Sum, Gauge, NumberDataPoint
+from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import ExportMetricsServiceRequest, \
+    ExportMetricsServiceResponse
+from opentelemetry.proto.metrics.v1 import metrics_pb2 as pb2
+from opentelemetry.proto.resource.v1.resource_pb2 import Resource as PB2Resource
+
+from otelmini.types import Resource, InstrumentationScope
 
 if TYPE_CHECKING:
     from opentelemetry.context import Context
@@ -28,14 +35,6 @@ if TYPE_CHECKING:
 class MetricExportResult(Enum):
     SUCCESS = 0
     FAILURE = 1
-
-
-class Metric:
-    pass
-
-
-class MetricsData:
-    pass
 
 
 def mk_metric_request(metrics: Sequence[Metric]) -> ExportMetricsServiceRequest:  # noqa: ARG001
@@ -73,6 +72,7 @@ class GrpcMetricExporter(Exporter):
         if self.exporter:
             return
         self.exporter = GrpcExporter(
+            response_class=ExportMetricsServiceResponse,
             addr=self.addr,
             max_retries=self.max_retries,
             channel_provider=self.channel_provider,
@@ -92,6 +92,7 @@ class GrpcMetricExporter(Exporter):
 
 
 class ConsoleMetricExporter(Exporter[Metric]):
+
     def export(self, metrics: Sequence[Metric]) -> MetricExportResult:
         print(f"exporting metrics: {metrics}")
         return MetricExportResult.SUCCESS
@@ -103,18 +104,15 @@ class ConsoleMetricExporter(Exporter[Metric]):
         return None
 
 
-def metrics_to_pb(metrics):
-    pass
-
-
-class PeriodicExportingMetricReader:
-    def __init__(self, exporter: Exporter[Metric], metric_producer: MetricProducer):
+class SimpleMetricReader:
+    def __init__(self, exporter: Exporter[Metric]):
         self.exporter = exporter
-        self.metric_producer = metric_producer
+        self.metric_producer = MetricProducer()
 
-    def collect(self, metrics_data: MetricsData, timeout_millis: float = 10_000, **kwargs) -> bool:
+    def collect(self) -> bool:
         metrics = self.metric_producer.produce()
-        self.exporter.export(metrics_to_pb(metrics))
+        encoded = encode_metrics(metrics)
+        self.exporter.export(encoded)
         return True
 
     def force_flush(self, timeout_millis: float = 10_000) -> bool:
@@ -126,7 +124,7 @@ class PeriodicExportingMetricReader:
 
 class MetricProducer:
     """
-    MetricProducer https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/metrics/sdk.md#metricproducer
+    Spec: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/metrics/sdk.md#metricproducer
     """
 
     def __init__(self):
@@ -135,17 +133,17 @@ class MetricProducer:
     def _register_counter(self, counter: Counter) -> None:
         self.counters.append(counter)
 
-    def produce(self) -> list:
-        out = []
-        for counter in self.counters:
-            v = counter.get_value()
-            out.append(v)
-        return out
+    def produce(self) -> MetricsData:
+        scope = InstrumentationScope(name="opentelemetry")
+        gauge = Gauge([NumberDataPoint({}, 0, 0, 0)])
+        sm = ScopeMetrics(scope, [Metric("", "", "", gauge)], "")
+        rm = ResourceMetrics(Resource(), [sm], "")
+        return MetricsData([rm])
 
 
 class MeterProvider(ApiMeterProvider):
 
-    def __init__(self, metric_readers: Sequence[PeriodicExportingMetricReader] = ()):
+    def __init__(self, metric_readers: Sequence[SimpleMetricReader] = ()):
         self.metric_readers = metric_readers
         self.metric_producer = MetricProducer()
 
@@ -235,3 +233,29 @@ class Meter(ApiMeter):
         self, name: str, callbacks: Optional[Sequence[CallbackT]] = None, unit: str = "", description: str = ""
     ) -> ApiObservableUpDownCounter:
         pass
+
+
+def encode_metrics(data: MetricsData) -> ExportMetricsServiceRequest:
+    resource_metrics_dict = {}
+
+    for resource_metrics in data.resource_metrics:
+        _encode_resource_metrics(resource_metrics, resource_metrics_dict)
+
+    resource_data = []
+    for (sdk_resource, scope_data) in resource_metrics_dict.items():
+        resource_data.append(
+            pb2.ResourceMetrics(
+                resource=PB2Resource(attributes=_encode_attributes(sdk_resource.attributes)),
+                scope_metrics=scope_data.values(),
+                schema_url=sdk_resource.schema_url,
+            )
+        )
+    return ExportMetricsServiceRequest(resource_metrics=resource_data)
+
+
+def _encode_resource_metrics(resource_metrics, resource_metrics_dict):
+    pass
+
+
+def _encode_attributes(attributes):
+    pass

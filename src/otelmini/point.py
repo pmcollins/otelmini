@@ -17,22 +17,20 @@
 from dataclasses import asdict, dataclass, field
 from json import dumps, loads
 from typing import Optional, Sequence, Union
+from enum import Enum
 
-# This kind of import is needed to avoid Sphinx errors.
-# import opentelemetry.sdk.metrics._internal
-# from opentelemetry.sdk.metrics._internal.exemplar import Exemplar
-# from opentelemetry.sdk.resources import Resource
-# from opentelemetry.sdk.util.instrumentation import InstrumentationScope
 from opentelemetry.util.types import Attributes
 
-from otelmini.types import InstrumentationScope
+from otelmini.types import InstrumentationScope, Resource
+
+
+class AggregationTemporality(Enum):
+    CUMULATIVE = 2
+    DELTA = 1
 
 
 @dataclass(frozen=True)
 class NumberDataPoint:
-    """Single data point in a timeseries that describes the time-varying scalar
-    value of a metric.
-    """
 
     attributes: Attributes
     start_time_unix_nano: int
@@ -46,9 +44,6 @@ class NumberDataPoint:
 
 @dataclass(frozen=True)
 class HistogramDataPoint:
-    """Single data point in a timeseries that describes the time-varying scalar
-    value of a metric.
-    """
 
     attributes: Attributes
     start_time_unix_nano: int
@@ -73,10 +68,6 @@ class Buckets:
 
 @dataclass(frozen=True)
 class ExponentialHistogramDataPoint:
-    """Single data point in a timeseries whose boundaries are defined by an
-    exponential function. This timeseries describes the time-varying scalar
-    value of a metric.
-    """
 
     attributes: Attributes
     start_time_unix_nano: int
@@ -98,14 +89,9 @@ class ExponentialHistogramDataPoint:
 
 @dataclass(frozen=True)
 class ExponentialHistogram:
-    """Represents the type of a metric that is calculated by aggregating as an
-    ExponentialHistogram of all reported measurements over a time interval.
-    """
 
     data_points: Sequence[ExponentialHistogramDataPoint]
-    aggregation_temporality: (
-        "opentelemetry.sdk.metrics.export.AggregationTemporality"
-    )
+    aggregation_temporality: AggregationTemporality
 
     def to_json(self, indent: Optional[int] = 4) -> str:
         return dumps(
@@ -122,13 +108,9 @@ class ExponentialHistogram:
 
 @dataclass(frozen=True)
 class Sum:
-    """Represents the type of a scalar metric that is calculated as a sum of
-    all reported measurements over a time interval."""
 
     data_points: Sequence[NumberDataPoint]
-    aggregation_temporality: (
-        "opentelemetry.sdk.metrics.export.AggregationTemporality"
-    )
+    aggregation_temporality: AggregationTemporality
     is_monotonic: bool
 
     def to_json(self, indent: Optional[int] = 4) -> str:
@@ -147,9 +129,6 @@ class Sum:
 
 @dataclass(frozen=True)
 class Gauge:
-    """Represents the type of a scalar metric that always exports the current
-    value for every data point. It should be used for an unknown
-    aggregation."""
 
     data_points: Sequence[NumberDataPoint]
 
@@ -167,13 +146,8 @@ class Gauge:
 
 @dataclass(frozen=True)
 class Histogram:
-    """Represents the type of a metric that is calculated by aggregating as a
-    histogram of all reported measurements over a time interval."""
-
     data_points: Sequence[HistogramDataPoint]
-    aggregation_temporality: (
-        "opentelemetry.sdk.metrics.export.AggregationTemporality"
-    )
+    aggregation_temporality: AggregationTemporality
 
     def to_json(self, indent: Optional[int] = 4) -> str:
         return dumps(
@@ -197,9 +171,6 @@ DataPointT = Union[
 
 @dataclass(frozen=True)
 class Metric:
-    """Represents a metric point in the OpenTelemetry data model to be
-    exported."""
-
     name: str
     description: Optional[str]
     unit: Optional[str]
@@ -219,8 +190,6 @@ class Metric:
 
 @dataclass(frozen=True)
 class ScopeMetrics:
-    """A collection of Metrics produced by a scope"""
-
     scope: InstrumentationScope
     metrics: Sequence[Metric]
     schema_url: str
@@ -241,8 +210,6 @@ class ScopeMetrics:
 
 @dataclass(frozen=True)
 class ResourceMetrics:
-    """A collection of ScopeMetrics from a Resource"""
-
     resource: Resource
     scope_metrics: Sequence[ScopeMetrics]
     schema_url: str
@@ -263,8 +230,6 @@ class ResourceMetrics:
 
 @dataclass(frozen=True)
 class MetricsData:
-    """An array of ResourceMetrics"""
-
     resource_metrics: Sequence[ResourceMetrics]
 
     def to_json(self, indent: Optional[int] = 4) -> str:

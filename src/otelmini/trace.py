@@ -7,6 +7,7 @@ from collections import defaultdict
 from typing import TYPE_CHECKING, Iterator, Optional, Sequence
 
 from opentelemetry import trace
+from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceResponse
 from opentelemetry.proto.common.v1.common_pb2 import InstrumentationScope as PB2InstrumentationScope
 from opentelemetry.proto.resource.v1.resource_pb2 import (
     Resource as PB2Resource,
@@ -117,6 +118,7 @@ class GrpcSpanExporter(Exporter[MiniSpan]):
         from otelmini._grpclib import GrpcExporter
 
         self.exporter = GrpcExporter(
+            response_class=ExportTraceServiceResponse,
             addr=self.addr,
             max_retries=self.max_retries,
             channel_provider=self.channel_provider,

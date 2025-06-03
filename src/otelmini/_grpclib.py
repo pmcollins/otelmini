@@ -41,7 +41,8 @@ class GrpcConnectionManager:
 
 class GrpcExporter:
     class SingleGrpcAttempt:
-        def __init__(self, connection_manager: GrpcConnectionManager, req: Any):
+        def __init__(self, response_class, connection_manager: GrpcConnectionManager, req: Any):
+            self.response_class = response_class
             self.connection_manager = connection_manager
             self.req = req
 
@@ -49,7 +50,7 @@ class GrpcExporter:
             try:
                 response = self.connection_manager.export(self.req)
 
-                if isinstance(response, ExportTraceServiceResponse):
+                if isinstance(response, self.response_class):
                     return SingleAttemptResult.SUCCESS
                 return SingleAttemptResult.FAILURE
             except RpcError as e:
@@ -60,18 +61,20 @@ class GrpcExporter:
 
     def __init__(
         self,
+        response_class,
         addr: str = "127.0.0.1:4317",
         max_retries: int = 3,
         channel_provider: Optional[Callable[[], Any]] = None,
         sleep: Callable[[float], None] = time.sleep,
         stub_class: Any = None,
     ):
+        self.response_class = response_class
         self.addr = addr
         self.connection_manager = GrpcConnectionManager(stub_class, addr, channel_provider)
         self.retrier = Retrier(max_retries, sleep=sleep)
 
     def export(self, req) -> Any:
-        single_req_exporter = GrpcExporter.SingleGrpcAttempt(self.connection_manager, req)
+        single_req_exporter = GrpcExporter.SingleGrpcAttempt(self.response_class, self.connection_manager, req)
         retry_result = self.retrier.retry(single_req_exporter.export)
         return ExportResult.SUCCESS if retry_result == RetrierResult.SUCCESS else ExportResult.FAILURE
 

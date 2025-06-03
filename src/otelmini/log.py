@@ -11,7 +11,7 @@ from opentelemetry._logs import Logger as ApiLogger
 from opentelemetry._logs import LoggerProvider as ApiLoggerProvider
 from opentelemetry._logs import SeverityNumber
 from opentelemetry.proto.collector.logs.v1.logs_service_pb2 import (
-    ExportLogsServiceRequest as PB2ExportLogsServiceRequest,
+    ExportLogsServiceRequest as PB2ExportLogsServiceRequest, ExportLogsServiceResponse,
 )
 from opentelemetry.proto.common.v1.common_pb2 import AnyValue as PB2AnyValue
 from opentelemetry.proto.common.v1.common_pb2 import KeyValue as PB2KeyValue
@@ -117,6 +117,7 @@ class GrpcLogExporter(LogRecordExporter):
             raise GrpcLogExporterImportError from err
 
         self.exporter = GrpcExporter(
+            response_class=ExportLogsServiceResponse,
             addr=self.addr,
             max_retries=self.max_retries,
             channel_provider=self.channel_provider,
