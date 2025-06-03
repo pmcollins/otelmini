@@ -1,8 +1,15 @@
 from pathlib import Path
 from typing import Mapping, Optional, Sequence
 
+from otelmini.metric import ConsoleMetricExporter, PeriodicExportingMetricReader, MeterProvider
+
 if __name__ == '__main__':
-    pass
+    exporter = ConsoleMetricExporter()
+    reader = PeriodicExportingMetricReader(exporter=exporter)
+    meter_provider = MeterProvider(metric_readers=(reader,))
+    meter = meter_provider.get_meter("my-meter")
+    counter = meter.create_counter("x")
+    print(f"counter: {counter}")
 
 
 class MetricsOtelTest:

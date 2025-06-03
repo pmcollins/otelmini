@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import time
-from abc import ABC, abstractmethod
 from enum import Enum
 from typing import TYPE_CHECKING, Optional, Sequence
 
@@ -35,16 +34,6 @@ class Metric:
     pass
 
 
-class MetricReader(ABC):
-    @abstractmethod
-    def _receive_metrics(self, metrics_data: MetricsData, timeout_millis: float = 10_000, **kwargs) -> None:
-        pass
-
-    @abstractmethod
-    def shutdown(self, timeout_millis: float = 30_000, **kwargs) -> None:
-        pass
-
-
 class MetricsData:
     pass
 
@@ -61,24 +50,9 @@ class CounterError(Exception):
         super().__init__("Counter cannot be decremented (amount must be non-negative)")
 
 
-class MetricResponseError(Exception):
-    def __init__(self, rejected_data_points: int, error_message: str) -> None:
-        super().__init__(
-            f"partial success: rejected_data_points: [{rejected_data_points}], error_message: [{error_message}]"
-        )
-
-
 class GrpcMetricExporterError(Exception):
     def __init__(self) -> None:
         super().__init__("opentelemetry-proto package is required for GrpcMetricExporter")
-
-
-def handle_metric_response(resp):
-    if resp.HasField("partial_success") and resp.partial_success:
-        ps = resp.partial_success
-        import logging
-
-        logging.warning(str(MetricResponseError(ps.rejected_data_points, ps.error_message)))
 
 
 class GrpcMetricExporter(Exporter):
@@ -104,7 +78,6 @@ class GrpcMetricExporter(Exporter):
             channel_provider=self.channel_provider,
             sleep=self.sleep,
             stub_class=MetricsServiceStub,
-            response_handler=handle_metric_response,
         )
 
     def export(self, metrics: Sequence[Metric]) -> MetricExportResult:
@@ -118,8 +91,9 @@ class GrpcMetricExporter(Exporter):
         self.exporter.shutdown()
 
 
-class SimpleMetricExporter(Exporter[Metric]):
+class ConsoleMetricExporter(Exporter[Metric]):
     def export(self, metrics: Sequence[Metric]) -> MetricExportResult:
+        print(f"exporting metrics: {metrics}")
         return MetricExportResult.SUCCESS
 
     def force_flush(self, timeout_millis: float = 10_000) -> bool:
@@ -129,21 +103,51 @@ class SimpleMetricExporter(Exporter[Metric]):
         return None
 
 
-class ExportingMetricReader(MetricReader):
-    def __init__(self, exporter: Exporter[Metric]):
-        super().__init__()
-        self.exporter = exporter
+def metrics_to_pb(metrics):
+    pass
 
-    def _receive_metrics(self, metrics_data: MetricsData, timeout_millis: float = 10_000, **kwargs) -> None:
-        pass
+
+class PeriodicExportingMetricReader:
+    def __init__(self, exporter: Exporter[Metric], metric_producer: MetricProducer):
+        self.exporter = exporter
+        self.metric_producer = metric_producer
+
+    def collect(self, metrics_data: MetricsData, timeout_millis: float = 10_000, **kwargs) -> bool:
+        metrics = self.metric_producer.produce()
+        self.exporter.export(metrics_to_pb(metrics))
+        return True
+
+    def force_flush(self, timeout_millis: float = 10_000) -> bool:
+        return True
 
     def shutdown(self, timeout_millis: float = 30_000, **kwargs) -> None:
         pass
 
 
+class MetricProducer:
+    """
+    MetricProducer https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/metrics/sdk.md#metricproducer
+    """
+
+    def __init__(self):
+        self.counters = []
+
+    def _register_counter(self, counter: Counter) -> None:
+        self.counters.append(counter)
+
+    def produce(self) -> list:
+        out = []
+        for counter in self.counters:
+            v = counter.get_value()
+            out.append(v)
+        return out
+
+
 class MeterProvider(ApiMeterProvider):
-    def __init__(self, metric_readers: Sequence[MetricReader] = ()):
+
+    def __init__(self, metric_readers: Sequence[PeriodicExportingMetricReader] = ()):
         self.metric_readers = metric_readers
+        self.metric_producer = MetricProducer()
 
     def get_meter(
         self,
@@ -152,7 +156,13 @@ class MeterProvider(ApiMeterProvider):
         schema_url: Optional[str] = None,
         attributes: Optional[Attributes] = None,
     ) -> ApiMeter:
-        return Meter(name, version, schema_url, self.metric_readers)
+        return Meter(self, name, version, schema_url)
+
+    def _register_counter(self, counter: Counter) -> None:
+        self.metric_producer._register_counter(counter)
+
+    def produce_metrics(self):
+        return self.metric_producer.produce()
 
 
 class Counter(ApiCounter):
@@ -172,20 +182,31 @@ class Counter(ApiCounter):
             raise CounterError
         self._value += amount
 
+    def get_value(self):
+        return self._value
+
 
 class Meter(ApiMeter):
     def __init__(
         self,
+        meter_provider: MeterProvider,
         name: str,
         version: Optional[str] = None,
         schema_url: Optional[str] = None,
-        metric_readers: Sequence[MetricReader] = (),
     ):
         super().__init__(name, version, schema_url)
-        self.metric_readers = metric_readers
+        self.meter_provider = meter_provider
 
     def create_counter(self, name: str, unit: str = "", description: str = "") -> ApiCounter:
-        return Counter(name=name, unit=unit, description=description)
+        counter = Counter(name=name, unit=unit, description=description)
+
+        # self._register_instrument() is an API method
+        reg_status = self._register_instrument(name, Counter, unit, description)
+        print(f"registering counter: {reg_status}")
+
+        self.meter_provider._register_counter(counter)
+
+        return counter
 
     def create_up_down_counter(self, name: str, unit: str = "", description: str = "") -> ApiUpDownCounter:
         pass
@@ -214,16 +235,3 @@ class Meter(ApiMeter):
         self, name: str, callbacks: Optional[Sequence[CallbackT]] = None, unit: str = "", description: str = ""
     ) -> ApiObservableUpDownCounter:
         pass
-
-
-def main():
-    exporter = SimpleMetricExporter()
-    reader = ExportingMetricReader(exporter=exporter)
-    meter_provider = MeterProvider(metric_readers=(reader,))
-    print(meter_provider.get_meter(name="foo"))  # noqa: T201
-    meter = meter_provider.get_meter("my-meter")
-    print(meter)  # noqa: T201
-
-
-if __name__ == "__main__":
-    main()
