@@ -31,7 +31,7 @@ from opentelemetry.trace.span import SpanContext, Status, TraceState
 from opentelemetry.util._decorator import _agnosticcontextmanager
 
 from otelmini._lib import Exporter, ExportResult, Retrier, RetrierResult, SingleAttemptResult, _HttpExporter
-from otelmini.pb import mk_trace_request
+from otelmini.pb import mk_trace_request, encode_attributes, encode_key_value, encode_value, EncodingError
 from otelmini.types import MiniSpan, InstrumentationScope, Resource
 
 if TYPE_CHECKING:
@@ -153,10 +153,6 @@ class GrpcSpanExporter(Exporter[MiniSpan]):
         # self.init_grpc()  # this would have to be called for this class to wake up after being deserialized
 
 
-def mk_trace_request(spans: Sequence[MiniSpan]) -> PB2ExportTraceServiceRequest:
-    return PB2ExportTraceServiceRequest(resource_spans=encode_resource_spans(spans))
-
-
 def encode_resource_spans(spans: Sequence[MiniSpan]) -> list[PB2ResourceSpans]:
     sdk_resource_spans = defaultdict(lambda: defaultdict(list))
 
@@ -237,47 +233,6 @@ def encode_span(span: MiniSpan) -> PB2SPan:
     )
 
 
-def encode_attributes(
-    attributes: Attributes,
-) -> Optional[list[PB2KeyValue]]:
-    if attributes:
-        pb2_attributes = []
-        for key, value in attributes.items():
-            try:
-                pb2_attributes.append(encode_key_value(key, value))
-            except Exception:
-                _pylogger.exception("Failed to encode key %s", key)
-    else:
-        pb2_attributes = None
-    return pb2_attributes
-
-
-def encode_links(links: Sequence[Link]) -> Sequence[PB2SPan.Link]:
-    pb2_links = None
-    if links:
-        pb2_links = []
-        for link in links:
-            encoded_link = PB2SPan.Link(
-                trace_id=encode_trace_id(link.context.trace_id),
-                span_id=encode_span_id(link.context.span_id),
-                attributes=encode_attributes(link.attributes),
-                dropped_attributes_count=link.dropped_attributes,
-                flags=span_flags(link.context),
-            )
-            pb2_links.append(encoded_link)
-    return pb2_links
-
-
-def encode_status(status: Status) -> Optional[PB2Status]:
-    pb2_status = None
-    if status is not None:
-        pb2_status = PB2Status(
-            code=status.status_code.value,
-            message=status.description,
-        )
-    return pb2_status
-
-
 def encode_trace_state(trace_state: TraceState) -> Optional[str]:
     pb2_trace_state = None
     if trace_state is not None:
@@ -295,32 +250,5 @@ def encode_span_id(span_id: int) -> bytes:
     return span_id.to_bytes(length=8, byteorder="big", signed=False)
 
 
-def encode_key_value(key: str, value: Any) -> PB2KeyValue:
-    return PB2KeyValue(key=key, value=encode_value(value))
-
-
 def encode_trace_id(trace_id: int) -> bytes:
     return trace_id.to_bytes(length=16, byteorder="big", signed=False)
-
-
-def encode_value(value: Any) -> PB2AnyValue:
-    if isinstance(value, bool):
-        return PB2AnyValue(bool_value=value)
-    if isinstance(value, str):
-        return PB2AnyValue(string_value=value)
-    if isinstance(value, int):
-        return PB2AnyValue(int_value=value)
-    if isinstance(value, float):
-        return PB2AnyValue(double_value=value)
-    if isinstance(value, bytes):
-        return PB2AnyValue(bytes_value=value)
-    if isinstance(value, Sequence):
-        return PB2AnyValue(array_value=PB2ArrayValue(values=[encode_value(v) for v in value]))
-    if isinstance(value, Mapping):
-        return PB2AnyValue(kvlist_value=PB2KeyValueList(values=[encode_key_value(str(k), v) for k, v in value.items()]))
-    raise EncodingError(value)
-
-
-class EncodingError(Exception):
-    def __init__(self, value):
-        super().__init__(f"Invalid type {type(value)} of value {value}")
