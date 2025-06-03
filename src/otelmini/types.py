@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
+import json
 
 from opentelemetry.trace import Span as ApiSpan
 from opentelemetry.trace.span import SpanContext
@@ -13,6 +14,14 @@ class InstrumentationScope:
     schema_url: Optional[str] = None
     attributes: Optional[Attributes] = None
 
+    def to_dict(self):
+        return {
+            "name": self.name,
+            "version": self.version,
+            "schema_url": self.schema_url,
+            "attributes": self.attributes,
+        }
+
 
 class Resource:
     def __init__(self, schema_url: str = ""):
@@ -25,12 +34,28 @@ class Resource:
     def get_schema_url(self):
         return self._schema_url
 
+    def to_dict(self):
+        return {
+            "schema_url": self._schema_url,
+            "attributes": self._attributes,
+        }
+
     def __getstate__(self):
         return {"schema_url": self._schema_url, "attributes": self._attributes}
 
     def __setstate__(self, state):
         self._schema_url = state["schema_url"]
         self._attributes = state["attributes"]
+
+
+def span_context_to_dict(span_context: SpanContext) -> dict:
+    return {
+        "trace_id": span_context.trace_id,
+        "span_id": span_context.span_id,
+        "trace_flags": int(getattr(span_context, "trace_flags", 0)),
+        "is_remote": getattr(span_context, "is_remote", False),
+        "tracestate": str(getattr(span_context, "trace_state", "")),
+    }
 
 
 class MiniSpan(ApiSpan):
@@ -116,9 +141,9 @@ class MiniSpan(ApiSpan):
     def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.get_name(),
-            "span_context": self.get_span_context(),
-            "resource": self.get_resource(),
-            "instrumentation_scope": self.get_instrumentation_scope(),
+            "span_context": span_context_to_dict(self.get_span_context()),
+            "resource": self.get_resource().to_dict(),
+            "instrumentation_scope": self.get_instrumentation_scope().to_dict(),
             "attributes": self._attributes,
             "events": self._events,
             "status": self._status,
@@ -130,10 +155,21 @@ class MiniSpan(ApiSpan):
 
     @classmethod
     def from_dict(cls, data: dict[str, Any], on_end_callback: Callable[["MiniSpan"], None]) -> "MiniSpan":
+        span_context_dict = data["span_context"]
+        span_context = SpanContext(
+            trace_id=span_context_dict["trace_id"],
+            span_id=span_context_dict["span_id"],
+            is_remote=span_context_dict.get("is_remote", False),
+            trace_flags=span_context_dict.get("trace_flags", 0),
+            trace_state=span_context_dict.get("tracestate", ""),
+        )
         return cls(
             name=data["name"],
-            span_context=data["span_context"],
+            span_context=span_context,
             resource=data["resource"],
             instrumentation_scope=data["instrumentation_scope"],
             on_end_callback=on_end_callback,
         )
+
+    def to_json(self, indent: int = 2) -> str:
+        return json.dumps(self.to_dict(), indent=indent)
