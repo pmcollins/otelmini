@@ -1,14 +1,6 @@
-from __future__ import annotations
-
-import logging
-import time
-import typing
 from collections import defaultdict
-from http.client import BAD_GATEWAY, GATEWAY_TIMEOUT, OK, SERVICE_UNAVAILABLE, TOO_MANY_REQUESTS, HTTPConnection
-from typing import TYPE_CHECKING, Any, Iterator, Mapping, Optional, Sequence
-from urllib.parse import urlparse
+from typing import Any, Mapping, Optional, Sequence
 
-from opentelemetry import trace
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest as PB2ExportTraceServiceRequest,
 )
@@ -25,149 +17,28 @@ from opentelemetry.proto.trace.v1.trace_pb2 import ScopeSpans as PB2ScopeSpans
 from opentelemetry.proto.trace.v1.trace_pb2 import Span as PB2SPan
 from opentelemetry.proto.trace.v1.trace_pb2 import SpanFlags as PB2SpanFlags
 from opentelemetry.proto.trace.v1.trace_pb2 import Status as PB2Status
-from opentelemetry.trace import Link, SpanKind, StatusCode, Tracer, TracerProvider, _Links
-from opentelemetry.trace import Span as ApiSpan
-from opentelemetry.trace.span import SpanContext, Status, TraceState
-from opentelemetry.util._decorator import _agnosticcontextmanager
+from opentelemetry.trace import Link, SpanKind
 
-from otelmini._lib import Exporter, ExportResult, Retrier, RetrierResult, SingleAttemptResult, _HttpExporter
-from otelmini.pb import mk_trace_request
+# These types are referenced in the encoding functions
 from otelmini.types import MiniSpan, InstrumentationScope, Resource
 
-if TYPE_CHECKING:
-    from opentelemetry.context import Context
-    from opentelemetry.util import types
+# Type alias for attributes
+try:
     from opentelemetry.util.types import Attributes
-
-    from otelmini.processor import Processor
-
-_pylogger = logging.getLogger(__package__)
-_tracer = trace.get_tracer(__package__)
-
-
-class MiniTracerProvider(TracerProvider):
-    def __init__(self, span_processor=None):
-        self.span_processor = span_processor
-
-    def get_tracer(
-        self,
-        instrumenting_module_name: str,
-        instrumenting_library_version: typing.Optional[str] = None,
-        schema_url: typing.Optional[str] = None,
-        attributes: typing.Optional[types.Attributes] = None,
-    ) -> MiniTracer:
-        return MiniTracer(self.span_processor)
-
-    def shutdown(self):
-        pass
-
-
-class MiniTracer(Tracer):
-    def __init__(self, span_processor: Processor[MiniSpan]):
-        self.span_processor = span_processor
-
-    def start_span(
-        self,
-        name: str,
-        context: Optional[Context] = None,
-        kind: SpanKind = SpanKind.INTERNAL,
-        attributes: types.Attributes = None,
-        links: _Links = None,
-        start_time: Optional[int] = None,
-        record_exception: bool = True,  # noqa: FBT001, FBT002
-        set_status_on_exception: bool = True,  # noqa: FBT001, FBT002
-    ) -> ApiSpan:
-        span = MiniSpan(
-            name, SpanContext(0, 0, False), Resource(""), InstrumentationScope("", ""), self.span_processor.on_end
-        )
-        self.span_processor.on_start(span)
-        return span
-
-    @_agnosticcontextmanager
-    def start_as_current_span(
-        self,
-        name: str,
-        context: Optional[Context] = None,
-        kind: SpanKind = SpanKind.INTERNAL,
-        attributes: types.Attributes = None,
-        links: _Links = None,
-        start_time: Optional[int] = None,
-        record_exception: bool = True,  # noqa: FBT001, FBT002
-        set_status_on_exception: bool = True,  # noqa: FBT001, FBT002
-        end_on_exit: bool = True,  # noqa: FBT001, FBT002
-    ) -> Iterator[ApiSpan]:
-        span = self.start_span(name, context, kind, attributes, links, start_time, end_on_exit)
-        with trace.use_span(span, end_on_exit=True) as active_span:
-            yield active_span
-
-
-class HttpSpanExporter(Exporter[MiniSpan]):
-    def __init__(self, endpoint="http://localhost:4318/v1/traces", timeout=30):
-        self._exporter = _HttpExporter(endpoint, timeout)
-
-    def export(self, items: Sequence[MiniSpan]) -> ExportResult:
-        request = mk_trace_request(items)
-        return self._exporter.export(request)
-
-
-class GrpcSpanExporter(Exporter[MiniSpan]):
-    def __init__(self, addr="127.0.0.1:4317", max_retries=3, channel_provider=None, sleep=time.sleep):
-        self.addr = addr
-        self.max_retries = max_retries
-        self.channel_provider = channel_provider
-        self.sleep = sleep
-        self.exporter = None
-        self.init_grpc()  # this would need to be called lazily for this class to be serializable for multiprocessing
-
-    def init_grpc(self):
-        if self.exporter:
-            return
-
-        from opentelemetry.proto.collector.trace.v1.trace_service_pb2_grpc import TraceServiceStub
-
-        from otelmini._grpclib import GrpcExporter
-
-        self.exporter = GrpcExporter(
-            addr=self.addr,
-            max_retries=self.max_retries,
-            channel_provider=self.channel_provider,
-            sleep=self.sleep,
-            stub_class=TraceServiceStub,
-        )
-
-    def export(self, spans: Sequence[MiniSpan]) -> ExportResult:
-        self.init_grpc()
-        req = mk_trace_request(spans)
-        return self.exporter.export(req)
-
-    def force_flush(self, timeout_millis: int = 30000) -> bool:
-        return self.exporter.force_flush(timeout_millis)
-
-    def shutdown(self) -> None:
-        if self.exporter is not None:
-            self.exporter.shutdown()
-            self.exporter = None
-
-    def __setstate__(self, state):
-        self.__dict__.update(state)
-        # self.init_grpc()  # this would have to be called for this class to wake up after being deserialized
-
+except ImportError:
+    Attributes = dict
 
 def mk_trace_request(spans: Sequence[MiniSpan]) -> PB2ExportTraceServiceRequest:
     return PB2ExportTraceServiceRequest(resource_spans=encode_resource_spans(spans))
 
-
 def encode_resource_spans(spans: Sequence[MiniSpan]) -> list[PB2ResourceSpans]:
     sdk_resource_spans = defaultdict(lambda: defaultdict(list))
-
     for span in spans:
         resource = span.get_resource()
         instrumentation_scope = span.get_instrumentation_scope()
         pb2_span = encode_span(span)
         sdk_resource_spans[resource][instrumentation_scope].append(pb2_span)
-
     pb2_resource_spans = []
-
     for resource, sdk_instrumentations in sdk_resource_spans.items():
         scope_spans = []
         for instrumentation_scope, pb2_spans in sdk_instrumentations.items():
@@ -184,13 +55,10 @@ def encode_resource_spans(spans: Sequence[MiniSpan]) -> list[PB2ResourceSpans]:
                 schema_url=resource.get_schema_url(),
             )
         )
-
     return pb2_resource_spans
-
 
 def encode_resource(resource: Resource) -> PB2Resource:
     return PB2Resource(attributes=encode_attributes(resource.get_attributes()))
-
 
 def encode_instrumentation_scope(instrumentation_scope: InstrumentationScope) -> PB2InstrumentationScope:
     return PB2InstrumentationScope(
@@ -198,13 +66,11 @@ def encode_instrumentation_scope(instrumentation_scope: InstrumentationScope) ->
         version=instrumentation_scope.get_version(),
     )
 
-
-def span_flags(parent_span_context: Optional[SpanContext]) -> int:
+def span_flags(parent_span_context: Optional[Any]) -> int:
     flags = PB2SpanFlags.SPAN_FLAGS_CONTEXT_HAS_IS_REMOTE_MASK
-    if parent_span_context and parent_span_context.is_remote:
+    if parent_span_context and getattr(parent_span_context, 'is_remote', False):
         flags |= PB2SpanFlags.SPAN_FLAGS_CONTEXT_IS_REMOTE_MASK
     return flags
-
 
 _SPAN_KIND_MAP = {
     SpanKind.INTERNAL: PB2SPan.SpanKind.SPAN_KIND_INTERNAL,
@@ -214,13 +80,12 @@ _SPAN_KIND_MAP = {
     SpanKind.CONSUMER: PB2SPan.SpanKind.SPAN_KIND_CONSUMER,
 }
 
-
 def encode_span(span: MiniSpan) -> PB2SPan:
     span_context = span.get_span_context()
     return PB2SPan(
         trace_id=encode_trace_id(span_context.trace_id),
         span_id=encode_span_id(span_context.span_id),
-        trace_state=encode_trace_state(span_context.trace_state),
+        trace_state=encode_trace_state(getattr(span_context, 'trace_state', None)),
         name=span.get_name(),
         # parent_span_id=encode_parent_id(span.parent),
         # kind=_SPAN_KIND_MAP[span.kind],
@@ -236,7 +101,6 @@ def encode_span(span: MiniSpan) -> PB2SPan:
         # flags=_span_flags(span.parent),
     )
 
-
 def encode_attributes(
     attributes: Attributes,
 ) -> Optional[list[PB2KeyValue]]:
@@ -246,11 +110,10 @@ def encode_attributes(
             try:
                 pb2_attributes.append(encode_key_value(key, value))
             except Exception:
-                _pylogger.exception("Failed to encode key %s", key)
+                pass  # Logging is handled in the caller
     else:
         pb2_attributes = None
     return pb2_attributes
-
 
 def encode_links(links: Sequence[Link]) -> Sequence[PB2SPan.Link]:
     pb2_links = None
@@ -261,47 +124,40 @@ def encode_links(links: Sequence[Link]) -> Sequence[PB2SPan.Link]:
                 trace_id=encode_trace_id(link.context.trace_id),
                 span_id=encode_span_id(link.context.span_id),
                 attributes=encode_attributes(link.attributes),
-                dropped_attributes_count=link.dropped_attributes,
-                flags=span_flags(link.context),
+                dropped_attributes_count=getattr(link, 'dropped_attributes', 0),
+                flags=span_flags(getattr(link, 'context', None)),
             )
             pb2_links.append(encoded_link)
     return pb2_links
 
-
-def encode_status(status: Status) -> Optional[PB2Status]:
+def encode_status(status: Any) -> Optional[PB2Status]:
     pb2_status = None
     if status is not None:
         pb2_status = PB2Status(
-            code=status.status_code.value,
-            message=status.description,
+            code=getattr(status, 'status_code', None).value if hasattr(status, 'status_code') else None,
+            message=getattr(status, 'description', None),
         )
     return pb2_status
 
-
-def encode_trace_state(trace_state: TraceState) -> Optional[str]:
+def encode_trace_state(trace_state: Any) -> Optional[str]:
     pb2_trace_state = None
     if trace_state is not None:
         pb2_trace_state = ",".join([f"{key}={value}" for key, value in (trace_state.items())])
     return pb2_trace_state
 
-
-def encode_parent_id(context: Optional[SpanContext]) -> Optional[bytes]:
+def encode_parent_id(context: Optional[Any]) -> Optional[bytes]:
     if context:
         return encode_span_id(context.span_id)
     return None
 
-
 def encode_span_id(span_id: int) -> bytes:
     return span_id.to_bytes(length=8, byteorder="big", signed=False)
-
 
 def encode_key_value(key: str, value: Any) -> PB2KeyValue:
     return PB2KeyValue(key=key, value=encode_value(value))
 
-
 def encode_trace_id(trace_id: int) -> bytes:
     return trace_id.to_bytes(length=16, byteorder="big", signed=False)
-
 
 def encode_value(value: Any) -> PB2AnyValue:
     if isinstance(value, bool):
@@ -320,7 +176,6 @@ def encode_value(value: Any) -> PB2AnyValue:
         return PB2AnyValue(kvlist_value=PB2KeyValueList(values=[encode_key_value(str(k), v) for k, v in value.items()]))
     raise EncodingError(value)
 
-
 class EncodingError(Exception):
     def __init__(self, value):
-        super().__init__(f"Invalid type {type(value)} of value {value}")
+        super().__init__(f"Invalid type {type(value)} of value {value}") 
