@@ -4,8 +4,12 @@ from typing import Optional
 
 from opentelemetry import trace
 
-from otelmini.log import BatchLogRecordProcessor, GrpcLogExporter, LoggerProvider, OtelBridgeLoggingHandler, \
-    HttpLogExporter
+from otelmini.log import (
+    BatchLogRecordProcessor,
+    HttpLogExporter,
+    LoggerProvider,
+    OtelBridgeLoggingHandler,
+)
 from otelmini.processor import BatchProcessor
 from otelmini.trace import HttpSpanExporter, MiniTracerProvider
 

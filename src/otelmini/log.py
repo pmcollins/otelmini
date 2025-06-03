@@ -6,9 +6,9 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Optional, Sequence
 
-from opentelemetry._logs import LogRecord as ApiLogRecord
 from opentelemetry._logs import Logger as ApiLogger
 from opentelemetry._logs import LoggerProvider as ApiLoggerProvider
+from opentelemetry._logs import LogRecord as ApiLogRecord
 from opentelemetry._logs import SeverityNumber
 from opentelemetry.proto.collector.logs.v1.logs_service_pb2 import (
     ExportLogsServiceRequest as PB2ExportLogsServiceRequest,
@@ -116,6 +116,7 @@ class GrpcLogExporter(LogRecordExporter):
     def init_grpc(self):
         try:
             from opentelemetry.proto.collector.logs.v1.logs_service_pb2_grpc import LogsServiceStub
+
             from otelmini._grpclib import GrpcExporter
         except ImportError as err:
             raise GrpcLogExporterImportError from err

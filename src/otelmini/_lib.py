@@ -58,7 +58,14 @@ class _HttpExporter:
             self.timeout = timeout
 
         def export(self):
-            from http.client import HTTPConnection, OK, TOO_MANY_REQUESTS, BAD_GATEWAY, SERVICE_UNAVAILABLE, GATEWAY_TIMEOUT
+            from http.client import (
+                BAD_GATEWAY,
+                GATEWAY_TIMEOUT,
+                OK,
+                SERVICE_UNAVAILABLE,
+                TOO_MANY_REQUESTS,
+                HTTPConnection,
+            )
             data = self.request.SerializeToString()
             conn = HTTPConnection(self.parsed_url.netloc, timeout=self.timeout)
             conn.request("POST", self.parsed_url.path, data, {"Content-Type": "application/x-protobuf"})

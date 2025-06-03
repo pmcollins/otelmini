@@ -19,7 +19,8 @@ from opentelemetry.proto.trace.v1.trace_pb2 import SpanFlags as PB2SpanFlags
 from opentelemetry.proto.trace.v1.trace_pb2 import Status as PB2Status
 from opentelemetry.trace import Link, SpanKind
 
-from otelmini.types import MiniSpan, InstrumentationScope, Resource
+from otelmini.types import InstrumentationScope, MiniSpan, Resource
+
 
 def mk_trace_request(spans: Sequence[MiniSpan]) -> PB2ExportTraceServiceRequest:
     return PB2ExportTraceServiceRequest(resource_spans=encode_resource_spans(spans))
@@ -171,4 +172,4 @@ def encode_value(value: Any) -> PB2AnyValue:
 
 class EncodingError(Exception):
     def __init__(self, value):
-        super().__init__(f"Invalid type {type(value)} of value {value}") 
+        super().__init__(f"Invalid type {type(value)} of value {value}")

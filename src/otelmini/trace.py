@@ -4,19 +4,10 @@ import logging
 import time
 import typing
 from collections import defaultdict
-from http.client import BAD_GATEWAY, GATEWAY_TIMEOUT, OK, SERVICE_UNAVAILABLE, TOO_MANY_REQUESTS, HTTPConnection
-from typing import TYPE_CHECKING, Any, Iterator, Mapping, Optional, Sequence
-from urllib.parse import urlparse
+from typing import TYPE_CHECKING, Iterator, Optional, Sequence
 
 from opentelemetry import trace
-from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
-    ExportTraceServiceRequest as PB2ExportTraceServiceRequest,
-)
-from opentelemetry.proto.common.v1.common_pb2 import AnyValue as PB2AnyValue
-from opentelemetry.proto.common.v1.common_pb2 import ArrayValue as PB2ArrayValue
 from opentelemetry.proto.common.v1.common_pb2 import InstrumentationScope as PB2InstrumentationScope
-from opentelemetry.proto.common.v1.common_pb2 import KeyValue as PB2KeyValue
-from opentelemetry.proto.common.v1.common_pb2 import KeyValueList as PB2KeyValueList
 from opentelemetry.proto.resource.v1.resource_pb2 import (
     Resource as PB2Resource,
 )
@@ -24,20 +15,18 @@ from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans as PB2ResourceS
 from opentelemetry.proto.trace.v1.trace_pb2 import ScopeSpans as PB2ScopeSpans
 from opentelemetry.proto.trace.v1.trace_pb2 import Span as PB2SPan
 from opentelemetry.proto.trace.v1.trace_pb2 import SpanFlags as PB2SpanFlags
-from opentelemetry.proto.trace.v1.trace_pb2 import Status as PB2Status
-from opentelemetry.trace import Link, SpanKind, StatusCode, Tracer, TracerProvider, _Links
 from opentelemetry.trace import Span as ApiSpan
-from opentelemetry.trace.span import SpanContext, Status, TraceState
+from opentelemetry.trace import SpanKind, Tracer, TracerProvider, _Links
+from opentelemetry.trace.span import SpanContext, TraceState
 from opentelemetry.util._decorator import _agnosticcontextmanager
 
-from otelmini._lib import Exporter, ExportResult, Retrier, RetrierResult, SingleAttemptResult, _HttpExporter
-from otelmini.pb import mk_trace_request, encode_attributes, encode_key_value, encode_value, EncodingError
-from otelmini.types import MiniSpan, InstrumentationScope, Resource
+from otelmini._lib import Exporter, ExportResult, _HttpExporter
+from otelmini.pb import encode_attributes, mk_trace_request
+from otelmini.types import InstrumentationScope, MiniSpan, Resource
 
 if TYPE_CHECKING:
     from opentelemetry.context import Context
     from opentelemetry.util import types
-    from opentelemetry.util.types import Attributes
 
     from otelmini.processor import Processor
 

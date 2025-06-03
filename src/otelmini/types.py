@@ -1,6 +1,8 @@
+from typing import Any, Callable, Optional
+
 from opentelemetry.trace import Span as ApiSpan
 from opentelemetry.trace.span import SpanContext
-from typing import Any, Optional, Sequence, Callable
+
 
 class InstrumentationScope:
     def __init__(self, name, version):
@@ -134,4 +136,4 @@ class MiniSpan(ApiSpan):
             resource=data["resource"],
             instrumentation_scope=data["instrumentation_scope"],
             on_end_callback=on_end_callback,
-        ) 
+        )
