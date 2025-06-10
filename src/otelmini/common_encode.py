@@ -45,7 +45,7 @@ from opentelemetry.proto.resource.v1.resource_pb2 import (
 )
 from opentelemetry.util.types import _ExtendedAttributes
 
-from otelmini.types import InstrumentationScope
+from otelmini.types import InstrumentationScope, Resource
 
 _logger = logging.getLogger(__name__)
 
@@ -66,7 +66,7 @@ def _encode_instrumentation_scope(
 
 
 def _encode_resource(resource: Resource) -> PB2Resource:
-    return PB2Resource(attributes=_encode_attributes(resource.attributes))
+    return PB2Resource(attributes=_encode_attributes(resource.get_attributes()))
 
 
 def _encode_value(
