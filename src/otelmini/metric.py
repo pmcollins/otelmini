@@ -102,7 +102,8 @@ class ConsoleMetricExporter(Exporter[Metric]):
         return None
 
 
-class MiniMetricReader:
+class PeriodicExportingMetricReader:
+
     def __init__(self, exporter: Exporter[Metric]):
         self.exporter = exporter
 
@@ -144,7 +145,7 @@ class MetricProducer:
 
 class MeterProvider(ApiMeterProvider):
 
-    def __init__(self, metric_readers: Sequence[MiniMetricReader] = ()):
+    def __init__(self, metric_readers: Sequence[PeriodicExportingMetricReader] = ()):
         self.metric_readers = metric_readers
         self.metric_producer = MetricProducer()
 
