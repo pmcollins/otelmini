@@ -33,4 +33,6 @@ class MetricsOtelTest:
         pass
 
     def on_stop(self, tel, stdout: str, stderr: str, returncode: int) -> None:
-        pass
+        from oteltest.telemetry import count_metrics
+
+        assert count_metrics(tel)
