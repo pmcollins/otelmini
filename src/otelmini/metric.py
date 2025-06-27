@@ -103,7 +103,7 @@ class ConsoleMetricExporter(Exporter[Metric]):
 
 
 class PeriodicExportingMetricReader:
-
+    """As opposed to a pull based metric reader (e.g. Prometheus)"""
     def __init__(self, exporter: Exporter[Metric]):
         self.exporter = exporter
 
