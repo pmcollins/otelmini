@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from abc import ABC, abstractmethod
 from enum import Enum
 from typing import TYPE_CHECKING, Optional, Sequence
 
@@ -33,13 +34,6 @@ if TYPE_CHECKING:
 class MetricExportResult(Enum):
     SUCCESS = 0
     FAILURE = 1
-
-
-def mk_metric_request(metrics: Sequence[Metric]) -> ExportMetricsServiceRequest:  # noqa: ARG001
-    from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import ExportMetricsServiceRequest
-    from opentelemetry.proto.metrics.v1.metrics_pb2 import ResourceMetrics
-
-    return ExportMetricsServiceRequest(resource_metrics=[ResourceMetrics()])
 
 
 class CounterError(Exception):
@@ -89,6 +83,13 @@ class GrpcMetricExporter(Exporter):
         self.exporter.shutdown()
 
 
+def mk_metric_request(metrics: Sequence[Metric]) -> ExportMetricsServiceRequest:  # noqa: ARG001
+    from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import ExportMetricsServiceRequest
+    from opentelemetry.proto.metrics.v1.metrics_pb2 import ResourceMetrics
+
+    return ExportMetricsServiceRequest(resource_metrics=[ResourceMetrics()])
+
+
 class ConsoleMetricExporter(Exporter[Metric]):
 
     def export(self, metrics: Sequence[Metric]) -> MetricExportResult:
@@ -102,15 +103,33 @@ class ConsoleMetricExporter(Exporter[Metric]):
         return None
 
 
-class PeriodicExportingMetricReader:
-    """As opposed to a pull based metric reader (e.g. Prometheus)"""
+class MetricReader(ABC):
+
+    @abstractmethod
+    def set_metric_producer(self, metric_producer):
+        pass
+
+    @abstractmethod
+    def force_flush(self, timeout_millis: float = 10_000) -> bool:
+        pass
+
+    @abstractmethod
+    def shutdown(self, timeout_millis: float = 30_000, **kwargs) -> None:
+        pass
+
+
+class ManualExportingMetricReader(MetricReader):
+
     def __init__(self, exporter: Exporter[Metric]):
+        self.metric_producer = None
         self.exporter = exporter
 
-    def export(self, metrics):
-        return self.exporter.export(metrics)
+    def set_metric_producer(self, metric_producer):
+        self.metric_producer = metric_producer
 
     def force_flush(self, timeout_millis: float = 10_000) -> bool:
+        metrics = self.metric_producer.produce()
+        self.exporter.export(metrics)
         return True
 
     def shutdown(self, timeout_millis: float = 30_000, **kwargs) -> None:
@@ -145,9 +164,11 @@ class MetricProducer:
 
 class MeterProvider(ApiMeterProvider):
 
-    def __init__(self, metric_readers: Sequence[PeriodicExportingMetricReader] = ()):
-        self.metric_readers = metric_readers
+    def __init__(self, metric_readers: Sequence[ManualExportingMetricReader] = ()):
         self.metric_producer = MetricProducer()
+        self.metric_readers = metric_readers
+        for reader in self.metric_readers:
+            reader.set_metric_producer(self.metric_producer)
 
     def get_meter(
         self,
