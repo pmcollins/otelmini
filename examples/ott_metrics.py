@@ -2,7 +2,7 @@ import time
 from pathlib import Path
 from typing import Mapping, Optional, Sequence
 
-from otelmini.metric import ConsoleMetricExporter, PeriodicExportingMetricReader, MeterProvider, GrpcMetricExporter
+from otelmini.metric import PeriodicExportingMetricReader, MeterProvider, GrpcMetricExporter
 
 if __name__ == '__main__':
     exporter = GrpcMetricExporter()

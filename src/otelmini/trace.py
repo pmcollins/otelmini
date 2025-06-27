@@ -18,11 +18,11 @@ from opentelemetry.proto.trace.v1.trace_pb2 import Span as PB2SPan
 from opentelemetry.proto.trace.v1.trace_pb2 import SpanFlags as PB2SpanFlags
 from opentelemetry.trace import Span as ApiSpan
 from opentelemetry.trace import SpanKind, Tracer, TracerProvider, _Links
-from opentelemetry.trace.span import SpanContext, TraceState
+from opentelemetry.trace.span import SpanContext
 from opentelemetry.util._decorator import _agnosticcontextmanager
 
 from otelmini._lib import Exporter, ExportResult, _HttpExporter
-from otelmini.pb import encode_attributes, mk_trace_request
+from otelmini.pb import encode_attributes, mk_trace_request, pb_encode_span
 from otelmini.types import InstrumentationScope, MiniSpan, Resource
 
 if TYPE_CHECKING:
@@ -150,7 +150,7 @@ def encode_resource_spans(spans: Sequence[MiniSpan]) -> list[PB2ResourceSpans]:
     for span in spans:
         resource = span.get_resource()
         instrumentation_scope = span.get_instrumentation_scope()
-        pb2_span = encode_span(span)
+        pb2_span = pb_encode_span(span)
         sdk_resource_spans[resource][instrumentation_scope].append(pb2_span)
 
     pb2_resource_spans = []
@@ -200,46 +200,3 @@ _SPAN_KIND_MAP = {
     SpanKind.PRODUCER: PB2SPan.SpanKind.SPAN_KIND_PRODUCER,
     SpanKind.CONSUMER: PB2SPan.SpanKind.SPAN_KIND_CONSUMER,
 }
-
-
-def encode_span(span: MiniSpan) -> PB2SPan:
-    span_context = span.get_span_context()
-    return PB2SPan(
-        trace_id=encode_trace_id(span_context.trace_id),
-        span_id=encode_span_id(span_context.span_id),
-        trace_state=encode_trace_state(span_context.trace_state),
-        name=span.get_name(),
-        # parent_span_id=encode_parent_id(span.parent),
-        # kind=_SPAN_KIND_MAP[span.kind],
-        # start_time_unix_nano=span.start_time,
-        # end_time_unix_nano=span.end_time,
-        # attributes=encode_attributes(span.attributes),
-        # events=encode_events(span.events),
-        # links=encode_links(span.links),
-        # status=encode_status(span.status),
-        # dropped_attributes_count=span.dropped_attributes,
-        # dropped_events_count=span.dropped_events,
-        # dropped_links_count=span.dropped_links,
-        # flags=_span_flags(span.parent),
-    )
-
-
-def encode_trace_state(trace_state: TraceState) -> Optional[str]:
-    pb2_trace_state = None
-    if trace_state is not None:
-        pb2_trace_state = ",".join([f"{key}={value}" for key, value in (trace_state.items())])
-    return pb2_trace_state
-
-
-def encode_parent_id(context: Optional[SpanContext]) -> Optional[bytes]:
-    if context:
-        return encode_span_id(context.span_id)
-    return None
-
-
-def encode_span_id(span_id: int) -> bytes:
-    return span_id.to_bytes(length=8, byteorder="big", signed=False)
-
-
-def encode_trace_id(trace_id: int) -> bytes:
-    return trace_id.to_bytes(length=16, byteorder="big", signed=False)

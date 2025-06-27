@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections import defaultdict
 from typing import Any, Mapping, Optional, Sequence
 
@@ -12,12 +14,12 @@ from opentelemetry.proto.common.v1.common_pb2 import KeyValueList as PB2KeyValue
 from opentelemetry.proto.resource.v1.resource_pb2 import (
     Resource as PB2Resource,
 )
-from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans as PB2ResourceSpans
+from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans as PB2ResourceSpans, Span as PB2SPan
 from opentelemetry.proto.trace.v1.trace_pb2 import ScopeSpans as PB2ScopeSpans
 from opentelemetry.proto.trace.v1.trace_pb2 import Span as PB2SPan
 from opentelemetry.proto.trace.v1.trace_pb2 import SpanFlags as PB2SpanFlags
 from opentelemetry.proto.trace.v1.trace_pb2 import Status as PB2Status
-from opentelemetry.trace import Link, SpanKind
+from opentelemetry.trace import Link, SpanKind, TraceState
 
 from otelmini.types import InstrumentationScope, MiniSpan, Resource
 
@@ -173,3 +175,40 @@ def encode_value(value: Any) -> PB2AnyValue:
 class EncodingError(Exception):
     def __init__(self, value):
         super().__init__(f"Invalid type {type(value)} of value {value}")
+
+
+def pb_encode_span(span: MiniSpan) -> PB2SPan:
+    span_context = span.get_span_context()
+    return PB2SPan(
+        trace_id=pb_encode_trace_id(span_context.trace_id),
+        span_id=pb_encode_span_id(span_context.span_id),
+        trace_state=pb_encode_trace_state(span_context.trace_state),
+        name=span.get_name(),
+        # parent_span_id=encode_parent_id(span.parent),
+        # kind=_SPAN_KIND_MAP[span.kind],
+        # start_time_unix_nano=span.start_time,
+        # end_time_unix_nano=span.end_time,
+        # attributes=encode_attributes(span.attributes),
+        # events=encode_events(span.events),
+        # links=encode_links(span.links),
+        # status=encode_status(span.status),
+        # dropped_attributes_count=span.dropped_attributes,
+        # dropped_events_count=span.dropped_events,
+        # dropped_links_count=span.dropped_links,
+        # flags=_span_flags(span.parent),
+    )
+
+
+def pb_encode_trace_state(trace_state: TraceState) -> Optional[str]:
+    pb2_trace_state = None
+    if trace_state is not None:
+        pb2_trace_state = ",".join([f"{key}={value}" for key, value in (trace_state.items())])
+    return pb2_trace_state
+
+
+def pb_encode_span_id(span_id: int) -> bytes:
+    return span_id.to_bytes(length=8, byteorder="big", signed=False)
+
+
+def pb_encode_trace_id(trace_id: int) -> bytes:
+    return trace_id.to_bytes(length=16, byteorder="big", signed=False)
