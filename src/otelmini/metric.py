@@ -187,6 +187,7 @@ class MeterProvider(ApiMeterProvider):
 
 
 class Counter(ApiCounter):
+
     def __init__(self, name: str, unit: str = "", description: str = ""):
         self.name = name
         self.unit = unit
@@ -208,6 +209,7 @@ class Counter(ApiCounter):
 
 
 class Meter(ApiMeter):
+
     def __init__(
         self,
         meter_provider: MeterProvider,
