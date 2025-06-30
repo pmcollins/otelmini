@@ -5,7 +5,7 @@ from otelmini.metric import ManualExportingMetricReader, MeterProvider
 
 
 def test_metric():
-    exporter = TestExporter()
+    exporter = FakeExporter()
     reader = ManualExportingMetricReader(exporter)
     meter_provider = MeterProvider(metric_readers=(reader,))
     meter = meter_provider.get_meter(name="my-meter")
@@ -15,7 +15,7 @@ def test_metric():
     assert len(exporter.get_exports())
 
 
-class TestExporter(Exporter):
+class FakeExporter(Exporter):
     def __init__(self):
         self.exports = []
 
@@ -25,5 +25,3 @@ class TestExporter(Exporter):
 
     def get_exports(self):
         return self.exports
-
-
