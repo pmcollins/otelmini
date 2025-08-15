@@ -151,7 +151,7 @@ class MetricProducer:
     def produce(self) -> MetricsData:
         print(f"produce: Counters registered: {len(self.counters)}")
         scope = InstrumentationScope(name="opentelemetry")
-        data_points = [NumberDataPoint({}, counter.get_value(), 0, 0) for counter in self.counters]
+        data_points = [NumberDataPoint({}, 0, 0, counter.get_value()) for counter in self.counters]
         sum_metric = Sum(
             data_points,
             is_monotonic=True,
