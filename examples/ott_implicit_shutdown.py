@@ -12,12 +12,11 @@ from otelmini.trace import GrpcSpanExporter, MiniTracerProvider
 
 if __name__ == '__main__':
     os.environ["OTEL_SERVICE_NAME"] = "manual"
-    tp = MiniTracerProvider()
-    proc = BatchProcessor(
+    tp = MiniTracerProvider(BatchProcessor(
         GrpcSpanExporter(),
         batch_size=24,
         interval_seconds=6,
-    )
+    ))
     trace.set_tracer_provider(tp)
 
     tracer = tp.get_tracer(__name__)
