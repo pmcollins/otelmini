@@ -4,24 +4,20 @@ from pathlib import Path
 from typing import Mapping, Optional, Sequence
 
 from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
 from oteltest import OtelTest, Telemetry
 from oteltest.telemetry import count_spans
 
 from otelmini.processor import BatchProcessor
-from otelmini.trace import GrpcSpanExporter
+from otelmini.trace import GrpcSpanExporter, MiniTracerProvider
 
 if __name__ == '__main__':
     os.environ["OTEL_SERVICE_NAME"] = "manual"
-    tp = TracerProvider()
-    exporter = GrpcSpanExporter()
+    tp = MiniTracerProvider()
     proc = BatchProcessor(
-        exporter,
+        GrpcSpanExporter(),
         batch_size=24,
         interval_seconds=6,
     )
-
-    tp.add_span_processor(proc)
     trace.set_tracer_provider(tp)
 
     tracer = tp.get_tracer(__name__)
