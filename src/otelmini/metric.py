@@ -12,8 +12,17 @@ from opentelemetry.metrics import MeterProvider as ApiMeterProvider
 from opentelemetry.metrics import ObservableCounter as ApiObservableCounter
 from opentelemetry.metrics import ObservableGauge as ApiObservableGauge
 from opentelemetry.metrics import ObservableUpDownCounter as ApiObservableUpDownCounter
-from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import ExportMetricsServiceRequest, \
-    ExportMetricsServiceResponse
+from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import ExportMetricsServiceRequest
+from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import ExportMetricsServiceResponse
+from opentelemetry.proto.common.v1.common_pb2 import AnyValue, KeyValue, InstrumentationScope as PbInstrumentationScope
+from opentelemetry.proto.metrics.v1.metrics_pb2 import (
+    Metric as PbMetric,
+    NumberDataPoint as PbNumberDataPoint,
+    ResourceMetrics as PbResourceMetrics,
+    ScopeMetrics as PbScopeMetrics,
+    Sum as PbSum,
+)
+from opentelemetry.proto.resource.v1.resource_pb2 import Resource as PbResource
 
 from otelmini._grpclib import GrpcExporter
 from otelmini._lib import Exporter
@@ -72,8 +81,8 @@ class GrpcMetricExporter(Exporter):
             stub_class=MetricsServiceStub,
         )
 
-    def export(self, metrics: Sequence[Metric]) -> MetricExportResult:
-        req = mk_metric_request(metrics)
+    def export(self, metrics_data: MetricsData) -> MetricExportResult:
+        req = mk_metric_request(metrics_data)
         return self.exporter.export(req)
 
     def force_flush(self, timeout_millis: float = 10_000) -> bool:
@@ -83,11 +92,63 @@ class GrpcMetricExporter(Exporter):
         self.exporter.shutdown()
 
 
-def mk_metric_request(metrics: Sequence[Metric]) -> ExportMetricsServiceRequest:  # noqa: ARG001
-    from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import ExportMetricsServiceRequest
-    from opentelemetry.proto.metrics.v1.metrics_pb2 import ResourceMetrics
+def mk_metric_request(metrics_data: MetricsData) -> ExportMetricsServiceRequest:
+    resource_metrics_list = []
+    for rm in metrics_data.resource_metrics:
+        scope_metrics_list = []
+        for sm in rm.scope_metrics:
+            pb_metrics = []
+            for metric in sm.metrics:
+                data_points = []
+                if isinstance(metric.data, Sum):
+                    for point in metric.data.data_points:
+                        attributes = [
+                            KeyValue(key=k, value=AnyValue(string_value=str(v)))
+                            for k, v in point.attributes.items()
+                        ]
+                        data_points.append(
+                            PbNumberDataPoint(
+                                attributes=attributes,
+                                start_time_unix_nano=point.start_time_unix_nano,
+                                time_unix_nano=point.time_unix_nano,
+                                as_double=point.value,
+                            )
+                        )
+                    pb_metric_data = PbSum(
+                        data_points=data_points,
+                        aggregation_temporality=metric.data.aggregation_temporality.value,
+                        is_monotonic=metric.data.is_monotonic,
+                    )
+                    pb_metrics.append(
+                        PbMetric(
+                            name=metric.name,
+                            description=metric.description,
+                            unit=metric.unit,
+                            sum=pb_metric_data,
+                        )
+                    )
 
-    return ExportMetricsServiceRequest(resource_metrics=[ResourceMetrics()])
+            scope_metrics_list.append(
+                PbScopeMetrics(
+                    scope=PbInstrumentationScope(name=sm.scope.name, version=sm.scope.version),
+                    metrics=pb_metrics,
+                    schema_url=sm.schema_url,
+                )
+            )
+
+        resource_attributes = [
+            KeyValue(key=k, value=AnyValue(string_value=str(v)))
+            for k, v in rm.resource.get_attributes().items()
+        ]
+        resource_metrics_list.append(
+            PbResourceMetrics(
+                resource=PbResource(attributes=resource_attributes),
+                scope_metrics=scope_metrics_list,
+                schema_url=rm.schema_url,
+            )
+        )
+
+    return ExportMetricsServiceRequest(resource_metrics=resource_metrics_list)
 
 
 class ConsoleMetricExporter(Exporter[Metric]):
@@ -120,7 +181,7 @@ class MetricReader(ABC):
 
 class ManualExportingMetricReader(MetricReader):
 
-    def __init__(self, exporter: Exporter[Metric]):
+    def __init__(self, exporter: Exporter[MetricsData]):
         self.metric_producer = None
         self.exporter = exporter
 
