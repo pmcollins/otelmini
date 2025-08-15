@@ -2,15 +2,18 @@ import time
 from pathlib import Path
 from typing import Mapping, Optional, Sequence
 
-from otelmini.metric import ManualExportingMetricReader, MeterProvider, GrpcMetricExporter
+from otelmini.metric import ManualExportingMetricReader, MeterProvider, GrpcMetricExporter, ConsoleMetricExporter
 
 if __name__ == '__main__':
     exporter = GrpcMetricExporter()
+    # exporter = ConsoleMetricExporter()
     reader = ManualExportingMetricReader(exporter=exporter)
     meter_provider = MeterProvider(metric_readers=(reader,))
     meter = meter_provider.get_meter("my-meter")
     counter = meter.create_counter("x")
     counter.add(42)
+    time.sleep(1)
+    reader.force_flush()
     time.sleep(1)
 
 
