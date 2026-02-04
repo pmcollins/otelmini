@@ -52,8 +52,8 @@ class Retrier:
 
 class _HttpExporter:
     class SingleHttpAttempt:
-        def __init__(self, request, parsed_url, timeout):
-            self.request = request
+        def __init__(self, data: str, parsed_url, timeout):
+            self.data = data
             self.parsed_url = parsed_url
             self.timeout = timeout
 
@@ -66,9 +66,9 @@ class _HttpExporter:
                 TOO_MANY_REQUESTS,
                 HTTPConnection,
             )
-            data = self.request.SerializeToString()
+            body = self.data.encode("utf-8")
             conn = HTTPConnection(self.parsed_url.netloc, timeout=self.timeout)
-            conn.request("POST", self.parsed_url.path, data, {"Content-Type": "application/x-protobuf"})
+            conn.request("POST", self.parsed_url.path, body, {"Content-Type": "application/json"})
             response = conn.getresponse()
             response.read()
             conn.close()
@@ -84,7 +84,7 @@ class _HttpExporter:
         self.timeout = timeout
         self.retrier = Retrier(4)
 
-    def export(self, request):
-        attempt = _HttpExporter.SingleHttpAttempt(request, self.parsed_url, self.timeout)
+    def export(self, data: str):
+        attempt = _HttpExporter.SingleHttpAttempt(data, self.parsed_url, self.timeout)
         retry_result = self.retrier.retry(attempt.export)
         return ExportResult.SUCCESS if retry_result == RetrierResult.SUCCESS else ExportResult.FAILURE

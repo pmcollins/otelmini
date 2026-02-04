@@ -9,18 +9,11 @@ from opentelemetry._logs import LogRecord as ApiLogRecord
 from opentelemetry._logs import Logger as ApiLogger
 from opentelemetry._logs import LoggerProvider as ApiLoggerProvider
 from opentelemetry._logs import SeverityNumber
-from opentelemetry.proto.collector.logs.v1.logs_service_pb2 import (
-    ExportLogsServiceRequest as PB2ExportLogsServiceRequest,
-)
-from opentelemetry.proto.common.v1.common_pb2 import AnyValue as PB2AnyValue
-from opentelemetry.proto.common.v1.common_pb2 import KeyValue as PB2KeyValue
-from opentelemetry.proto.logs.v1.logs_pb2 import LogRecord as PB2LogRecord
-from opentelemetry.proto.logs.v1.logs_pb2 import ResourceLogs as PB2ResourceLogs
-from opentelemetry.proto.logs.v1.logs_pb2 import ScopeLogs as PB2ScopeLogs
 from opentelemetry.trace import TraceFlags
 from opentelemetry.util.types import Attributes
 
 from otelmini._lib import Exporter, ExportResult, _HttpExporter
+from otelmini.encode import encode_logs_request
 
 
 class LogExportResult(Enum):
@@ -95,8 +88,8 @@ class HttpLogExporter(LogRecordExporter):
         self._exporter = _HttpExporter(endpoint, timeout)
 
     def export(self, logs: Sequence[MiniLogRecord]) -> ExportResult:
-        request = mk_log_request(logs)
-        return self._exporter.export(request)
+        data = encode_logs_request(logs)
+        return self._exporter.export(data)
 
     def force_flush(self, timeout_millis: Optional[int] = None) -> bool:
         pass
@@ -200,39 +193,3 @@ class OtelBridgeLoggingHandler(logging.Handler):
         except (AttributeError, TypeError):
             logging.exception("error emitting log record")
             self.handleError(record)
-
-
-def mk_log_request(logs: Sequence[MiniLogRecord]) -> PB2ExportLogsServiceRequest:
-    req = PB2ExportLogsServiceRequest()
-    for log in logs:
-        # Simplified logging: just append the log message as a string
-        log_record = PB2LogRecord(
-            time_unix_nano=log.timestamp or 0,
-            severity_number=log.severity_number.value if log.severity_number else 0,
-            severity_text=log.severity_text or "",
-            body=PB2AnyValue(string_value=str(log.body) if log.body else ""),
-            attributes=[
-                PB2KeyValue(key=key, value=PB2AnyValue(string_value=str(value)))
-                for key, value in (log.attributes or {}).items()
-            ],
-        )
-        req.resource_logs.append(
-            PB2ResourceLogs(
-                scope_logs=[PB2ScopeLogs(log_records=[log_record])],
-            )
-        )
-    return req
-
-
-def encode_log_record(log_record: MiniLogRecord) -> PB2LogRecord:
-    # Basic encoding logic for a log record
-    return PB2LogRecord(
-        time_unix_nano=log_record.timestamp or 0,
-        severity_number=log_record.severity_number.value if log_record.severity_number else 0,
-        severity_text=log_record.severity_text or "",
-        body=PB2AnyValue(string_value=str(log_record.body) if log_record.body else ""),
-        attributes=[
-            PB2KeyValue(key=key, value=PB2AnyValue(string_value=str(value)))
-            for key, value in (log_record.attributes or {}).items()
-        ],
-    )

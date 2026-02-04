@@ -10,8 +10,7 @@ from otelmini.log import (
     SeverityNumber,
 )
 from otelmini.processor import BatchProcessor
-from opentelemetry.proto.logs.v1.logs_pb2 import LogRecord as PB2LogRecord
-from otelmini.log import encode_log_record
+from otelmini.encode import encode_logs_request
 
 
 def test_basic_logging(capsys):
@@ -69,15 +68,27 @@ def test_encode_log_record():
         attributes={"test.attribute": "value"}
     )
 
-    # Action: Encode the LogRecord
-    encoded_record = encode_log_record(log_record)
+    # Action: Encode the LogRecord to JSON
+    encoded_json = encode_logs_request([log_record])
+    decoded = json.loads(encoded_json)
 
-    # Assertion: Verify the encoded PB2LogRecord
-    assert isinstance(encoded_record, PB2LogRecord)
-    assert encoded_record.time_unix_nano == 1234567890
-    assert encoded_record.severity_number == SeverityNumber.INFO.value
-    assert encoded_record.severity_text == "INFO"
-    assert encoded_record.body.string_value == "Test log message"
-    assert len(encoded_record.attributes) == 1
-    assert encoded_record.attributes[0].key == "test.attribute"
-    assert encoded_record.attributes[0].value.string_value == "value"
+    # Assertion: Verify the encoded structure
+    assert "resourceLogs" in decoded
+    assert len(decoded["resourceLogs"]) == 1
+
+    resource_log = decoded["resourceLogs"][0]
+    assert "scopeLogs" in resource_log
+    assert len(resource_log["scopeLogs"]) == 1
+
+    scope_log = resource_log["scopeLogs"][0]
+    assert "logRecords" in scope_log
+    assert len(scope_log["logRecords"]) == 1
+
+    log_rec = scope_log["logRecords"][0]
+    assert log_rec["timeUnixNano"] == "1234567890"
+    assert log_rec["severityNumber"] == SeverityNumber.INFO.value
+    assert log_rec["severityText"] == "INFO"
+    assert log_rec["body"]["stringValue"] == "Test log message"
+    assert len(log_rec["attributes"]) == 1
+    assert log_rec["attributes"][0]["key"] == "test.attribute"
+    assert log_rec["attributes"][0]["value"]["stringValue"] == "value"

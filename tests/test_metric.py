@@ -1,7 +1,9 @@
+import json
 from typing import Sequence
 
 from otelmini._lib import Exporter, T, ExportResult
-from otelmini.metric import ManualExportingMetricReader, MeterProvider, mk_metric_request
+from otelmini.metric import ManualExportingMetricReader, MeterProvider
+from otelmini.encode import encode_metrics_request
 from otelmini.point import (
     AggregationTemporality,
     Metric,
@@ -14,7 +16,7 @@ from otelmini.point import (
 from otelmini.types import InstrumentationScope, Resource
 
 
-def test_mk_metric_request():
+def test_encode_metrics_request():
     data_point = NumberDataPoint(
         attributes={"label": "value"},
         start_time_unix_nano=1678886400000000000,
@@ -47,45 +49,42 @@ def test_mk_metric_request():
     )
     metrics_data = MetricsData(resource_metrics=[resource_metrics])
 
-    request = mk_metric_request(metrics_data)
+    encoded_json = encode_metrics_request(metrics_data)
+    decoded = json.loads(encoded_json)
 
-    assert len(request.resource_metrics) == 1
-    proto_resource_metrics = request.resource_metrics[0]
-    assert proto_resource_metrics.schema_url == "http://example.com/resource_schema"
-    assert len(proto_resource_metrics.resource.attributes) == 1
-    assert proto_resource_metrics.resource.attributes[0].key == "service.name"
-    assert (
-        proto_resource_metrics.resource.attributes[0].value.string_value
-        == "test_service"
-    )
+    assert "resourceMetrics" in decoded
+    assert len(decoded["resourceMetrics"]) == 1
 
-    assert len(proto_resource_metrics.scope_metrics) == 1
-    proto_scope_metrics = proto_resource_metrics.scope_metrics[0]
-    assert proto_scope_metrics.schema_url == "http://example.com/schema"
-    assert proto_scope_metrics.scope.name == "test.scope"
-    assert proto_scope_metrics.scope.version == "0.1.0"
+    rm = decoded["resourceMetrics"][0]
+    assert rm["schemaUrl"] == "http://example.com/resource_schema"
+    assert len(rm["resource"]["attributes"]) == 1
+    assert rm["resource"]["attributes"][0]["key"] == "service.name"
+    assert rm["resource"]["attributes"][0]["value"]["stringValue"] == "test_service"
 
-    assert len(proto_scope_metrics.metrics) == 1
-    proto_metric = proto_scope_metrics.metrics[0]
-    assert proto_metric.name == "test.metric"
-    assert proto_metric.description == "A test metric"
-    assert proto_metric.unit == "ms"
+    assert len(rm["scopeMetrics"]) == 1
+    sm = rm["scopeMetrics"][0]
+    assert sm["schemaUrl"] == "http://example.com/schema"
+    assert sm["scope"]["name"] == "test.scope"
+    assert sm["scope"]["version"] == "0.1.0"
 
-    proto_sum = proto_metric.sum
-    assert proto_sum.is_monotonic is True
-    assert (
-        proto_sum.aggregation_temporality
-        == AggregationTemporality.CUMULATIVE.value
-    )
+    assert len(sm["metrics"]) == 1
+    m = sm["metrics"][0]
+    assert m["name"] == "test.metric"
+    assert m["description"] == "A test metric"
+    assert m["unit"] == "ms"
 
-    assert len(proto_sum.data_points) == 1
-    proto_data_point = proto_sum.data_points[0]
-    assert proto_data_point.start_time_unix_nano == 1678886400000000000
-    assert proto_data_point.time_unix_nano == 1678886401000000000
-    assert proto_data_point.as_double == 123.45
-    assert len(proto_data_point.attributes) == 1
-    assert proto_data_point.attributes[0].key == "label"
-    assert proto_data_point.attributes[0].value.string_value == "value"
+    s = m["sum"]
+    assert s["isMonotonic"] is True
+    assert s["aggregationTemporality"] == AggregationTemporality.CUMULATIVE.value
+
+    assert len(s["dataPoints"]) == 1
+    dp = s["dataPoints"][0]
+    assert dp["startTimeUnixNano"] == "1678886400000000000"
+    assert dp["timeUnixNano"] == "1678886401000000000"
+    assert dp["asDouble"] == 123.45
+    assert len(dp["attributes"]) == 1
+    assert dp["attributes"][0]["key"] == "label"
+    assert dp["attributes"][0]["value"]["stringValue"] == "value"
 
 
 def test_metric():

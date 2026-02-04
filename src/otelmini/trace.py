@@ -3,25 +3,16 @@ from __future__ import annotations
 import logging
 import random
 import typing
-from collections import defaultdict
 from typing import TYPE_CHECKING, Iterator, Optional, Sequence
 
 from opentelemetry import trace
-from opentelemetry.proto.common.v1.common_pb2 import InstrumentationScope as PB2InstrumentationScope
-from opentelemetry.proto.resource.v1.resource_pb2 import (
-    Resource as PB2Resource,
-)
-from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans as PB2ResourceSpans
-from opentelemetry.proto.trace.v1.trace_pb2 import ScopeSpans as PB2ScopeSpans
-from opentelemetry.proto.trace.v1.trace_pb2 import Span as PB2SPan
-from opentelemetry.proto.trace.v1.trace_pb2 import SpanFlags as PB2SpanFlags
 from opentelemetry.trace import Span as ApiSpan
 from opentelemetry.trace import SpanKind, Tracer, TracerProvider, _Links
 from opentelemetry.trace.span import SpanContext
 from opentelemetry.util._decorator import _agnosticcontextmanager
 
 from otelmini._lib import Exporter, ExportResult, _HttpExporter
-from otelmini.pb import encode_attributes, mk_trace_request, pb_encode_span
+from otelmini.encode import encode_trace_request
 from otelmini.types import InstrumentationScope, MiniSpan, Resource
 
 if TYPE_CHECKING:
@@ -31,7 +22,6 @@ if TYPE_CHECKING:
     from otelmini.processor import Processor
 
 _pylogger = logging.getLogger(__package__)
-_tracer = trace.get_tracer(__package__)
 
 
 def _generate_trace_id() -> int:
@@ -120,63 +110,5 @@ class HttpSpanExporter(Exporter[MiniSpan]):
         self._exporter = _HttpExporter(endpoint, timeout)
 
     def export(self, items: Sequence[MiniSpan]) -> ExportResult:
-        request = mk_trace_request(items)
-        return self._exporter.export(request)
-
-
-def encode_resource_spans(spans: Sequence[MiniSpan]) -> list[PB2ResourceSpans]:
-    sdk_resource_spans = defaultdict(lambda: defaultdict(list))
-
-    for span in spans:
-        resource = span.get_resource()
-        instrumentation_scope = span.get_instrumentation_scope()
-        pb2_span = pb_encode_span(span)
-        sdk_resource_spans[resource][instrumentation_scope].append(pb2_span)
-
-    pb2_resource_spans = []
-
-    for resource, sdk_instrumentations in sdk_resource_spans.items():
-        scope_spans = []
-        for instrumentation_scope, pb2_spans in sdk_instrumentations.items():
-            scope_spans.append(
-                PB2ScopeSpans(
-                    scope=(encode_instrumentation_scope(instrumentation_scope)),
-                    spans=pb2_spans,
-                )
-            )
-        pb2_resource_spans.append(
-            PB2ResourceSpans(
-                resource=encode_resource(resource),
-                scope_spans=scope_spans,
-                schema_url=resource.get_schema_url(),
-            )
-        )
-
-    return pb2_resource_spans
-
-
-def encode_resource(resource: Resource) -> PB2Resource:
-    return PB2Resource(attributes=encode_attributes(resource.get_attributes()))
-
-
-def encode_instrumentation_scope(instrumentation_scope: InstrumentationScope) -> PB2InstrumentationScope:
-    return PB2InstrumentationScope(
-        name=instrumentation_scope.name,
-        version=instrumentation_scope.version,
-    )
-
-
-def span_flags(parent_span_context: Optional[SpanContext]) -> int:
-    flags = PB2SpanFlags.SPAN_FLAGS_CONTEXT_HAS_IS_REMOTE_MASK
-    if parent_span_context and parent_span_context.is_remote:
-        flags |= PB2SpanFlags.SPAN_FLAGS_CONTEXT_IS_REMOTE_MASK
-    return flags
-
-
-_SPAN_KIND_MAP = {
-    SpanKind.INTERNAL: PB2SPan.SpanKind.SPAN_KIND_INTERNAL,
-    SpanKind.SERVER: PB2SPan.SpanKind.SPAN_KIND_SERVER,
-    SpanKind.CLIENT: PB2SPan.SpanKind.SPAN_KIND_CLIENT,
-    SpanKind.PRODUCER: PB2SPan.SpanKind.SPAN_KIND_PRODUCER,
-    SpanKind.CONSUMER: PB2SPan.SpanKind.SPAN_KIND_CONSUMER,
-}
+        data = encode_trace_request(items)
+        return self._exporter.export(data)
