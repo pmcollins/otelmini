@@ -2,10 +2,10 @@ import time
 from pathlib import Path
 from typing import Mapping, Optional, Sequence
 
-from otelmini.metric import ManualExportingMetricReader, MeterProvider, ConsoleMetricExporter
+from otelmini.metric import ManualExportingMetricReader, MeterProvider, HttpMetricExporter
 
 if __name__ == '__main__':
-    exporter = ConsoleMetricExporter()
+    exporter = HttpMetricExporter()
     reader = ManualExportingMetricReader(exporter=exporter)
     meter_provider = MeterProvider(metric_readers=(reader,))
     meter = meter_provider.get_meter("my-meter")
