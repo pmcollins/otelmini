@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import time
 from abc import abstractmethod
 from enum import Enum
 from typing import Any, Optional, Sequence
@@ -11,7 +10,7 @@ from opentelemetry._logs import Logger as ApiLogger
 from opentelemetry._logs import LoggerProvider as ApiLoggerProvider
 from opentelemetry._logs import SeverityNumber
 from opentelemetry.proto.collector.logs.v1.logs_service_pb2 import (
-    ExportLogsServiceRequest as PB2ExportLogsServiceRequest, ExportLogsServiceResponse,
+    ExportLogsServiceRequest as PB2ExportLogsServiceRequest,
 )
 from opentelemetry.proto.common.v1.common_pb2 import AnyValue as PB2AnyValue
 from opentelemetry.proto.common.v1.common_pb2 import KeyValue as PB2KeyValue
@@ -89,50 +88,6 @@ class ConsoleLogExporter(LogRecordExporter):
 
     def shutdown(self, timeout_millis: Optional[int] = None) -> None:
         pass
-
-
-class GrpcLogExporterImportError(ImportError):
-    def __init__(
-        self,
-        message: str = "The opentelemetry-proto package is required for GrpcLogExporter. Install it with: pip install otelmini[grpc]",
-    ):
-        super().__init__(message)
-
-
-class GrpcLogExporter(LogRecordExporter):
-    def __init__(self, addr="127.0.0.1:4317", max_retries=3, channel_provider=None, sleep=time.sleep):
-        self.exporter = None
-        self.addr = addr
-        self.max_retries = max_retries
-        self.channel_provider = channel_provider
-        self.sleep = sleep
-
-    def init_grpc(self):
-        try:
-            from opentelemetry.proto.collector.logs.v1.logs_service_pb2_grpc import LogsServiceStub
-
-            from otelmini._grpclib import GrpcExporter
-        except ImportError as err:
-            raise GrpcLogExporterImportError from err
-
-        self.exporter = GrpcExporter(
-            response_class=ExportLogsServiceResponse,
-            addr=self.addr,
-            max_retries=self.max_retries,
-            channel_provider=self.channel_provider,
-            sleep=self.sleep,
-            stub_class=LogsServiceStub,
-        )
-
-    def export(self, logs: Sequence[MiniLogRecord]) -> ExportResult:
-        req = mk_log_request(logs)
-        return self.exporter.export(req)
-
-    def force_flush(self, timeout_millis: Optional[int] = None) -> bool:
-        return self.exporter.force_flush(timeout_millis)
-
-    def shutdown(self, timeout_millis: Optional[int] = None) -> None:
-        self.exporter.shutdown()
 
 
 class HttpLogExporter(LogRecordExporter):

@@ -1,7 +1,7 @@
 import logging
 from typing import Mapping, Optional, Sequence
 
-from _lib import package_grpc
+from _lib import package
 from otelmini.auto._lib import OTEL_MINI_LOG_FORMAT
 
 MSG = "this is a warning"
@@ -13,7 +13,7 @@ class LogsOtelTest:
         return {OTEL_MINI_LOG_FORMAT: "%(message)s"}
 
     def requirements(self) -> Sequence[str]:
-        return (package_grpc(),)
+        return (package(),)
 
     def wrapper_command(self) -> str:
         return "otel"

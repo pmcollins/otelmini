@@ -3,7 +3,7 @@ from typing import Mapping, Optional, Sequence
 
 from opentelemetry import trace
 
-from _lib import package_grpc
+from _lib import package
 
 
 class TraceOtelTest:
@@ -11,7 +11,7 @@ class TraceOtelTest:
         return {}
 
     def requirements(self) -> Sequence[str]:
-        return (package_grpc(),)
+        return (package(),)
 
     def wrapper_command(self) -> str:
         return "otel"

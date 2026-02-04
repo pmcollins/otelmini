@@ -29,11 +29,6 @@ dependencies = [
   "googleapis-common-protos",
 ]
 
-[project.optional-dependencies]
-grpc = [
-  "grpcio",
-]
-
 [project.urls]
 Documentation = "https://github.com/pmcollins/otelmini#readme"
 Issues = "https://github.com/pmcollins/otelmini/issues"

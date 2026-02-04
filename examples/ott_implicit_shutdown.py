@@ -6,7 +6,7 @@ from typing import Mapping, Optional, Sequence
 from opentelemetry import trace
 
 from otelmini.processor import BatchProcessor
-from otelmini.trace import GrpcSpanExporter, MiniTracerProvider
+from otelmini.trace import HttpSpanExporter, MiniTracerProvider
 
 
 class OtelTest:
@@ -15,13 +15,13 @@ class OtelTest:
 
     def requirements(self) -> Sequence[str]:
         parent = str(Path(__file__).resolve().parent.parent)
-        return (parent + "[grpc]",)
+        return (parent,)
 
     def wrapper_command(self) -> str:
         return ""
 
     def is_http(self) -> bool:
-        return False
+        return True
 
     def on_start(self) -> Optional[float]:
         pass
@@ -36,7 +36,7 @@ if __name__ == '__main__':
     os.environ["OTEL_SERVICE_NAME"] = "manual"
     tp = MiniTracerProvider(
         BatchProcessor(
-            GrpcSpanExporter(),
+            HttpSpanExporter(),
             batch_size=24,
             interval_seconds=6,
         )

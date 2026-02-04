@@ -2,13 +2,11 @@ from __future__ import annotations
 
 import logging
 import random
-import time
 import typing
 from collections import defaultdict
 from typing import TYPE_CHECKING, Iterator, Optional, Sequence
 
 from opentelemetry import trace
-from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceResponse
 from opentelemetry.proto.common.v1.common_pb2 import InstrumentationScope as PB2InstrumentationScope
 from opentelemetry.proto.resource.v1.resource_pb2 import (
     Resource as PB2Resource,
@@ -124,50 +122,6 @@ class HttpSpanExporter(Exporter[MiniSpan]):
     def export(self, items: Sequence[MiniSpan]) -> ExportResult:
         request = mk_trace_request(items)
         return self._exporter.export(request)
-
-
-class GrpcSpanExporter(Exporter[MiniSpan]):
-    def __init__(self, addr="127.0.0.1:4317", max_retries=3, channel_provider=None, sleep=time.sleep):
-        self.addr = addr
-        self.max_retries = max_retries
-        self.channel_provider = channel_provider
-        self.sleep = sleep
-        self.exporter = None
-        self.init_grpc()  # this would need to be called lazily for this class to be serializable for multiprocessing
-
-    def init_grpc(self):
-        if self.exporter:
-            return
-
-        from opentelemetry.proto.collector.trace.v1.trace_service_pb2_grpc import TraceServiceStub
-
-        from otelmini._grpclib import GrpcExporter
-
-        self.exporter = GrpcExporter(
-            response_class=ExportTraceServiceResponse,
-            addr=self.addr,
-            max_retries=self.max_retries,
-            channel_provider=self.channel_provider,
-            sleep=self.sleep,
-            stub_class=TraceServiceStub,
-        )
-
-    def export(self, spans: Sequence[MiniSpan]) -> ExportResult:
-        self.init_grpc()
-        req = mk_trace_request(spans)
-        return self.exporter.export(req)
-
-    def force_flush(self, timeout_millis: int = 30000) -> bool:
-        return self.exporter.force_flush(timeout_millis)
-
-    def shutdown(self) -> None:
-        if self.exporter is not None:
-            self.exporter.shutdown()
-            self.exporter = None
-
-    def __setstate__(self, state):
-        self.__dict__.update(state)
-        # self.init_grpc()  # this would have to be called for this class to wake up after being deserialized
 
 
 def encode_resource_spans(spans: Sequence[MiniSpan]) -> list[PB2ResourceSpans]:

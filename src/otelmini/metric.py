@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import time
 from abc import ABC, abstractmethod
 from enum import Enum
 from typing import TYPE_CHECKING, Optional, Sequence
@@ -13,7 +12,6 @@ from opentelemetry.metrics import ObservableCounter as ApiObservableCounter
 from opentelemetry.metrics import ObservableGauge as ApiObservableGauge
 from opentelemetry.metrics import ObservableUpDownCounter as ApiObservableUpDownCounter
 from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import ExportMetricsServiceRequest
-from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import ExportMetricsServiceResponse
 from opentelemetry.proto.common.v1.common_pb2 import AnyValue, KeyValue, InstrumentationScope as PbInstrumentationScope
 from opentelemetry.proto.metrics.v1.metrics_pb2 import (
     Metric as PbMetric,
@@ -24,7 +22,6 @@ from opentelemetry.proto.metrics.v1.metrics_pb2 import (
 )
 from opentelemetry.proto.resource.v1.resource_pb2 import Resource as PbResource
 
-from otelmini._grpclib import GrpcExporter
 from otelmini._lib import Exporter
 from otelmini.point import AggregationTemporality
 from otelmini.point import MetricsData, Metric, ResourceMetrics, ScopeMetrics, Sum, NumberDataPoint
@@ -48,48 +45,6 @@ class MetricExportResult(Enum):
 class CounterError(Exception):
     def __init__(self) -> None:
         super().__init__("Counter cannot be decremented (amount must be non-negative)")
-
-
-class GrpcMetricExporterError(Exception):
-    def __init__(self) -> None:
-        super().__init__("opentelemetry-proto package is required for GrpcMetricExporter")
-
-
-class GrpcMetricExporter(Exporter):
-    def __init__(self, addr="127.0.0.1:4317", max_retries=3, channel_provider=None, sleep=time.sleep):
-        self.addr = addr
-        self.max_retries = max_retries
-        self.channel_provider = channel_provider
-        self.sleep = sleep
-        self.exporter = None
-        self.init_grpc()
-
-    def init_grpc(self):
-        try:
-            from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2_grpc import MetricsServiceStub
-        except ImportError as err:
-            raise GrpcMetricExporterError from err
-
-        if self.exporter:
-            return
-        self.exporter = GrpcExporter(
-            response_class=ExportMetricsServiceResponse,
-            addr=self.addr,
-            max_retries=self.max_retries,
-            channel_provider=self.channel_provider,
-            sleep=self.sleep,
-            stub_class=MetricsServiceStub,
-        )
-
-    def export(self, metrics_data: MetricsData) -> MetricExportResult:
-        req = mk_metric_request(metrics_data)
-        return self.exporter.export(req)
-
-    def force_flush(self, timeout_millis: float = 10_000) -> bool:
-        return self.exporter.force_flush(timeout_millis)
-
-    def shutdown(self, timeout_millis: float = 30_000) -> None:
-        self.exporter.shutdown()
 
 
 def mk_metric_request(metrics_data: MetricsData) -> ExportMetricsServiceRequest:
