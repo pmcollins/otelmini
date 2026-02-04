@@ -49,7 +49,8 @@ class MiniTracerProvider(TracerProvider):
         return MiniTracer(self.span_processor)
 
     def shutdown(self):
-        pass
+        if self.span_processor:
+            self.span_processor.shutdown()
 
 
 class MiniTracer(Tracer):
@@ -181,8 +182,8 @@ def encode_resource(resource: Resource) -> PB2Resource:
 
 def encode_instrumentation_scope(instrumentation_scope: InstrumentationScope) -> PB2InstrumentationScope:
     return PB2InstrumentationScope(
-        name=instrumentation_scope.get_name(),
-        version=instrumentation_scope.get_version(),
+        name=instrumentation_scope.name,
+        version=instrumentation_scope.version,
     )
 
 

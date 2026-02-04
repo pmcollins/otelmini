@@ -7,9 +7,9 @@ from otelmini.log import (
     MiniLogRecord,
     Logger,
     LoggerProvider,
-    BatchLogRecordProcessor,
     SeverityNumber,
 )
+from otelmini.processor import BatchProcessor
 from opentelemetry.proto.logs.v1.logs_pb2 import LogRecord as PB2LogRecord
 from otelmini.log import encode_log_record
 
@@ -17,8 +17,8 @@ from otelmini.log import encode_log_record
 def test_basic_logging(capsys):
     # Setup
     console_exporter = ConsoleLogExporter()
-    batch_processor = BatchLogRecordProcessor(console_exporter)
-    logger_provider = LoggerProvider([batch_processor])
+    batch_processor = BatchProcessor(console_exporter, batch_size=512, interval_seconds=5)
+    logger_provider = LoggerProvider(batch_processor)
     logger = logger_provider.get_logger("test_logger")
 
     # Configure root logger
@@ -46,7 +46,7 @@ def test_basic_logging(capsys):
 
     # Emit the log record
     logger.emit(log_record)
-    logger_provider.force_flush()
+    batch_processor.force_flush()
 
     # Capture the output
     captured = capsys.readouterr()
@@ -56,7 +56,7 @@ def test_basic_logging(capsys):
 
     # Cleanup
     root_logger.removeHandler(handler)
-    logger_provider.shutdown()
+    batch_processor.shutdown()
 
 
 def test_encode_log_record():

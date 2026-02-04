@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import time
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from enum import Enum
 from typing import Any, Optional, Sequence
 
@@ -22,7 +22,6 @@ from opentelemetry.trace import TraceFlags
 from opentelemetry.util.types import Attributes
 
 from otelmini._lib import Exporter, ExportResult, _HttpExporter
-from otelmini.processor import BatchProcessor, Processor
 
 
 class LogExportResult(Enum):
@@ -167,9 +166,8 @@ class Logger(ApiLogger):
         self._logger_provider = logger_provider
 
     def emit(self, pylog_record: logging.LogRecord) -> None:
-        pylog_mini_log_record = _pylog_to_minilog(pylog_record)
-        for processor in self._logger_provider.processors:
-            processor.on_end(pylog_mini_log_record)
+        mini_log_record = _pylog_to_minilog(pylog_record)
+        self._logger_provider.log_processor.on_end(mini_log_record)
 
 
 def _pylog_to_minilog(pylog_record):
@@ -198,8 +196,8 @@ def _pylog_to_minilog(pylog_record):
 
 
 class LoggerProvider(ApiLoggerProvider):
-    def __init__(self, processors: Optional[Sequence[LogRecordProcessor]] = None):
-        self.processors = list(processors) if processors else []
+    def __init__(self, log_processor=None):
+        self.log_processor = log_processor
 
     def get_logger(
         self,
@@ -216,54 +214,9 @@ class LoggerProvider(ApiLoggerProvider):
             attributes=attributes,
         )
 
-    def add_log_record_processor(self, processor: LogRecordProcessor) -> None:
-        self.processors.append(processor)
-
     def shutdown(self) -> None:
-        for processor in self.processors:
-            processor.shutdown()
-
-    def force_flush(self, timeout_millis: Optional[int] = None) -> bool:
-        return all(processor.force_flush(timeout_millis) for processor in self.processors)
-
-
-class LogRecordProcessor(Processor[MiniLogRecord], ABC):
-    @abstractmethod
-    def on_start(self, log_record: MiniLogRecord) -> None:
-        pass
-
-    @abstractmethod
-    def on_end(self, log_record: MiniLogRecord) -> None:
-        pass
-
-    @abstractmethod
-    def shutdown(self) -> None:
-        pass
-
-    @abstractmethod
-    def force_flush(self, timeout_millis: Optional[int] = None) -> bool:
-        pass
-
-
-class BatchLogRecordProcessor(LogRecordProcessor):
-    def __init__(self, exporter: LogRecordExporter, batch_size: int = 512, export_interval_millis: int = 5000):
-        self._processor = BatchProcessor(
-            exporter=exporter,
-            batch_size=batch_size,
-            interval_seconds=export_interval_millis / 1000,
-        )
-
-    def on_start(self, log_record: MiniLogRecord) -> None:
-        self._processor.on_start(log_record)
-
-    def on_end(self, log_record: MiniLogRecord) -> None:
-        self._processor.on_end(log_record)
-
-    def shutdown(self) -> None:
-        self._processor.shutdown()
-
-    def force_flush(self, timeout_millis: Optional[int] = None) -> bool:
-        return self._processor.force_flush(timeout_millis)
+        if self.log_processor:
+            self.log_processor.shutdown()
 
 
 def _get_severity_number(levelno):

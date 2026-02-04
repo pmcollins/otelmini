@@ -19,7 +19,7 @@ class LogsOtelTest:
         return "otel"
 
     def is_http(self) -> bool:
-        return False
+        return True
 
     def on_start(self) -> Optional[float]:
         print("started")
