@@ -78,12 +78,13 @@ _SPAN_KIND_MAP = {
 
 def encode_span(span: MiniSpan) -> PB2SPan:
     span_context = span.get_span_context()
+    parent_span_id = span.get_parent_span_id()
     return PB2SPan(
         trace_id=encode_trace_id(span_context.trace_id),
         span_id=encode_span_id(span_context.span_id),
+        parent_span_id=encode_span_id(parent_span_id) if parent_span_id else None,
         trace_state=encode_trace_state(getattr(span_context, 'trace_state', None)),
         name=span.get_name(),
-        # parent_span_id=encode_parent_id(span.parent),
         # kind=_SPAN_KIND_MAP[span.kind],
         # start_time_unix_nano=span.start_time,
         # end_time_unix_nano=span.end_time,
@@ -179,12 +180,13 @@ class EncodingError(Exception):
 
 def pb_encode_span(span: MiniSpan) -> PB2SPan:
     span_context = span.get_span_context()
+    parent_span_id = span.get_parent_span_id()
     return PB2SPan(
         trace_id=pb_encode_trace_id(span_context.trace_id),
         span_id=pb_encode_span_id(span_context.span_id),
+        parent_span_id=pb_encode_span_id(parent_span_id) if parent_span_id else None,
         trace_state=pb_encode_trace_state(span_context.trace_state),
         name=span.get_name(),
-        # parent_span_id=encode_parent_id(span.parent),
         # kind=_SPAN_KIND_MAP[span.kind],
         # start_time_unix_nano=span.start_time,
         # end_time_unix_nano=span.end_time,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import random
 import time
 import typing
 from collections import defaultdict
@@ -33,6 +34,16 @@ if TYPE_CHECKING:
 
 _pylogger = logging.getLogger(__package__)
 _tracer = trace.get_tracer(__package__)
+
+
+def _generate_trace_id() -> int:
+    """Generate a random 128-bit trace ID."""
+    return random.getrandbits(128)
+
+
+def _generate_span_id() -> int:
+    """Generate a random 64-bit span ID."""
+    return random.getrandbits(64)
 
 
 class MiniTracerProvider(TracerProvider):
@@ -68,8 +79,18 @@ class MiniTracer(Tracer):
         record_exception: bool = True,  # noqa: FBT001, FBT002
         set_status_on_exception: bool = True,  # noqa: FBT001, FBT002
     ) -> ApiSpan:
+        parent_span_context = trace.get_current_span().get_span_context()
+        if parent_span_context.is_valid:
+            trace_id = parent_span_context.trace_id
+            parent_span_id = parent_span_context.span_id
+        else:
+            trace_id = _generate_trace_id()
+            parent_span_id = None
+        span_id = _generate_span_id()
+        span_context = SpanContext(trace_id, span_id, is_remote=False)
         span = MiniSpan(
-            name, SpanContext(0, 0, False), Resource(""), InstrumentationScope("", ""), self.span_processor.on_end
+            name, span_context, Resource(""), InstrumentationScope("", ""), self.span_processor.on_end,
+            parent_span_id=parent_span_id,
         )
         self.span_processor.on_start(span)
         return span

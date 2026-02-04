@@ -72,6 +72,7 @@ class MiniSpan(ApiSpan):
         resource: Resource,
         instrumentation_scope: InstrumentationScope,
         on_end_callback: Callable[["MiniSpan"], None],
+        parent_span_id: Optional[int] = None,
     ):
         self._name = name
         self._span_context = span_context
@@ -82,6 +83,10 @@ class MiniSpan(ApiSpan):
         self._status = None
         self._status_description = None
         self._on_end_callback = on_end_callback
+        self._parent_span_id = parent_span_id
+
+    def get_parent_span_id(self) -> Optional[int]:
+        return self._parent_span_id
 
     def __enter__(self):
         return self
