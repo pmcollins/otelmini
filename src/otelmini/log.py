@@ -46,6 +46,9 @@ class MiniLogRecord(ApiLogRecord):
             attributes=attributes or {},
         )
 
+    def __str__(self) -> str:
+        return f"MiniLogRecord(severity={self.severity_text}, body='{self.body}')"
+
 
 class LogExportError(Exception):
     def __init__(self, message: str = "Error exporting logs"):
@@ -68,8 +71,7 @@ class LogRecordExporter(Exporter[MiniLogRecord]):
 
 class ConsoleLogExporter(LogRecordExporter):
     def export(self, items: Sequence[MiniLogRecord]) -> ExportResult:
-        for item in items:
-            print(f"log: {item}")  # noqa: T201
+        print(encode_logs_request(items))  # noqa: T201
         return ExportResult.SUCCESS
 
     def force_flush(self, timeout_millis: Optional[int] = None) -> bool:

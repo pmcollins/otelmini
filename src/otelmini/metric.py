@@ -52,10 +52,7 @@ class HttpMetricExporter(Exporter[MetricsData]):
 
 class ConsoleMetricExporter(Exporter[MetricsData]):
     def export(self, items: MetricsData) -> ExportResult:
-        for rm in items.resource_metrics:
-            for sm in rm.scope_metrics:
-                for metric in sm.metrics:
-                    print(f"metric: {metric}")  # noqa: T201
+        print(encode_metrics_request(items))  # noqa: T201
         return ExportResult.SUCCESS
 
     def force_flush(self, timeout_millis: float = 10_000) -> bool:
@@ -108,10 +105,8 @@ class MetricProducer:
 
     def _register_counter(self, counter: Counter) -> None:
         self.counters.append(counter)
-        print(f"_register_counter: Counters registered: {len(self.counters)}")
 
     def produce(self) -> MetricsData:
-        print(f"produce: Counters registered: {len(self.counters)}")
         scope = InstrumentationScope(name="opentelemetry")
         data_points = [NumberDataPoint({}, 0, 0, counter.get_value()) for counter in self.counters]
         sum_metric = Sum(

@@ -107,8 +107,7 @@ class MiniTracer(Tracer):
 
 class ConsoleSpanExporter(Exporter[MiniSpan]):
     def export(self, items: Sequence[MiniSpan]) -> ExportResult:
-        for item in items:
-            print(f"span: {item}")  # noqa: T201
+        print(encode_trace_request(items))  # noqa: T201
         return ExportResult.SUCCESS
 
 
