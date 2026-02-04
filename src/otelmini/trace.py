@@ -47,8 +47,9 @@ def _generate_span_id() -> int:
 
 
 class MiniTracerProvider(TracerProvider):
-    def __init__(self, span_processor=None):
+    def __init__(self, span_processor=None, resource: Resource = None):
         self.span_processor = span_processor
+        self.resource = resource or Resource()
 
     def get_tracer(
         self,
@@ -57,7 +58,8 @@ class MiniTracerProvider(TracerProvider):
         schema_url: typing.Optional[str] = None,
         attributes: typing.Optional[types.Attributes] = None,
     ) -> MiniTracer:
-        return MiniTracer(self.span_processor)
+        scope = InstrumentationScope(instrumenting_module_name, instrumenting_library_version)
+        return MiniTracer(self.span_processor, self.resource, scope)
 
     def shutdown(self):
         if self.span_processor:
@@ -65,8 +67,10 @@ class MiniTracerProvider(TracerProvider):
 
 
 class MiniTracer(Tracer):
-    def __init__(self, span_processor: Processor[MiniSpan]):
+    def __init__(self, span_processor: Processor[MiniSpan], resource: Resource, scope: InstrumentationScope):
         self.span_processor = span_processor
+        self.resource = resource
+        self.scope = scope
 
     def start_span(
         self,
@@ -89,7 +93,7 @@ class MiniTracer(Tracer):
         span_id = _generate_span_id()
         span_context = SpanContext(trace_id, span_id, is_remote=False)
         span = MiniSpan(
-            name, span_context, Resource(""), InstrumentationScope("", ""), self.span_processor.on_end,
+            name, span_context, self.resource, self.scope, self.span_processor.on_end,
             parent_span_id=parent_span_id,
         )
         self.span_processor.on_start(span)

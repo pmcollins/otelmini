@@ -1,10 +1,16 @@
 from dataclasses import dataclass
+import time
 from typing import Any, Callable, Optional
 import json
 
 from opentelemetry.trace import Span as ApiSpan
 from opentelemetry.trace.span import SpanContext
 from opentelemetry.util.types import Attributes
+
+
+def _time_ns() -> int:
+    """Get current time in nanoseconds."""
+    return time.time_ns()
 
 
 @dataclass(frozen=True)
@@ -27,9 +33,9 @@ class InstrumentationScope:
 
 
 class Resource:
-    def __init__(self, schema_url: str = ""):
+    def __init__(self, schema_url: str = "", attributes: Optional[dict] = None):
         self._schema_url = schema_url
-        self._attributes = {}
+        self._attributes = attributes or {}
 
     def get_attributes(self):
         return self._attributes
@@ -73,6 +79,7 @@ class MiniSpan(ApiSpan):
         instrumentation_scope: InstrumentationScope,
         on_end_callback: Callable[["MiniSpan"], None],
         parent_span_id: Optional[int] = None,
+        start_time: Optional[int] = None,
     ):
         self._name = name
         self._span_context = span_context
@@ -84,9 +91,17 @@ class MiniSpan(ApiSpan):
         self._status_description = None
         self._on_end_callback = on_end_callback
         self._parent_span_id = parent_span_id
+        self._start_time = start_time if start_time is not None else _time_ns()
+        self._end_time: Optional[int] = None
 
     def get_parent_span_id(self) -> Optional[int]:
         return self._parent_span_id
+
+    def get_start_time(self) -> int:
+        return self._start_time
+
+    def get_end_time(self) -> Optional[int]:
+        return self._end_time
 
     def __enter__(self):
         return self
@@ -147,6 +162,7 @@ class MiniSpan(ApiSpan):
         self._events.append((exception.__class__.__name__, attributes, timestamp))
 
     def end(self, end_time: Optional[int] = None) -> None:
+        self._end_time = end_time if end_time is not None else _time_ns()
         self._on_end_callback(self)
 
     def to_dict(self) -> dict[str, Any]:
