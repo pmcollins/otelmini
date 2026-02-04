@@ -105,6 +105,13 @@ class MiniTracer(Tracer):
             yield active_span
 
 
+class ConsoleSpanExporter(Exporter[MiniSpan]):
+    def export(self, items: Sequence[MiniSpan]) -> ExportResult:
+        for item in items:
+            print(f"span: {item}")  # noqa: T201
+        return ExportResult.SUCCESS
+
+
 class HttpSpanExporter(Exporter[MiniSpan]):
     def __init__(self, endpoint="http://localhost:4318/v1/traces", timeout=30):
         self._exporter = _HttpExporter(endpoint, timeout)

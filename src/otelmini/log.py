@@ -67,17 +67,13 @@ class LogRecordExporter(Exporter[MiniLogRecord]):
 
 
 class ConsoleLogExporter(LogRecordExporter):
-    def export(self, logs: Sequence[MiniLogRecord]) -> ExportResult:
-        try:
-            for log in logs:
-                print(f"log: {log}")  # noqa: T201
-        except Exception as e:
-            raise LogExportError from e
-        else:
-            return ExportResult.SUCCESS
+    def export(self, items: Sequence[MiniLogRecord]) -> ExportResult:
+        for item in items:
+            print(f"log: {item}")  # noqa: T201
+        return ExportResult.SUCCESS
 
     def force_flush(self, timeout_millis: Optional[int] = None) -> bool:
-        pass
+        return True
 
     def shutdown(self, timeout_millis: Optional[int] = None) -> None:
         pass

@@ -50,17 +50,19 @@ class HttpMetricExporter(Exporter[MetricsData]):
         pass
 
 
-class ConsoleMetricExporter(Exporter[Metric]):
-
-    def export(self, metrics: Sequence[Metric]) -> MetricExportResult:
-        print(f"exporting metrics: {metrics}")
-        return MetricExportResult.SUCCESS
+class ConsoleMetricExporter(Exporter[MetricsData]):
+    def export(self, items: MetricsData) -> ExportResult:
+        for rm in items.resource_metrics:
+            for sm in rm.scope_metrics:
+                for metric in sm.metrics:
+                    print(f"metric: {metric}")  # noqa: T201
+        return ExportResult.SUCCESS
 
     def force_flush(self, timeout_millis: float = 10_000) -> bool:
         return True
 
     def shutdown(self, timeout_millis: float = 30_000) -> None:
-        return None
+        pass
 
 
 class MetricReader(ABC):
