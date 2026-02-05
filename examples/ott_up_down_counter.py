@@ -52,4 +52,4 @@ class UpDownCounterOtelTest:
         # UpDownCounter should be non-monotonic (isMonotonic absent or False)
         assert metric["sum"].get("isMonotonic", False) is False
         # Value should be 10 + (-3) = 7
-        assert metric["sum"]["dataPoints"][0]["asDouble"] == 7.0
+        assert metric["sum"]["dataPoints"][0]["asInt"] == "7"

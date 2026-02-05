@@ -64,4 +64,5 @@ class ObservableGaugeOtelTest:
         # Gauge should not have aggregationTemporality
         assert "aggregationTemporality" not in metric["gauge"]
         # Value from callback should be 65.5
+        # Value from callback is 65.5 (not an integer, so asDouble)
         assert metric["gauge"]["dataPoints"][0]["asDouble"] == 65.5

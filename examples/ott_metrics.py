@@ -48,4 +48,4 @@ class MetricsOtelTest:
         # Counter should be monotonic
         assert metric["sum"].get("isMonotonic", False) is True
         assert metric["sum"]["aggregationTemporality"] == "AGGREGATION_TEMPORALITY_CUMULATIVE"
-        assert metric["sum"]["dataPoints"][0]["asDouble"] == 42.0
+        assert metric["sum"]["dataPoints"][0]["asInt"] == "42"

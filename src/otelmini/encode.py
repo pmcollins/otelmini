@@ -145,6 +145,13 @@ def _encode_log_record(log: MiniLogRecord) -> dict:
     }
 
 
+def _encode_number_value(value) -> dict:
+    """Encode a numeric value as asInt or asDouble based on type."""
+    if isinstance(value, int) or (isinstance(value, float) and value.is_integer()):
+        return {"asInt": str(int(value))}
+    return {"asDouble": value}
+
+
 def _encode_metric(metric) -> Optional[dict]:
     """Encode a single metric to OTLP format."""
     from otelmini.point import Sum, Gauge, Histogram
@@ -158,12 +165,13 @@ def _encode_metric(metric) -> Optional[dict]:
     if isinstance(metric.data, Sum):
         data_points = []
         for point in metric.data.data_points:
-            data_points.append({
+            dp = {
                 "attributes": _encode_attributes(point.attributes),
                 "startTimeUnixNano": str(point.start_time_unix_nano),
                 "timeUnixNano": str(point.time_unix_nano),
-                "asDouble": point.value,
-            })
+            }
+            dp.update(_encode_number_value(point.value))
+            data_points.append(dp)
         base["sum"] = {
             "dataPoints": data_points,
             "aggregationTemporality": metric.data.aggregation_temporality.value,
@@ -174,12 +182,13 @@ def _encode_metric(metric) -> Optional[dict]:
     if isinstance(metric.data, Gauge):
         data_points = []
         for point in metric.data.data_points:
-            data_points.append({
+            dp = {
                 "attributes": _encode_attributes(point.attributes),
                 "startTimeUnixNano": str(point.start_time_unix_nano),
                 "timeUnixNano": str(point.time_unix_nano),
-                "asDouble": point.value,
-            })
+            }
+            dp.update(_encode_number_value(point.value))
+            data_points.append(dp)
         base["gauge"] = {
             "dataPoints": data_points,
         }
