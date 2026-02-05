@@ -41,11 +41,18 @@ class Processor(ABC, Generic[T]):
 
 
 class BatchProcessor(Processor[T], ForkAware):
+    """Batch processor with periodic export.
+
+    Default values follow the OTel spec:
+    - batch_size: 512 (OTEL_BSP_MAX_EXPORT_BATCH_SIZE)
+    - interval_seconds: 5 (OTEL_BSP_SCHEDULE_DELAY = 5000ms)
+    """
+
     def __init__(
         self,
         exporter: Exporter,
-        batch_size,
-        interval_seconds,
+        batch_size: int = 512,
+        interval_seconds: float = 5,
         batcher_factory=None,
         timer_factory=None,
     ):
