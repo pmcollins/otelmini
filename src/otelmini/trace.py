@@ -48,7 +48,7 @@ class MiniTracerProvider(TracerProvider):
         instrumenting_library_version: typing.Optional[str] = None,
         schema_url: typing.Optional[str] = None,
         attributes: typing.Optional[types.Attributes] = None,
-    ) -> MiniTracer:
+    ) -> Tracer:
         scope = InstrumentationScope(instrumenting_module_name, instrumenting_library_version)
         return MiniTracer(self.span_processor, self.resource, scope)
 
