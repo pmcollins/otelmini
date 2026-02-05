@@ -108,13 +108,16 @@ class MetricProducer:
 
     def produce(self) -> MetricsData:
         scope = InstrumentationScope(name="opentelemetry")
-        data_points = [NumberDataPoint({}, 0, 0, counter.get_value()) for counter in self.counters]
-        sum_metric = Sum(
-            data_points,
-            is_monotonic=True,
-            aggregation_temporality=AggregationTemporality.CUMULATIVE
-        )
-        sm = ScopeMetrics(scope, [Metric("", "", "", sum_metric)], "")
+        metrics = []
+        for counter in self.counters:
+            data_point = NumberDataPoint({}, 0, 0, counter.get_value())
+            sum_metric = Sum(
+                [data_point],
+                is_monotonic=True,
+                aggregation_temporality=AggregationTemporality.CUMULATIVE
+            )
+            metrics.append(Metric(counter.name, counter.description, counter.unit, sum_metric))
+        sm = ScopeMetrics(scope, metrics, "")
         rm = ResourceMetrics(Resource(), [sm], "")
         return MetricsData([rm])
 

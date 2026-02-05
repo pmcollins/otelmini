@@ -98,6 +98,23 @@ def test_metric():
     assert len(exporter.get_exports())
 
 
+def test_metric_name_and_metadata():
+    exporter = FakeExporter()
+    reader = ManualExportingMetricReader(exporter)
+    meter_provider = MeterProvider(metric_readers=(reader,))
+    meter = meter_provider.get_meter(name="my-meter")
+    counter = meter.create_counter(name="requests", unit="1", description="Number of requests")
+    counter.add(10)
+    reader.force_flush()
+
+    metrics_data = exporter.get_exports()[0]
+    metric = metrics_data.resource_metrics[0].scope_metrics[0].metrics[0]
+    assert metric.name == "requests"
+    assert metric.unit == "1"
+    assert metric.description == "Number of requests"
+    assert metric.data.data_points[0].value == 10
+
+
 class FakeExporter(Exporter):
     def __init__(self):
         self.exports = []
