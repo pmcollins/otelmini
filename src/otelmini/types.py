@@ -133,13 +133,15 @@ class MiniSpan(ApiSpan):
     def get_status_description(self):
         return self._status_description
 
-    def set_attributes(self, attributes):
+    def set_attributes(self, attributes: Attributes) -> None:
         self._attributes.update(attributes)
 
-    def set_attribute(self, key: str, value):
+    def set_attribute(self, key: str, value: Any) -> None:
         self._attributes[key] = value
 
-    def add_event(self, name: str, attributes=None, timestamp: Optional[int] = None) -> None:
+    def add_event(
+        self, name: str, attributes: Optional[Attributes] = None, timestamp: Optional[int] = None
+    ) -> None:
         if timestamp is None:
             timestamp = _time_ns()
         self._events.append((name, attributes, timestamp))
@@ -150,14 +152,14 @@ class MiniSpan(ApiSpan):
     def is_recording(self) -> bool:
         return self._status is None
 
-    def set_status(self, status, description: Optional[str] = None) -> None:
+    def set_status(self, status: Any, description: Optional[str] = None) -> None:
         self._status = status
         self._status_description = description
 
     def record_exception(
         self,
         exception: BaseException,
-        attributes=None,
+        attributes: Optional[Attributes] = None,
         timestamp: Optional[int] = None,
         escaped: bool = False,  # noqa: FBT001, FBT002
     ) -> None:

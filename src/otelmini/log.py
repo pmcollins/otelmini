@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Optional, Sequence
 
 from opentelemetry._logs import LogRecord as ApiLogRecord
 from opentelemetry._logs import Logger as ApiLogger
 from opentelemetry._logs import LoggerProvider as ApiLoggerProvider
 from opentelemetry._logs import SeverityNumber
 from opentelemetry.trace import TraceFlags
+
+if TYPE_CHECKING:
+    from otelmini.processor import Processor
 from opentelemetry.util.types import Attributes
 
 from otelmini._lib import Exporter, ExportResult, _HttpExporter
@@ -88,7 +91,7 @@ class Logger(ApiLogger):
         self._logger_provider.log_processor.on_end(mini_log_record)
 
 
-def _pylog_to_minilog(pylog_record):
+def _pylog_to_minilog(pylog_record: logging.LogRecord) -> MiniLogRecord:
     return MiniLogRecord(
         timestamp=int(pylog_record.created * 1e9),  # Convert to nanoseconds
         observed_timestamp=int(pylog_record.created * 1e9),
@@ -114,7 +117,7 @@ def _pylog_to_minilog(pylog_record):
 
 
 class LoggerProvider(ApiLoggerProvider):
-    def __init__(self, log_processor=None):
+    def __init__(self, log_processor: Optional[Processor[MiniLogRecord]] = None) -> None:
         self.log_processor = log_processor
 
     def get_logger(
@@ -157,11 +160,11 @@ def _get_severity_number(levelno: int) -> SeverityNumber:
 
 
 class OtelBridgeLoggingHandler(logging.Handler):
-    def __init__(self, logger_provider, level=logging.NOTSET):
+    def __init__(self, logger_provider: LoggerProvider, level: int = logging.NOTSET) -> None:
         super().__init__(level=level)
         self.logger_provider = logger_provider
 
-    def emit(self, record: logging.LogRecord):
+    def emit(self, record: logging.LogRecord) -> None:
         try:
             logger = self.logger_provider.get_logger(record.name)
             logger.emit(record)

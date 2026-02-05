@@ -5,7 +5,7 @@ import logging
 import os
 import threading
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Generic, TypeVar
+from typing import TYPE_CHECKING, Callable, Generic, List, Optional, TypeVar
 
 if TYPE_CHECKING:
     from otelmini._lib import Exporter
@@ -94,14 +94,14 @@ class BatchProcessor(Processor[T], ForkAware):
         return True
 
 
-class Batcher:
-    def __init__(self, batch_size):
+class Batcher(Generic[T]):
+    def __init__(self, batch_size: int) -> None:
         self.lock = threading.RLock()
         self.batch_size = batch_size
-        self.items = []
-        self.batches = []
+        self.items: List[T] = []
+        self.batches: List[List[T]] = []
 
-    def add(self, item):
+    def add(self, item: T) -> bool:
         with self.lock:
             self.items.append(item)
             if len(self.items) == self.batch_size:
@@ -109,18 +109,18 @@ class Batcher:
                 return True
             return False
 
-    def pop(self):
+    def pop(self) -> Optional[List[T]]:
         with self.lock:
             self._batch()
             return self.batches.pop(0) if len(self.batches) > 0 else None
 
-    def _batch(self):
+    def _batch(self) -> None:
         self.batches.append(self.items)
         self.items = []
 
 
 class Timer:
-    def __init__(self, target_fcn, interval_seconds):
+    def __init__(self, target_fcn: Callable[[], None], interval_seconds: float) -> None:
         self._target_fcn = target_fcn
         self._interval_seconds = interval_seconds
         self._sleeper = threading.Condition()
@@ -128,21 +128,21 @@ class Timer:
 
         atexit.register(self.stop)
 
-    def run(self):
+    def run(self) -> None:
         while not self._stopper.is_set():
             self._sleep()
             if not self._stopper.is_set():
                 self._target_fcn()
 
-    def _sleep(self):
+    def _sleep(self) -> None:
         with self._sleeper:
             self._sleeper.wait(self._interval_seconds)
 
-    def notify_sleeper(self):
+    def notify_sleeper(self) -> None:
         with self._sleeper:
             self._sleeper.notify()
 
-    def stop(self):
+    def stop(self) -> None:
         self._stopper.set()
         self.notify_sleeper()
         self._target_fcn()

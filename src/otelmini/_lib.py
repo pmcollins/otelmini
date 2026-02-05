@@ -3,7 +3,10 @@ from __future__ import annotations
 import time
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Generic, Sequence, TypeVar
+from typing import TYPE_CHECKING, Callable, FrozenSet, Generic, Optional, Sequence, TypeVar
+
+if TYPE_CHECKING:
+    from urllib.parse import ParseResult
 
 T = TypeVar("T")
 
@@ -43,12 +46,17 @@ class RetrierResult(Enum):
 
 
 class Retrier:
-    def __init__(self, max_retries, base_seconds=1, sleep=time.sleep):
+    def __init__(
+        self,
+        max_retries: int,
+        base_seconds: float = 1,
+        sleep: Callable[[float], None] = time.sleep,
+    ) -> None:
         self.max_retries = max_retries
         self.base_seconds = base_seconds
         self.sleep = sleep
 
-    def retry(self, single_attempt_func):
+    def retry(self, single_attempt_func: Callable[[], SingleAttemptResult]) -> RetrierResult:
         for attempt in range(self.max_retries + 1):
             resp = single_attempt_func()
             if resp == SingleAttemptResult.SUCCESS:
@@ -67,13 +75,19 @@ DEFAULT_RETRYABLE_STATUS_CODES = frozenset([429, 502, 503, 504])  # TOO_MANY_REQ
 
 class _HttpExporter:
     class SingleHttpAttempt:
-        def __init__(self, data: str, parsed_url, timeout, retryable_status_codes):
+        def __init__(
+            self,
+            data: str,
+            parsed_url: ParseResult,
+            timeout: float,
+            retryable_status_codes: FrozenSet[int],
+        ) -> None:
             self.data = data
             self.parsed_url = parsed_url
             self.timeout = timeout
             self.retryable_status_codes = retryable_status_codes
 
-        def export(self):
+        def export(self) -> SingleAttemptResult:
             from http.client import OK, HTTPConnection
             body = self.data.encode("utf-8")
             conn = HTTPConnection(self.parsed_url.netloc, timeout=self.timeout)
@@ -87,14 +101,20 @@ class _HttpExporter:
                 return SingleAttemptResult.RETRY
             return SingleAttemptResult.FAILURE
 
-    def __init__(self, endpoint, timeout, retrier=None, retryable_status_codes=None):
+    def __init__(
+        self,
+        endpoint: str,
+        timeout: float,
+        retrier: Optional[Retrier] = None,
+        retryable_status_codes: Optional[FrozenSet[int]] = None,
+    ) -> None:
         from urllib.parse import urlparse
         self.parsed_url = urlparse(endpoint)
         self.timeout = timeout
         self.retrier = retrier or Retrier(4)
         self.retryable_status_codes = retryable_status_codes or DEFAULT_RETRYABLE_STATUS_CODES
 
-    def export(self, data: str):
+    def export(self, data: str) -> ExportResult:
         attempt = _HttpExporter.SingleHttpAttempt(
             data, self.parsed_url, self.timeout, self.retryable_status_codes
         )
