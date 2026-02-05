@@ -442,7 +442,7 @@ class Meter(ApiMeter):
     def create_observable_counter(
         self, name: str, callbacks: Optional[Sequence[CallbackT]] = None, unit: str = "", description: str = ""
     ) -> ApiObservableCounter:
-        pass
+        raise NotImplementedError("create_observable_counter is not yet implemented")
 
     def create_histogram(
         self,
@@ -478,4 +478,4 @@ class Meter(ApiMeter):
     def create_observable_up_down_counter(
         self, name: str, callbacks: Optional[Sequence[CallbackT]] = None, unit: str = "", description: str = ""
     ) -> ApiObservableUpDownCounter:
-        pass
+        raise NotImplementedError("create_observable_up_down_counter is not yet implemented")
