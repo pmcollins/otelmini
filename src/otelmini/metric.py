@@ -229,8 +229,13 @@ class MetricProducer:
 
 class MeterProvider(ApiMeterProvider):
 
-    def __init__(self, metric_readers: Sequence[MetricReader] = (), resource: Resource = None):
-        self.metric_producer = MetricProducer(resource=resource)
+    def __init__(
+        self,
+        metric_readers: Sequence[MetricReader] = (),
+        resource: Resource = None,
+        metric_producer: MetricProducer = None,
+    ):
+        self.metric_producer = metric_producer or MetricProducer(resource=resource)
         self.metric_readers = metric_readers
         for reader in self.metric_readers:
             reader.set_metric_producer(self.metric_producer)

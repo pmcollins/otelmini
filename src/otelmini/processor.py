@@ -41,12 +41,24 @@ class Processor(ABC, Generic[T]):
 
 
 class BatchProcessor(Processor[T], ForkAware):
-    def __init__(self, exporter: Exporter, batch_size, interval_seconds):
+    def __init__(
+        self,
+        exporter: Exporter,
+        batch_size,
+        interval_seconds,
+        batcher_factory=None,
+        timer_factory=None,
+    ):
         self.exporter = exporter
-        self.batcher = Batcher(batch_size)
+        self._batch_size = batch_size
+        self._interval_seconds = interval_seconds
+        self._batcher_factory = batcher_factory or Batcher
+        self._timer_factory = timer_factory or Timer
+
+        self.batcher = self._batcher_factory(batch_size)
         self.stop = threading.Event()
 
-        self.timer = Timer(self._export, interval_seconds)
+        self.timer = self._timer_factory(self._export, interval_seconds)
         self.thread = threading.Thread(target=self.timer.run, daemon=True)
         self.thread.start()
 
@@ -56,9 +68,9 @@ class BatchProcessor(Processor[T], ForkAware):
         self.shutdown()
 
         self.stop.clear()
-        self.batcher = Batcher(self.batcher.batch_size)
+        self.batcher = self._batcher_factory(self._batch_size)
 
-        self.timer = Timer(self._export, self.timer._interval_seconds)  # noqa: SLF001
+        self.timer = self._timer_factory(self._export, self._interval_seconds)
         self.thread = threading.Thread(target=self.timer.run, daemon=True)
         self.thread.start()
 
