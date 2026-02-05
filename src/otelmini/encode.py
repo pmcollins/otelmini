@@ -145,76 +145,21 @@ def _encode_log_record(log: MiniLogRecord) -> dict:
     }
 
 
-def _encode_number_value(value) -> dict:
-    """Encode a numeric value as asInt or asDouble based on type."""
-    if isinstance(value, int) or (isinstance(value, float) and value.is_integer()):
-        return {"asInt": str(int(value))}
-    return {"asDouble": value}
-
-
 def _encode_metric(metric) -> Optional[dict]:
-    """Encode a single metric to OTLP format."""
-    from otelmini.point import Sum, Gauge, Histogram
+    """Encode a single metric to OTLP format.
+
+    Uses polymorphism: each metric data type implements encode_otlp().
+    """
+    if not hasattr(metric.data, 'encode_otlp'):
+        return None
 
     base = {
         "name": metric.name,
         "description": metric.description or "",
         "unit": metric.unit or "",
     }
-
-    if isinstance(metric.data, Sum):
-        data_points = []
-        for point in metric.data.data_points:
-            dp = {
-                "attributes": _encode_attributes(point.attributes),
-                "startTimeUnixNano": str(point.start_time_unix_nano),
-                "timeUnixNano": str(point.time_unix_nano),
-            }
-            dp.update(_encode_number_value(point.value))
-            data_points.append(dp)
-        base["sum"] = {
-            "dataPoints": data_points,
-            "aggregationTemporality": metric.data.aggregation_temporality.value,
-            "isMonotonic": metric.data.is_monotonic,
-        }
-        return base
-
-    if isinstance(metric.data, Gauge):
-        data_points = []
-        for point in metric.data.data_points:
-            dp = {
-                "attributes": _encode_attributes(point.attributes),
-                "startTimeUnixNano": str(point.start_time_unix_nano),
-                "timeUnixNano": str(point.time_unix_nano),
-            }
-            dp.update(_encode_number_value(point.value))
-            data_points.append(dp)
-        base["gauge"] = {
-            "dataPoints": data_points,
-        }
-        return base
-
-    if isinstance(metric.data, Histogram):
-        data_points = []
-        for point in metric.data.data_points:
-            data_points.append({
-                "attributes": _encode_attributes(point.attributes),
-                "startTimeUnixNano": str(point.start_time_unix_nano),
-                "timeUnixNano": str(point.time_unix_nano),
-                "count": str(point.count),
-                "sum": point.sum,
-                "bucketCounts": [str(c) for c in point.bucket_counts],
-                "explicitBounds": list(point.explicit_bounds),
-                "min": point.min,
-                "max": point.max,
-            })
-        base["histogram"] = {
-            "dataPoints": data_points,
-            "aggregationTemporality": metric.data.aggregation_temporality.value,
-        }
-        return base
-
-    return None
+    base.update(metric.data.encode_otlp())
+    return base
 
 
 def _encode_attributes(attributes: Optional[Mapping[str, Any]]) -> list[dict]:

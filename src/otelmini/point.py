@@ -106,6 +106,40 @@ class ExponentialHistogram:
         )
 
 
+def _encode_number_data_point(point: NumberDataPoint) -> dict:
+    """Encode a NumberDataPoint to OTLP format."""
+    dp = {
+        "attributes": _encode_attributes_list(point.attributes),
+        "startTimeUnixNano": str(point.start_time_unix_nano),
+        "timeUnixNano": str(point.time_unix_nano),
+    }
+    # Use asInt for integers, asDouble for floats
+    if isinstance(point.value, int) or (isinstance(point.value, float) and point.value.is_integer()):
+        dp["asInt"] = str(int(point.value))
+    else:
+        dp["asDouble"] = point.value
+    return dp
+
+
+def _encode_attributes_list(attributes) -> list:
+    """Encode attributes to OTLP format."""
+    if not attributes:
+        return []
+    result = []
+    for k, v in attributes.items():
+        if isinstance(v, bool):
+            result.append({"key": k, "value": {"boolValue": v}})
+        elif isinstance(v, str):
+            result.append({"key": k, "value": {"stringValue": v}})
+        elif isinstance(v, int):
+            result.append({"key": k, "value": {"intValue": str(v)}})
+        elif isinstance(v, float):
+            result.append({"key": k, "value": {"doubleValue": v}})
+        else:
+            result.append({"key": k, "value": {"stringValue": str(v)}})
+    return result
+
+
 @dataclass(frozen=True)
 class Sum:
 
@@ -126,6 +160,16 @@ class Sum:
             indent=indent,
         )
 
+    def encode_otlp(self) -> dict:
+        """Encode to OTLP format for JSON export."""
+        return {
+            "sum": {
+                "dataPoints": [_encode_number_data_point(p) for p in self.data_points],
+                "aggregationTemporality": self.aggregation_temporality.value,
+                "isMonotonic": self.is_monotonic,
+            }
+        }
+
 
 @dataclass(frozen=True)
 class Gauge:
@@ -142,6 +186,14 @@ class Gauge:
             },
             indent=indent,
         )
+
+    def encode_otlp(self) -> dict:
+        """Encode to OTLP format for JSON export."""
+        return {
+            "gauge": {
+                "dataPoints": [_encode_number_data_point(p) for p in self.data_points],
+            }
+        }
 
 
 @dataclass(frozen=True)
@@ -160,6 +212,28 @@ class Histogram:
             },
             indent=indent,
         )
+
+    def encode_otlp(self) -> dict:
+        """Encode to OTLP format for JSON export."""
+        data_points = []
+        for p in self.data_points:
+            data_points.append({
+                "attributes": _encode_attributes_list(p.attributes),
+                "startTimeUnixNano": str(p.start_time_unix_nano),
+                "timeUnixNano": str(p.time_unix_nano),
+                "count": str(p.count),
+                "sum": p.sum,
+                "bucketCounts": [str(c) for c in p.bucket_counts],
+                "explicitBounds": list(p.explicit_bounds),
+                "min": p.min,
+                "max": p.max,
+            })
+        return {
+            "histogram": {
+                "dataPoints": data_points,
+                "aggregationTemporality": self.aggregation_temporality.value,
+            }
+        }
 
 
 # pylint: disable=invalid-name
