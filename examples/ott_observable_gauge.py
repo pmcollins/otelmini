@@ -48,6 +48,19 @@ class ObservableGaugeOtelTest:
         pass
 
     def on_stop(self, tel, stdout: str, stderr: str, returncode: int) -> None:
-        from oteltest.telemetry import count_metrics
+        from oteltest.telemetry import count_metrics, get_metric_names, MessageToDict
 
-        assert count_metrics(tel)
+        assert count_metrics(tel) == 1
+        assert "cpu_usage" in get_metric_names(tel)
+
+        # Access raw metric data (convert protobuf to dict)
+        pbreq = MessageToDict(tel.metric_requests[0].pbreq)
+        metric = pbreq["resourceMetrics"][0]["scopeMetrics"][0]["metrics"][0]
+        assert metric["name"] == "cpu_usage"
+        assert metric["unit"] == "%"
+        assert metric["description"] == "CPU usage percentage"
+        assert "gauge" in metric
+        # Gauge should not have aggregationTemporality
+        assert "aggregationTemporality" not in metric["gauge"]
+        # Value from callback should be 65.5
+        assert metric["gauge"]["dataPoints"][0]["asDouble"] == 65.5

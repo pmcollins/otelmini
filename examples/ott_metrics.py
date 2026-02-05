@@ -34,6 +34,17 @@ class MetricsOtelTest:
         pass
 
     def on_stop(self, tel, stdout: str, stderr: str, returncode: int) -> None:
-        from oteltest.telemetry import count_metrics
+        from oteltest.telemetry import count_metrics, get_metric_names, MessageToDict
 
-        assert count_metrics(tel)
+        assert count_metrics(tel) == 1
+        assert "x" in get_metric_names(tel)
+
+        # Access raw metric data (convert protobuf to dict)
+        pbreq = MessageToDict(tel.metric_requests[0].pbreq)
+        metric = pbreq["resourceMetrics"][0]["scopeMetrics"][0]["metrics"][0]
+        assert metric["name"] == "x"
+        assert "sum" in metric
+        # Counter should be monotonic
+        assert metric["sum"].get("isMonotonic", False) is True
+        assert metric["sum"]["aggregationTemporality"] == "AGGREGATION_TEMPORALITY_CUMULATIVE"
+        assert metric["sum"]["dataPoints"][0]["asDouble"] == 42.0

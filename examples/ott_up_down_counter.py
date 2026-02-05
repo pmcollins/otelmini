@@ -35,6 +35,20 @@ class UpDownCounterOtelTest:
         pass
 
     def on_stop(self, tel, stdout: str, stderr: str, returncode: int) -> None:
-        from oteltest.telemetry import count_metrics
+        from oteltest.telemetry import count_metrics, get_metric_names, MessageToDict
 
-        assert count_metrics(tel)
+        assert count_metrics(tel) == 1
+        assert "connections" in get_metric_names(tel)
+
+        # Access raw metric data (convert protobuf to dict)
+        pbreq = MessageToDict(tel.metric_requests[0].pbreq)
+        metric = pbreq["resourceMetrics"][0]["scopeMetrics"][0]["metrics"][0]
+        assert metric["name"] == "connections"
+        assert metric["unit"] == "1"
+        assert metric["description"] == "Active connections"
+        assert "sum" in metric
+        assert metric["sum"]["aggregationTemporality"] == "AGGREGATION_TEMPORALITY_CUMULATIVE"
+        # UpDownCounter should be non-monotonic (isMonotonic absent or False)
+        assert metric["sum"].get("isMonotonic", False) is False
+        # Value should be 10 + (-3) = 7
+        assert metric["sum"]["dataPoints"][0]["asDouble"] == 7.0
