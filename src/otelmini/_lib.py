@@ -50,22 +50,20 @@ class Retrier:
         return RetrierResult.MAX_ATTEMPTS_REACHED
 
 
+# Default retryable HTTP status codes per OTLP spec
+DEFAULT_RETRYABLE_STATUS_CODES = frozenset([429, 502, 503, 504])  # TOO_MANY_REQUESTS, BAD_GATEWAY, SERVICE_UNAVAILABLE, GATEWAY_TIMEOUT
+
+
 class _HttpExporter:
     class SingleHttpAttempt:
-        def __init__(self, data: str, parsed_url, timeout):
+        def __init__(self, data: str, parsed_url, timeout, retryable_status_codes):
             self.data = data
             self.parsed_url = parsed_url
             self.timeout = timeout
+            self.retryable_status_codes = retryable_status_codes
 
         def export(self):
-            from http.client import (
-                BAD_GATEWAY,
-                GATEWAY_TIMEOUT,
-                OK,
-                SERVICE_UNAVAILABLE,
-                TOO_MANY_REQUESTS,
-                HTTPConnection,
-            )
+            from http.client import OK, HTTPConnection
             body = self.data.encode("utf-8")
             conn = HTTPConnection(self.parsed_url.netloc, timeout=self.timeout)
             conn.request("POST", self.parsed_url.path, body, {"Content-Type": "application/json"})
@@ -74,17 +72,20 @@ class _HttpExporter:
             conn.close()
             if response.status == OK:
                 return SingleAttemptResult.SUCCESS
-            if response.status in [TOO_MANY_REQUESTS, BAD_GATEWAY, SERVICE_UNAVAILABLE, GATEWAY_TIMEOUT]:
+            if response.status in self.retryable_status_codes:
                 return SingleAttemptResult.RETRY
             return SingleAttemptResult.FAILURE
 
-    def __init__(self, endpoint, timeout):
+    def __init__(self, endpoint, timeout, retrier=None, retryable_status_codes=None):
         from urllib.parse import urlparse
         self.parsed_url = urlparse(endpoint)
         self.timeout = timeout
-        self.retrier = Retrier(4)
+        self.retrier = retrier or Retrier(4)
+        self.retryable_status_codes = retryable_status_codes or DEFAULT_RETRYABLE_STATUS_CODES
 
     def export(self, data: str):
-        attempt = _HttpExporter.SingleHttpAttempt(data, self.parsed_url, self.timeout)
+        attempt = _HttpExporter.SingleHttpAttempt(
+            data, self.parsed_url, self.timeout, self.retryable_status_codes
+        )
         retry_result = self.retrier.retry(attempt.export)
         return ExportResult.SUCCESS if retry_result == RetrierResult.SUCCESS else ExportResult.FAILURE

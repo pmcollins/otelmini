@@ -90,7 +90,7 @@ class HttpLogExporter(LogRecordExporter):
         return self._exporter.export(data)
 
     def force_flush(self, timeout_millis: Optional[int] = None) -> bool:
-        pass
+        return True
 
     def shutdown(self, timeout_millis: Optional[int] = None) -> None:
         pass
@@ -165,17 +165,22 @@ class LoggerProvider(ApiLoggerProvider):
             self.log_processor.shutdown()
 
 
-def _get_severity_number(levelno):
-    if levelno >= logging.CRITICAL:
-        return SeverityNumber.FATAL
-    if levelno >= logging.ERROR:
-        return SeverityNumber.ERROR
-    if levelno >= logging.WARNING:
-        return SeverityNumber.WARN
-    if levelno >= logging.INFO:
-        return SeverityNumber.INFO
-    if levelno >= logging.DEBUG:
-        return SeverityNumber.DEBUG
+# Mapping from Python logging levels to OpenTelemetry severity numbers
+# Ordered from highest to lowest for threshold-based lookup
+_SEVERITY_MAP = (
+    (logging.CRITICAL, SeverityNumber.FATAL),
+    (logging.ERROR, SeverityNumber.ERROR),
+    (logging.WARNING, SeverityNumber.WARN),
+    (logging.INFO, SeverityNumber.INFO),
+    (logging.DEBUG, SeverityNumber.DEBUG),
+)
+
+
+def _get_severity_number(levelno: int) -> SeverityNumber:
+    """Map Python logging level to OpenTelemetry severity number."""
+    for threshold, severity in _SEVERITY_MAP:
+        if levelno >= threshold:
+            return severity
     return SeverityNumber.TRACE
 
 

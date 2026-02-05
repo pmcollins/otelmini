@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import atexit
-import os
 import threading
 import time
 from abc import ABC, abstractmethod
@@ -34,6 +33,14 @@ if TYPE_CHECKING:
 class MetricExportResult(Enum):
     SUCCESS = 0
     FAILURE = 1
+
+
+class InstrumentType(Enum):
+    """Types of metric instruments."""
+    COUNTER = "counter"
+    UP_DOWN_COUNTER = "up_down_counter"
+    HISTOGRAM = "histogram"
+    OBSERVABLE_GAUGE = "observable_gauge"
 
 
 class CounterError(Exception):
@@ -101,21 +108,12 @@ class ManualExportingMetricReader(MetricReader):
         pass
 
 
+from otelmini.resource import create_default_resource
+
+
 def _time_ns() -> int:
     """Get current time in nanoseconds."""
     return time.time_ns()
-
-
-def _create_default_resource() -> Resource:
-    """Create a resource with default SDK attributes."""
-    import otelmini
-    service_name = os.environ.get("OTEL_SERVICE_NAME", "unknown_service")
-    return Resource(attributes={
-        "telemetry.sdk.language": "python",
-        "telemetry.sdk.name": "otelmini",
-        "telemetry.sdk.version": getattr(otelmini, "__version__", "0.0.1"),
-        "service.name": service_name,
-    })
 
 
 class PeriodicExportingMetricReader(MetricReader):
@@ -162,31 +160,26 @@ class MetricProducer:
     """
 
     def __init__(self, resource: Resource = None):
-        self.resource = resource or _create_default_resource()
-        self.meters = {}  # meter_name -> list of instruments
+        self.resource = resource or create_default_resource()
+        self.meters = {}  # meter_name -> {InstrumentType -> list of instruments}
         self._start_time_unix_nano = _time_ns()
 
     def _get_meter_instruments(self, meter_name: str) -> dict:
         if meter_name not in self.meters:
-            self.meters[meter_name] = {
-                'counters': [],
-                'up_down_counters': [],
-                'histograms': [],
-                'observable_gauges': [],
-            }
+            self.meters[meter_name] = {itype: [] for itype in InstrumentType}
         return self.meters[meter_name]
 
     def _register_counter(self, counter: Counter, meter_name: str) -> None:
-        self._get_meter_instruments(meter_name)['counters'].append(counter)
+        self._get_meter_instruments(meter_name)[InstrumentType.COUNTER].append(counter)
 
     def _register_up_down_counter(self, up_down_counter: UpDownCounter, meter_name: str) -> None:
-        self._get_meter_instruments(meter_name)['up_down_counters'].append(up_down_counter)
+        self._get_meter_instruments(meter_name)[InstrumentType.UP_DOWN_COUNTER].append(up_down_counter)
 
     def _register_histogram(self, histogram: HistogramInstrument, meter_name: str) -> None:
-        self._get_meter_instruments(meter_name)['histograms'].append(histogram)
+        self._get_meter_instruments(meter_name)[InstrumentType.HISTOGRAM].append(histogram)
 
     def _register_observable_gauge(self, gauge: ObservableGaugeInstrument, meter_name: str) -> None:
-        self._get_meter_instruments(meter_name)['observable_gauges'].append(gauge)
+        self._get_meter_instruments(meter_name)[InstrumentType.OBSERVABLE_GAUGE].append(gauge)
 
     def produce(self) -> MetricsData:
         time_unix_nano = _time_ns()
@@ -195,7 +188,7 @@ class MetricProducer:
         for meter_name, instruments in self.meters.items():
             scope = InstrumentationScope(name=meter_name)
             metrics = []
-            for counter in instruments['counters']:
+            for counter in instruments[InstrumentType.COUNTER]:
                 data_point = NumberDataPoint(
                     {}, self._start_time_unix_nano, time_unix_nano, counter.get_value()
                 )
@@ -205,7 +198,7 @@ class MetricProducer:
                     aggregation_temporality=AggregationTemporality.CUMULATIVE
                 )
                 metrics.append(Metric(counter.name, counter.description, counter.unit, sum_metric))
-            for up_down_counter in instruments['up_down_counters']:
+            for up_down_counter in instruments[InstrumentType.UP_DOWN_COUNTER]:
                 data_point = NumberDataPoint(
                     {}, self._start_time_unix_nano, time_unix_nano, up_down_counter.get_value()
                 )
@@ -215,7 +208,7 @@ class MetricProducer:
                     aggregation_temporality=AggregationTemporality.CUMULATIVE
                 )
                 metrics.append(Metric(up_down_counter.name, up_down_counter.description, up_down_counter.unit, sum_metric))
-            for histogram in instruments['histograms']:
+            for histogram in instruments[InstrumentType.HISTOGRAM]:
                 h_data = histogram.get_histogram_data()
                 data_point = HistogramDataPoint(
                     attributes={},
@@ -233,7 +226,7 @@ class MetricProducer:
                     aggregation_temporality=AggregationTemporality.CUMULATIVE
                 )
                 metrics.append(Metric(histogram.name, histogram.description, histogram.unit, histogram_metric))
-            for gauge in instruments['observable_gauges']:
+            for gauge in instruments[InstrumentType.OBSERVABLE_GAUGE]:
                 data_point = NumberDataPoint(
                     {}, self._start_time_unix_nano, time_unix_nano, gauge.get_value()
                 )
