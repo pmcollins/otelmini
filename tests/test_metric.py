@@ -2,7 +2,7 @@ import json
 from typing import Sequence
 
 from otelmini._lib import Exporter, T, ExportResult
-from otelmini.metric import ManualExportingMetricReader, MeterProvider
+from otelmini.metric import ManualExportingMetricReader, MeterProvider, PeriodicExportingMetricReader
 from otelmini.encode import encode_metrics_request
 from otelmini.point import (
     AggregationTemporality,
@@ -316,3 +316,45 @@ def test_observable_gauge_no_callback():
     metrics_data = exporter.get_exports()[0]
     metric = metrics_data.resource_metrics[0].scope_metrics[0].metrics[0]
     assert metric.data.data_points[0].value == 0.0
+
+
+# PeriodicExportingMetricReader Tests
+
+def test_periodic_reader_exports_on_shutdown():
+    import time
+    exporter = FakeExporter()
+    reader = PeriodicExportingMetricReader(exporter, export_interval_millis=60_000)
+    meter_provider = MeterProvider(metric_readers=(reader,))
+    meter = meter_provider.get_meter(name="my-meter")
+    counter = meter.create_counter(name="test_counter")
+    counter.add(100)
+
+    # Shutdown should trigger final export
+    meter_provider.shutdown()
+
+    assert len(exporter.get_exports()) >= 1
+    metrics_data = exporter.get_exports()[0]
+    metric = metrics_data.resource_metrics[0].scope_metrics[0].metrics[0]
+    assert metric.name == "test_counter"
+    assert metric.data.data_points[0].value == 100
+
+
+def test_periodic_reader_force_flush():
+    exporter = FakeExporter()
+    reader = PeriodicExportingMetricReader(exporter, export_interval_millis=60_000)
+    meter_provider = MeterProvider(metric_readers=(reader,))
+    meter = meter_provider.get_meter(name="my-meter")
+    counter = meter.create_counter(name="flush_counter")
+    counter.add(50)
+
+    # Force flush should export immediately
+    reader.force_flush()
+
+    assert len(exporter.get_exports()) >= 1
+    metrics_data = exporter.get_exports()[0]
+    metric = metrics_data.resource_metrics[0].scope_metrics[0].metrics[0]
+    assert metric.name == "flush_counter"
+    assert metric.data.data_points[0].value == 50
+
+    # Clean up
+    reader.shutdown()

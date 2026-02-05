@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import atexit
+import threading
 from abc import ABC, abstractmethod
 from enum import Enum
 from typing import TYPE_CHECKING, Optional, Sequence
@@ -97,6 +99,44 @@ class ManualExportingMetricReader(MetricReader):
         pass
 
 
+class PeriodicExportingMetricReader(MetricReader):
+    """Periodically exports metrics at a configurable interval."""
+
+    def __init__(
+        self,
+        exporter: Exporter[MetricsData],
+        export_interval_millis: float = 60_000,
+    ):
+        self.metric_producer = None
+        self.exporter = exporter
+        self.export_interval_seconds = export_interval_millis / 1000
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+        atexit.register(self.shutdown)
+
+    def _run(self):
+        while not self._stop.wait(self.export_interval_seconds):
+            self._export()
+
+    def _export(self):
+        if self.metric_producer:
+            metrics = self.metric_producer.produce()
+            self.exporter.export(metrics)
+
+    def set_metric_producer(self, metric_producer):
+        self.metric_producer = metric_producer
+
+    def force_flush(self, timeout_millis: float = 10_000) -> bool:
+        self._export()
+        return True
+
+    def shutdown(self, timeout_millis: float = 30_000, **kwargs) -> None:
+        self._stop.set()
+        self._export()  # Final export
+        self._thread.join(timeout=timeout_millis / 1000)
+
+
 class MetricProducer:
     """
     Spec: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/metrics/sdk.md#metricproducer
@@ -168,7 +208,7 @@ class MetricProducer:
 
 class MeterProvider(ApiMeterProvider):
 
-    def __init__(self, metric_readers: Sequence[ManualExportingMetricReader] = ()):
+    def __init__(self, metric_readers: Sequence[MetricReader] = ()):
         self.metric_producer = MetricProducer()
         self.metric_readers = metric_readers
         for reader in self.metric_readers:
@@ -197,6 +237,10 @@ class MeterProvider(ApiMeterProvider):
 
     def produce_metrics(self):
         return self.metric_producer.produce()
+
+    def shutdown(self, timeout_millis: float = 30_000) -> None:
+        for reader in self.metric_readers:
+            reader.shutdown(timeout_millis)
 
 
 class Counter(ApiCounter):

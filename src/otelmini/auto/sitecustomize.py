@@ -1,4 +1,5 @@
-from otelmini.auto import set_up_logging, set_up_tracing
+from otelmini.auto import set_up_logging, set_up_metrics, set_up_tracing
 
 set_up_tracing()
 set_up_logging()
+set_up_metrics()

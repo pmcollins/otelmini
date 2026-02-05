@@ -2,12 +2,17 @@ import logging
 import os
 from typing import Optional
 
-from opentelemetry import trace
+from opentelemetry import metrics, trace
 
 from otelmini.log import (
     HttpLogExporter,
     LoggerProvider,
     OtelBridgeLoggingHandler,
+)
+from otelmini.metric import (
+    HttpMetricExporter,
+    MeterProvider,
+    PeriodicExportingMetricReader,
 )
 from otelmini.processor import BatchProcessor
 from otelmini.trace import HttpSpanExporter, MiniTracerProvider
@@ -65,6 +70,7 @@ class AutoInstrumentationManager:
     def __init__(self, env: Env):
         self.tracer_provider: Optional[MiniTracerProvider] = None
         self.logger_provider: Optional[LoggerProvider] = None
+        self.meter_provider: Optional[MeterProvider] = None
         self.otel_logging_handler: Optional[OtelBridgeLoggingHandler] = None
         self.root_logger: Optional[logging.Logger] = None
         self.config = Config(env)
@@ -78,6 +84,14 @@ class AutoInstrumentationManager:
             )
         )
         trace.set_tracer_provider(self.tracer_provider)
+
+    def set_up_metrics(self):
+        reader = PeriodicExportingMetricReader(
+            HttpMetricExporter(),
+            export_interval_millis=10_000,
+        )
+        self.meter_provider = MeterProvider(metric_readers=(reader,))
+        metrics.set_meter_provider(self.meter_provider)
 
     def set_up_logging(self):
         self.root_logger = logging.getLogger()
@@ -101,6 +115,9 @@ class AutoInstrumentationManager:
 
         if self.logger_provider:
             self.logger_provider.shutdown()
+
+        if self.meter_provider:
+            self.meter_provider.shutdown()
 
         if self.otel_logging_handler and self.root_logger:
             self.root_logger.removeHandler(self.otel_logging_handler)

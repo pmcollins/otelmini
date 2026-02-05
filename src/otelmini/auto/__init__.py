@@ -9,3 +9,7 @@ def set_up_tracing():
 
 def set_up_logging():
     manager.set_up_logging()
+
+
+def set_up_metrics():
+    manager.set_up_metrics()
