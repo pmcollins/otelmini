@@ -16,12 +16,14 @@ from otelmini._lib import Exporter, ExportResult, _HttpExporter
 from otelmini.encode import encode_metrics_request
 from otelmini.point import AggregationTemporality
 from otelmini.point import MetricsData, Metric, ResourceMetrics, ScopeMetrics, Sum, NumberDataPoint
+from otelmini.point import Histogram as HistogramData, HistogramDataPoint, Gauge
 from otelmini.types import Resource, InstrumentationScope
+
+from opentelemetry.metrics import UpDownCounter as ApiUpDownCounter
 
 if TYPE_CHECKING:
     from opentelemetry.context import Context
     from opentelemetry.metrics import CallbackT
-    from opentelemetry.metrics import UpDownCounter as ApiUpDownCounter
     from opentelemetry.util.types import Attributes
 
 
@@ -102,9 +104,21 @@ class MetricProducer:
 
     def __init__(self):
         self.counters = []
+        self.up_down_counters = []
+        self.histograms = []
+        self.observable_gauges = []
 
     def _register_counter(self, counter: Counter) -> None:
         self.counters.append(counter)
+
+    def _register_up_down_counter(self, up_down_counter: UpDownCounter) -> None:
+        self.up_down_counters.append(up_down_counter)
+
+    def _register_histogram(self, histogram: HistogramInstrument) -> None:
+        self.histograms.append(histogram)
+
+    def _register_observable_gauge(self, gauge: ObservableGaugeInstrument) -> None:
+        self.observable_gauges.append(gauge)
 
     def produce(self) -> MetricsData:
         scope = InstrumentationScope(name="opentelemetry")
@@ -117,6 +131,36 @@ class MetricProducer:
                 aggregation_temporality=AggregationTemporality.CUMULATIVE
             )
             metrics.append(Metric(counter.name, counter.description, counter.unit, sum_metric))
+        for up_down_counter in self.up_down_counters:
+            data_point = NumberDataPoint({}, 0, 0, up_down_counter.get_value())
+            sum_metric = Sum(
+                [data_point],
+                is_monotonic=False,
+                aggregation_temporality=AggregationTemporality.CUMULATIVE
+            )
+            metrics.append(Metric(up_down_counter.name, up_down_counter.description, up_down_counter.unit, sum_metric))
+        for histogram in self.histograms:
+            h_data = histogram.get_histogram_data()
+            data_point = HistogramDataPoint(
+                attributes={},
+                start_time_unix_nano=0,
+                time_unix_nano=0,
+                count=h_data['count'],
+                sum=h_data['sum'],
+                bucket_counts=h_data['bucket_counts'],
+                explicit_bounds=h_data['explicit_bounds'],
+                min=h_data['min'],
+                max=h_data['max'],
+            )
+            histogram_metric = HistogramData(
+                [data_point],
+                aggregation_temporality=AggregationTemporality.CUMULATIVE
+            )
+            metrics.append(Metric(histogram.name, histogram.description, histogram.unit, histogram_metric))
+        for gauge in self.observable_gauges:
+            data_point = NumberDataPoint({}, 0, 0, gauge.get_value())
+            gauge_metric = Gauge([data_point])
+            metrics.append(Metric(gauge.name, gauge.description, gauge.unit, gauge_metric))
         sm = ScopeMetrics(scope, metrics, "")
         rm = ResourceMetrics(Resource(), [sm], "")
         return MetricsData([rm])
@@ -141,6 +185,15 @@ class MeterProvider(ApiMeterProvider):
 
     def _register_counter(self, counter: Counter) -> None:
         self.metric_producer._register_counter(counter)
+
+    def _register_up_down_counter(self, up_down_counter: UpDownCounter) -> None:
+        self.metric_producer._register_up_down_counter(up_down_counter)
+
+    def _register_histogram(self, histogram: HistogramInstrument) -> None:
+        self.metric_producer._register_histogram(histogram)
+
+    def _register_observable_gauge(self, gauge: ObservableGaugeInstrument) -> None:
+        self.metric_producer._register_observable_gauge(gauge)
 
     def produce_metrics(self):
         return self.metric_producer.produce()
@@ -168,6 +221,96 @@ class Counter(ApiCounter):
         return self._value
 
 
+class UpDownCounter(ApiUpDownCounter):
+
+    def __init__(self, name: str, unit: str = "", description: str = ""):
+        self.name = name
+        self.unit = unit
+        self.description = description
+        self._value = 0.0
+
+    def add(
+        self,
+        amount: float,
+        attributes: Optional[Attributes] = None,
+        context: Optional[Context] = None,
+    ) -> None:
+        self._value += amount  # No non-negative check
+
+    def get_value(self):
+        return self._value
+
+
+class HistogramInstrument(ApiHistogram):
+    DEFAULT_BOUNDARIES = [0, 5, 10, 25, 50, 75, 100, 250, 500, 750, 1000, 2500, 5000, 7500, 10000]
+
+    def __init__(
+        self,
+        name: str,
+        unit: str = "",
+        description: str = "",
+        explicit_bucket_boundaries: Optional[Sequence[float]] = None,
+    ):
+        self.name = name
+        self.unit = unit
+        self.description = description
+        self.boundaries = list(explicit_bucket_boundaries) if explicit_bucket_boundaries else self.DEFAULT_BOUNDARIES
+        self.bucket_counts = [0] * (len(self.boundaries) + 1)
+        self._sum = 0.0
+        self._count = 0
+        self._min = float('inf')
+        self._max = float('-inf')
+
+    def record(
+        self,
+        amount: float,
+        attributes: Optional[Attributes] = None,
+        context: Optional[Context] = None,
+    ) -> None:
+        self._sum += amount
+        self._count += 1
+        self._min = min(self._min, amount)
+        self._max = max(self._max, amount)
+        # Find bucket
+        for i, bound in enumerate(self.boundaries):
+            if amount < bound:
+                self.bucket_counts[i] += 1
+                return
+        self.bucket_counts[-1] += 1
+
+    def get_histogram_data(self):
+        return {
+            'count': self._count,
+            'sum': self._sum,
+            'min': self._min if self._count > 0 else 0.0,
+            'max': self._max if self._count > 0 else 0.0,
+            'bucket_counts': self.bucket_counts,
+            'explicit_bounds': self.boundaries,
+        }
+
+
+class ObservableGaugeInstrument(ApiObservableGauge):
+
+    def __init__(
+        self,
+        name: str,
+        callbacks: Optional[Sequence] = None,
+        unit: str = "",
+        description: str = "",
+    ):
+        self.name = name
+        self.unit = unit
+        self.description = description
+        self.callbacks = list(callbacks) if callbacks else []
+
+    def get_value(self):
+        # Invoke callbacks, return latest observation value
+        for callback in self.callbacks:
+            for obs in callback():
+                return obs.value  # Simplified: first observation
+        return 0.0
+
+
 class Meter(ApiMeter):
 
     def __init__(
@@ -187,7 +330,10 @@ class Meter(ApiMeter):
         return counter
 
     def create_up_down_counter(self, name: str, unit: str = "", description: str = "") -> ApiUpDownCounter:
-        pass
+        up_down_counter = UpDownCounter(name=name, unit=unit, description=description)
+        self._register_instrument(name, UpDownCounter, unit, description)
+        self.meter_provider._register_up_down_counter(up_down_counter)
+        return up_down_counter
 
     def create_observable_counter(
         self, name: str, callbacks: Optional[Sequence[CallbackT]] = None, unit: str = "", description: str = ""
@@ -202,12 +348,28 @@ class Meter(ApiMeter):
         *,
         explicit_bucket_boundaries_advisory: Optional[Sequence[float]] = None,
     ) -> ApiHistogram:
-        pass
+        histogram = HistogramInstrument(
+            name=name,
+            unit=unit,
+            description=description,
+            explicit_bucket_boundaries=explicit_bucket_boundaries_advisory,
+        )
+        self._register_instrument(name, HistogramInstrument, unit, description)
+        self.meter_provider._register_histogram(histogram)
+        return histogram
 
     def create_observable_gauge(
         self, name: str, callbacks: Optional[Sequence[CallbackT]] = None, unit: str = "", description: str = ""
     ) -> ApiObservableGauge:
-        pass
+        gauge = ObservableGaugeInstrument(
+            name=name,
+            callbacks=callbacks,
+            unit=unit,
+            description=description,
+        )
+        self._register_instrument(name, ObservableGaugeInstrument, unit, description)
+        self.meter_provider._register_observable_gauge(gauge)
+        return gauge
 
     def create_observable_up_down_counter(
         self, name: str, callbacks: Optional[Sequence[CallbackT]] = None, unit: str = "", description: str = ""

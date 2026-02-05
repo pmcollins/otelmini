@@ -125,3 +125,194 @@ class FakeExporter(Exporter):
 
     def get_exports(self):
         return self.exports
+
+
+# UpDownCounter Tests
+
+def test_up_down_counter_increment_decrement():
+    exporter = FakeExporter()
+    reader = ManualExportingMetricReader(exporter)
+    meter_provider = MeterProvider(metric_readers=(reader,))
+    meter = meter_provider.get_meter(name="my-meter")
+    up_down_counter = meter.create_up_down_counter(name="connections")
+
+    up_down_counter.add(10)
+    up_down_counter.add(-3)
+    up_down_counter.add(5)
+    up_down_counter.add(-7)
+
+    reader.force_flush()
+
+    metrics_data = exporter.get_exports()[0]
+    metric = metrics_data.resource_metrics[0].scope_metrics[0].metrics[0]
+    assert metric.data.data_points[0].value == 5  # 10 - 3 + 5 - 7 = 5
+
+
+def test_up_down_counter_metadata():
+    exporter = FakeExporter()
+    reader = ManualExportingMetricReader(exporter)
+    meter_provider = MeterProvider(metric_readers=(reader,))
+    meter = meter_provider.get_meter(name="my-meter")
+    up_down_counter = meter.create_up_down_counter(
+        name="active_connections",
+        unit="1",
+        description="Number of active connections"
+    )
+    up_down_counter.add(42)
+    reader.force_flush()
+
+    metrics_data = exporter.get_exports()[0]
+    metric = metrics_data.resource_metrics[0].scope_metrics[0].metrics[0]
+    assert metric.name == "active_connections"
+    assert metric.unit == "1"
+    assert metric.description == "Number of active connections"
+
+
+def test_up_down_counter_is_non_monotonic():
+    exporter = FakeExporter()
+    reader = ManualExportingMetricReader(exporter)
+    meter_provider = MeterProvider(metric_readers=(reader,))
+    meter = meter_provider.get_meter(name="my-meter")
+    up_down_counter = meter.create_up_down_counter(name="items")
+    up_down_counter.add(10)
+    reader.force_flush()
+
+    metrics_data = exporter.get_exports()[0]
+    metric = metrics_data.resource_metrics[0].scope_metrics[0].metrics[0]
+    assert metric.data.is_monotonic is False
+
+
+# Histogram Tests
+
+def test_histogram_basic_recording():
+    exporter = FakeExporter()
+    reader = ManualExportingMetricReader(exporter)
+    meter_provider = MeterProvider(metric_readers=(reader,))
+    meter = meter_provider.get_meter(name="my-meter")
+    histogram = meter.create_histogram(name="request_latency", unit="ms", description="Request latency")
+
+    histogram.record(10)
+    histogram.record(20)
+    histogram.record(30)
+
+    reader.force_flush()
+
+    metrics_data = exporter.get_exports()[0]
+    metric = metrics_data.resource_metrics[0].scope_metrics[0].metrics[0]
+    data_point = metric.data.data_points[0]
+
+    assert data_point.count == 3
+    assert data_point.sum == 60
+    assert data_point.min == 10
+    assert data_point.max == 30
+
+
+def test_histogram_bucket_distribution():
+    exporter = FakeExporter()
+    reader = ManualExportingMetricReader(exporter)
+    meter_provider = MeterProvider(metric_readers=(reader,))
+    meter = meter_provider.get_meter(name="my-meter")
+    histogram = meter.create_histogram(
+        name="latency",
+        explicit_bucket_boundaries_advisory=[10, 50, 100]
+    )
+
+    # Values: <10 bucket, <50 bucket, <100 bucket, >=100 bucket
+    histogram.record(5)   # bucket 0: <10
+    histogram.record(15)  # bucket 1: <50
+    histogram.record(25)  # bucket 1: <50
+    histogram.record(75)  # bucket 2: <100
+    histogram.record(150) # bucket 3: >=100
+
+    reader.force_flush()
+
+    metrics_data = exporter.get_exports()[0]
+    metric = metrics_data.resource_metrics[0].scope_metrics[0].metrics[0]
+    data_point = metric.data.data_points[0]
+
+    assert data_point.bucket_counts == [1, 2, 1, 1]  # [<10, <50, <100, >=100]
+
+
+def test_histogram_custom_boundaries():
+    exporter = FakeExporter()
+    reader = ManualExportingMetricReader(exporter)
+    meter_provider = MeterProvider(metric_readers=(reader,))
+    meter = meter_provider.get_meter(name="my-meter")
+    custom_boundaries = [1, 5, 10]
+    histogram = meter.create_histogram(
+        name="custom_histogram",
+        explicit_bucket_boundaries_advisory=custom_boundaries
+    )
+
+    reader.force_flush()
+
+    metrics_data = exporter.get_exports()[0]
+    metric = metrics_data.resource_metrics[0].scope_metrics[0].metrics[0]
+    data_point = metric.data.data_points[0]
+
+    assert list(data_point.explicit_bounds) == [1, 5, 10]
+
+
+# ObservableGauge Tests
+
+def test_observable_gauge_callback_invoked():
+    callback_invoked = []
+
+    def my_callback():
+        callback_invoked.append(True)
+        from opentelemetry.metrics import Observation
+        return [Observation(value=42.0)]
+
+    exporter = FakeExporter()
+    reader = ManualExportingMetricReader(exporter)
+    meter_provider = MeterProvider(metric_readers=(reader,))
+    meter = meter_provider.get_meter(name="my-meter")
+    gauge = meter.create_observable_gauge(
+        name="cpu_usage",
+        callbacks=[my_callback]
+    )
+
+    reader.force_flush()
+
+    assert len(callback_invoked) == 1
+
+
+def test_observable_gauge_value_captured():
+    def my_callback():
+        from opentelemetry.metrics import Observation
+        return [Observation(value=75.5)]
+
+    exporter = FakeExporter()
+    reader = ManualExportingMetricReader(exporter)
+    meter_provider = MeterProvider(metric_readers=(reader,))
+    meter = meter_provider.get_meter(name="my-meter")
+    gauge = meter.create_observable_gauge(
+        name="memory_usage",
+        callbacks=[my_callback],
+        unit="%",
+        description="Memory usage percentage"
+    )
+
+    reader.force_flush()
+
+    metrics_data = exporter.get_exports()[0]
+    metric = metrics_data.resource_metrics[0].scope_metrics[0].metrics[0]
+
+    assert metric.name == "memory_usage"
+    assert metric.unit == "%"
+    assert metric.description == "Memory usage percentage"
+    assert metric.data.data_points[0].value == 75.5
+
+
+def test_observable_gauge_no_callback():
+    exporter = FakeExporter()
+    reader = ManualExportingMetricReader(exporter)
+    meter_provider = MeterProvider(metric_readers=(reader,))
+    meter = meter_provider.get_meter(name="my-meter")
+    gauge = meter.create_observable_gauge(name="empty_gauge")
+
+    reader.force_flush()
+
+    metrics_data = exporter.get_exports()[0]
+    metric = metrics_data.resource_metrics[0].scope_metrics[0].metrics[0]
+    assert metric.data.data_points[0].value == 0.0
