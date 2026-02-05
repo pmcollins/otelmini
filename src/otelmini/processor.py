@@ -25,12 +25,18 @@ class ForkAware(ABC):
 
 
 class Processor(ABC, Generic[T]):
-    @abstractmethod
+    """Base processor interface for telemetry items.
+
+    Subclasses can override on_start and/or on_end as needed.
+    Default implementations are no-ops.
+    """
+
     def on_start(self, item: T) -> None:
+        """Called when an item starts. Default is a no-op."""
         pass
 
-    @abstractmethod
     def on_end(self, item: T) -> None:
+        """Called when an item ends. Default is a no-op."""
         pass
 
 
@@ -55,9 +61,6 @@ class BatchProcessor(Processor[T], ForkAware):
         self.timer = Timer(self._export, self.timer._interval_seconds)  # noqa: SLF001
         self.thread = threading.Thread(target=self.timer.run, daemon=True)
         self.thread.start()
-
-    def on_start(self, item: T) -> None:
-        pass
 
     def on_end(self, item: T) -> None:
         if not self.stop.is_set():

@@ -56,23 +56,11 @@ class HttpMetricExporter(Exporter[MetricsData]):
         data = encode_metrics_request(metrics_data)
         return self._exporter.export(data)
 
-    def force_flush(self, timeout_millis: float = 10_000) -> bool:
-        return True
-
-    def shutdown(self, timeout_millis: float = 30_000) -> None:
-        pass
-
 
 class ConsoleMetricExporter(Exporter[MetricsData]):
     def export(self, items: MetricsData) -> ExportResult:
         print(encode_metrics_request(items))  # noqa: T201
         return ExportResult.SUCCESS
-
-    def force_flush(self, timeout_millis: float = 10_000) -> bool:
-        return True
-
-    def shutdown(self, timeout_millis: float = 30_000) -> None:
-        pass
 
 
 class MetricReader(ABC):

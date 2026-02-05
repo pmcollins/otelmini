@@ -9,8 +9,19 @@ T = TypeVar("T")
 
 
 class Exporter(ABC, Generic[T]):
+    """Base exporter interface for telemetry data."""
+
     @abstractmethod
     def export(self, items: Sequence[T]) -> ExportResult:
+        """Export telemetry items. Returns SUCCESS or FAILURE."""
+        pass
+
+    def force_flush(self, timeout_millis: float = 10_000) -> bool:
+        """Flush any buffered data. Default implementation is a no-op."""
+        return True
+
+    def shutdown(self, timeout_millis: float = 30_000) -> None:
+        """Shutdown the exporter. Default implementation is a no-op."""
         pass
 
 

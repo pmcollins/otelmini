@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from abc import abstractmethod
 from enum import Enum
 from typing import Any, Optional, Sequence
 
@@ -56,29 +55,14 @@ class LogExportError(Exception):
 
 
 class LogRecordExporter(Exporter[MiniLogRecord]):
-    @abstractmethod
-    def export(self, logs: Sequence[MiniLogRecord]) -> ExportResult:
-        pass
-
-    @abstractmethod
-    def force_flush(self, timeout_millis: Optional[int] = None) -> bool:
-        pass
-
-    @abstractmethod
-    def shutdown(self, timeout_millis: Optional[int] = None) -> None:
-        pass
+    """Base class for log record exporters."""
+    pass
 
 
 class ConsoleLogExporter(LogRecordExporter):
     def export(self, items: Sequence[MiniLogRecord]) -> ExportResult:
         print(encode_logs_request(items))  # noqa: T201
         return ExportResult.SUCCESS
-
-    def force_flush(self, timeout_millis: Optional[int] = None) -> bool:
-        return True
-
-    def shutdown(self, timeout_millis: Optional[int] = None) -> None:
-        pass
 
 
 class HttpLogExporter(LogRecordExporter):
@@ -88,12 +72,6 @@ class HttpLogExporter(LogRecordExporter):
     def export(self, logs: Sequence[MiniLogRecord]) -> ExportResult:
         data = encode_logs_request(logs)
         return self._exporter.export(data)
-
-    def force_flush(self, timeout_millis: Optional[int] = None) -> bool:
-        return True
-
-    def shutdown(self, timeout_millis: Optional[int] = None) -> None:
-        pass
 
 
 class Logger(ApiLogger):
