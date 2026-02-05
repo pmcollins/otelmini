@@ -1,8 +1,12 @@
+"""
+API-only logging test using auto-instrumentation.
+This script only uses stdlib logging - no otelmini imports.
+"""
+
 import logging
 from typing import Mapping, Optional, Sequence
 
 from _lib import package
-from otelmini.auto._lib import OTEL_MINI_LOG_FORMAT
 
 MSG = "this is a warning"
 
@@ -10,7 +14,7 @@ MSG = "this is a warning"
 class LogsOtelTest:
 
     def environment_variables(self) -> Mapping[str, str]:
-        return {OTEL_MINI_LOG_FORMAT: "%(message)s"}
+        return {"OTEL_MINI_LOG_FORMAT": "%(message)s"}
 
     def requirements(self) -> Sequence[str]:
         return (package(),)

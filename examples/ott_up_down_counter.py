@@ -1,19 +1,21 @@
+"""
+API-only UpDownCounter test using auto-instrumentation.
+This script only imports from opentelemetry.* - no otelmini imports.
+"""
+
 import time
-from pathlib import Path
 from typing import Mapping, Optional, Sequence
 
-from otelmini.metric import ManualExportingMetricReader, MeterProvider, HttpMetricExporter
+from opentelemetry import metrics
+
+from _lib import package
+
 
 if __name__ == '__main__':
-    exporter = HttpMetricExporter()
-    reader = ManualExportingMetricReader(exporter=exporter)
-    meter_provider = MeterProvider(metric_readers=(reader,))
-    meter = meter_provider.get_meter("my-meter")
+    meter = metrics.get_meter("my-meter")
     up_down_counter = meter.create_up_down_counter("connections", unit="1", description="Active connections")
     up_down_counter.add(10)
     up_down_counter.add(-3)  # Test decrement
-    time.sleep(1)
-    reader.force_flush()
     time.sleep(1)
 
 
@@ -22,17 +24,16 @@ class UpDownCounterOtelTest:
         return {}
 
     def requirements(self) -> Sequence[str]:
-        parent = str(Path(__file__).resolve().parent.parent)
-        return (parent,)
+        return (package(),)
 
     def wrapper_command(self) -> str:
-        return ""
+        return "otel"
 
     def is_http(self) -> bool:
         return True
 
     def on_start(self) -> Optional[float]:
-        pass
+        return 3.0
 
     def on_stop(self, tel, stdout: str, stderr: str, returncode: int) -> None:
         from oteltest.telemetry import count_metrics, get_metric_names, MessageToDict

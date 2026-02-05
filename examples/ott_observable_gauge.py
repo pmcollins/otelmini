@@ -1,9 +1,16 @@
+"""
+API-only ObservableGauge test using auto-instrumentation.
+This script only imports from opentelemetry.* - no otelmini imports.
+"""
+
 import time
-from pathlib import Path
 from typing import Mapping, Optional, Sequence
 
+from opentelemetry import metrics
 from opentelemetry.metrics import Observation
-from otelmini.metric import ManualExportingMetricReader, MeterProvider, HttpMetricExporter
+
+from _lib import package
+
 
 # Simulated CPU usage value
 _cpu_usage = 65.5
@@ -15,18 +22,13 @@ def cpu_callback():
 
 
 if __name__ == '__main__':
-    exporter = HttpMetricExporter()
-    reader = ManualExportingMetricReader(exporter=exporter)
-    meter_provider = MeterProvider(metric_readers=(reader,))
-    meter = meter_provider.get_meter("my-meter")
+    meter = metrics.get_meter("my-meter")
     gauge = meter.create_observable_gauge(
         "cpu_usage",
         callbacks=[cpu_callback],
         unit="%",
         description="CPU usage percentage"
     )
-    time.sleep(1)
-    reader.force_flush()
     time.sleep(1)
 
 
@@ -35,17 +37,16 @@ class ObservableGaugeOtelTest:
         return {}
 
     def requirements(self) -> Sequence[str]:
-        parent = str(Path(__file__).resolve().parent.parent)
-        return (parent,)
+        return (package(),)
 
     def wrapper_command(self) -> str:
-        return ""
+        return "otel"
 
     def is_http(self) -> bool:
         return True
 
     def on_start(self) -> Optional[float]:
-        pass
+        return 3.0
 
     def on_stop(self, tel, stdout: str, stderr: str, returncode: int) -> None:
         from oteltest.telemetry import count_metrics, get_metric_names, MessageToDict
