@@ -101,6 +101,17 @@ def _encode_scope(scope: InstrumentationScope) -> dict:
     return result
 
 
+def _encode_event(event: tuple) -> dict:
+    """Encode a span event to OTLP format."""
+    name, attributes, timestamp = event
+    result = {"name": name}
+    if timestamp is not None:
+        result["timeUnixNano"] = str(timestamp)
+    if attributes:
+        result["attributes"] = _encode_attributes(attributes)
+    return result
+
+
 def _encode_span(span: MiniSpan) -> dict:
     """Encode a single span to OTLP format."""
     ctx = span.get_span_context()
@@ -117,6 +128,9 @@ def _encode_span(span: MiniSpan) -> dict:
     parent_span_id = span.get_parent_span_id()
     if parent_span_id:
         result["parentSpanId"] = _encode_span_id(parent_span_id)
+    events = span.get_events()
+    if events:
+        result["events"] = [_encode_event(e) for e in events]
     return result
 
 

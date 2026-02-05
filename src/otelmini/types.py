@@ -140,6 +140,8 @@ class MiniSpan(ApiSpan):
         self._attributes[key] = value
 
     def add_event(self, name: str, attributes=None, timestamp: Optional[int] = None) -> None:
+        if timestamp is None:
+            timestamp = _time_ns()
         self._events.append((name, attributes, timestamp))
 
     def update_name(self, name: str) -> None:
@@ -159,6 +161,8 @@ class MiniSpan(ApiSpan):
         timestamp: Optional[int] = None,
         escaped: bool = False,  # noqa: FBT001, FBT002
     ) -> None:
+        if timestamp is None:
+            timestamp = _time_ns()
         self._events.append((exception.__class__.__name__, attributes, timestamp))
 
     def end(self, end_time: Optional[int] = None) -> None:

@@ -1,5 +1,6 @@
 from otelmini._lib import Retrier, RetrierResult
 from otelmini.trace import MiniSpan, Resource, InstrumentationScope, SpanContext
+from otelmini.encode import _encode_span, _encode_event
 from tests._lib import StubbornRunner, FakeSleeper
 
 
@@ -26,3 +27,82 @@ def test_span_dict_serialization():
     assert new_span.get_name() == "test"
     assert new_span.get_span_context().trace_id == 1
     assert new_span.get_span_context().span_id == 2
+
+
+def test_encode_event_with_all_fields():
+    event = ("test-event", {"key": "value"}, 1234567890)
+    encoded = _encode_event(event)
+    assert encoded["name"] == "test-event"
+    assert encoded["timeUnixNano"] == "1234567890"
+    assert encoded["attributes"] == [{"key": "key", "value": {"stringValue": "value"}}]
+
+
+def test_encode_event_without_timestamp():
+    # When timestamp is None in the tuple, no timeUnixNano is encoded
+    # (But add_event now auto-generates timestamps, so this tests the encoder edge case)
+    event = ("test-event", {"key": "value"}, None)
+    encoded = _encode_event(event)
+    assert encoded["name"] == "test-event"
+    assert "timeUnixNano" not in encoded
+    assert "attributes" in encoded
+
+
+def test_add_event_auto_generates_timestamp():
+    from otelmini.trace import MiniSpan, Resource, InstrumentationScope, SpanContext
+    span = MiniSpan(
+        name="test-span",
+        span_context=SpanContext(trace_id=1, span_id=2, is_remote=False),
+        resource=Resource(""),
+        instrumentation_scope=InstrumentationScope("", ""),
+        on_end_callback=lambda s: None
+    )
+    span.add_event("auto-timestamp-event", {"key": "value"})
+    events = span.get_events()
+    assert len(events) == 1
+    name, attrs, timestamp = events[0]
+    assert name == "auto-timestamp-event"
+    assert timestamp is not None
+    assert timestamp > 0
+
+
+def test_encode_event_without_attributes():
+    event = ("test-event", None, 1234567890)
+    encoded = _encode_event(event)
+    assert encoded["name"] == "test-event"
+    assert encoded["timeUnixNano"] == "1234567890"
+    assert "attributes" not in encoded
+
+
+def test_encode_span_with_events():
+    span = MiniSpan(
+        name="test-span",
+        span_context=SpanContext(trace_id=1, span_id=2, is_remote=False),
+        resource=Resource(""),
+        instrumentation_scope=InstrumentationScope("", ""),
+        on_end_callback=lambda s: None
+    )
+    span.add_event("event1", {"attr1": "val1"}, 1000)
+    span.add_event("event2", {"attr2": 42}, 2000)
+    span.end()
+
+    encoded = _encode_span(span)
+    assert "events" in encoded
+    assert len(encoded["events"]) == 2
+    assert encoded["events"][0]["name"] == "event1"
+    assert encoded["events"][0]["timeUnixNano"] == "1000"
+    assert encoded["events"][1]["name"] == "event2"
+    assert encoded["events"][1]["attributes"] == [{"key": "attr2", "value": {"intValue": "42"}}]
+
+
+def test_encode_span_without_events():
+    span = MiniSpan(
+        name="test-span",
+        span_context=SpanContext(trace_id=1, span_id=2, is_remote=False),
+        resource=Resource(""),
+        instrumentation_scope=InstrumentationScope("", ""),
+        on_end_callback=lambda s: None
+    )
+    span.end()
+
+    encoded = _encode_span(span)
+    assert "events" not in encoded
