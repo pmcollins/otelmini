@@ -48,6 +48,18 @@ class CounterError(Exception):
         super().__init__("Counter cannot be decremented (amount must be non-negative)")
 
 
+def _attributes_to_key(attributes: Optional[Attributes]) -> tuple:
+    """Convert attributes dict to a hashable key for aggregation."""
+    if not attributes:
+        return ()
+    return tuple(sorted(attributes.items()))
+
+
+def _key_to_attributes(key: tuple) -> dict:
+    """Convert hashable key back to attributes dict."""
+    return dict(key)
+
+
 class HttpMetricExporter(Exporter[MetricsData]):
     def __init__(self, endpoint="http://localhost:4318/v1/metrics", timeout=30):
         self._exporter = _HttpExporter(endpoint, timeout)
@@ -177,43 +189,57 @@ class MetricProducer:
             scope = InstrumentationScope(name=meter_name)
             metrics = []
             for counter in instruments[InstrumentType.COUNTER]:
-                data_point = NumberDataPoint(
-                    {}, self._start_time_unix_nano, time_unix_nano, counter.get_value()
-                )
-                sum_metric = Sum(
-                    [data_point],
-                    is_monotonic=True,
-                    aggregation_temporality=AggregationTemporality.CUMULATIVE
-                )
-                metrics.append(Metric(counter.name, counter.description, counter.unit, sum_metric))
+                data_points = []
+                for attr_key, value in counter.get_values().items():
+                    data_points.append(NumberDataPoint(
+                        _key_to_attributes(attr_key),
+                        self._start_time_unix_nano,
+                        time_unix_nano,
+                        value
+                    ))
+                if data_points:
+                    sum_metric = Sum(
+                        data_points,
+                        is_monotonic=True,
+                        aggregation_temporality=AggregationTemporality.CUMULATIVE
+                    )
+                    metrics.append(Metric(counter.name, counter.description, counter.unit, sum_metric))
             for up_down_counter in instruments[InstrumentType.UP_DOWN_COUNTER]:
-                data_point = NumberDataPoint(
-                    {}, self._start_time_unix_nano, time_unix_nano, up_down_counter.get_value()
-                )
-                sum_metric = Sum(
-                    [data_point],
-                    is_monotonic=False,
-                    aggregation_temporality=AggregationTemporality.CUMULATIVE
-                )
-                metrics.append(Metric(up_down_counter.name, up_down_counter.description, up_down_counter.unit, sum_metric))
+                data_points = []
+                for attr_key, value in up_down_counter.get_values().items():
+                    data_points.append(NumberDataPoint(
+                        _key_to_attributes(attr_key),
+                        self._start_time_unix_nano,
+                        time_unix_nano,
+                        value
+                    ))
+                if data_points:
+                    sum_metric = Sum(
+                        data_points,
+                        is_monotonic=False,
+                        aggregation_temporality=AggregationTemporality.CUMULATIVE
+                    )
+                    metrics.append(Metric(up_down_counter.name, up_down_counter.description, up_down_counter.unit, sum_metric))
             for histogram in instruments[InstrumentType.HISTOGRAM]:
-                h_data = histogram.get_histogram_data()
-                data_point = HistogramDataPoint(
-                    attributes={},
-                    start_time_unix_nano=self._start_time_unix_nano,
-                    time_unix_nano=time_unix_nano,
-                    count=h_data['count'],
-                    sum=h_data['sum'],
-                    bucket_counts=h_data['bucket_counts'],
-                    explicit_bounds=h_data['explicit_bounds'],
-                    min=h_data['min'],
-                    max=h_data['max'],
-                )
-                histogram_metric = HistogramData(
-                    [data_point],
-                    aggregation_temporality=AggregationTemporality.CUMULATIVE
-                )
-                metrics.append(Metric(histogram.name, histogram.description, histogram.unit, histogram_metric))
+                data_points = []
+                for attr_key, h_data in histogram.get_all_histogram_data().items():
+                    data_points.append(HistogramDataPoint(
+                        attributes=_key_to_attributes(attr_key),
+                        start_time_unix_nano=self._start_time_unix_nano,
+                        time_unix_nano=time_unix_nano,
+                        count=h_data['count'],
+                        sum=h_data['sum'],
+                        bucket_counts=h_data['bucket_counts'],
+                        explicit_bounds=h_data['explicit_bounds'],
+                        min=h_data['min'],
+                        max=h_data['max'],
+                    ))
+                if data_points:
+                    histogram_metric = HistogramData(
+                        data_points,
+                        aggregation_temporality=AggregationTemporality.CUMULATIVE
+                    )
+                    metrics.append(Metric(histogram.name, histogram.description, histogram.unit, histogram_metric))
             for gauge in instruments[InstrumentType.OBSERVABLE_GAUGE]:
                 data_point = NumberDataPoint(
                     {}, self._start_time_unix_nano, time_unix_nano, gauge.get_value()
@@ -275,7 +301,7 @@ class Counter(ApiCounter):
         self.name = name
         self.unit = unit
         self.description = description
-        self._value = 0.0
+        self._values: dict[tuple, float] = {}  # attribute_key -> value
 
     def add(
         self,
@@ -285,10 +311,12 @@ class Counter(ApiCounter):
     ) -> None:
         if amount < 0:
             raise CounterError
-        self._value += amount
+        key = _attributes_to_key(attributes)
+        self._values[key] = self._values.get(key, 0.0) + amount
 
-    def get_value(self):
-        return self._value
+    def get_values(self) -> dict[tuple, float]:
+        """Return all values keyed by attribute tuple."""
+        return self._values
 
 
 class UpDownCounter(ApiUpDownCounter):
@@ -297,7 +325,7 @@ class UpDownCounter(ApiUpDownCounter):
         self.name = name
         self.unit = unit
         self.description = description
-        self._value = 0.0
+        self._values: dict[tuple, float] = {}  # attribute_key -> value
 
     def add(
         self,
@@ -305,10 +333,45 @@ class UpDownCounter(ApiUpDownCounter):
         attributes: Optional[Attributes] = None,
         context: Optional[Context] = None,
     ) -> None:
-        self._value += amount  # No non-negative check
+        key = _attributes_to_key(attributes)
+        self._values[key] = self._values.get(key, 0.0) + amount
 
-    def get_value(self):
-        return self._value
+    def get_values(self) -> dict[tuple, float]:
+        """Return all values keyed by attribute tuple."""
+        return self._values
+
+
+class _HistogramAggregation:
+    """Aggregation state for a single attribute combination."""
+
+    def __init__(self, boundaries: list):
+        self.boundaries = boundaries
+        self.bucket_counts = [0] * (len(boundaries) + 1)
+        self._sum = 0.0
+        self._count = 0
+        self._min = float('inf')
+        self._max = float('-inf')
+
+    def record(self, amount: float) -> None:
+        self._sum += amount
+        self._count += 1
+        self._min = min(self._min, amount)
+        self._max = max(self._max, amount)
+        for i, bound in enumerate(self.boundaries):
+            if amount < bound:
+                self.bucket_counts[i] += 1
+                return
+        self.bucket_counts[-1] += 1
+
+    def get_data(self) -> dict:
+        return {
+            'count': self._count,
+            'sum': self._sum,
+            'min': self._min if self._count > 0 else 0.0,
+            'max': self._max if self._count > 0 else 0.0,
+            'bucket_counts': self.bucket_counts,
+            'explicit_bounds': self.boundaries,
+        }
 
 
 class HistogramInstrument(ApiHistogram):
@@ -325,11 +388,7 @@ class HistogramInstrument(ApiHistogram):
         self.unit = unit
         self.description = description
         self.boundaries = list(explicit_bucket_boundaries) if explicit_bucket_boundaries else self.DEFAULT_BOUNDARIES
-        self.bucket_counts = [0] * (len(self.boundaries) + 1)
-        self._sum = 0.0
-        self._count = 0
-        self._min = float('inf')
-        self._max = float('-inf')
+        self._aggregations: dict[tuple, _HistogramAggregation] = {}  # attribute_key -> aggregation
 
     def record(
         self,
@@ -337,26 +396,14 @@ class HistogramInstrument(ApiHistogram):
         attributes: Optional[Attributes] = None,
         context: Optional[Context] = None,
     ) -> None:
-        self._sum += amount
-        self._count += 1
-        self._min = min(self._min, amount)
-        self._max = max(self._max, amount)
-        # Find bucket
-        for i, bound in enumerate(self.boundaries):
-            if amount < bound:
-                self.bucket_counts[i] += 1
-                return
-        self.bucket_counts[-1] += 1
+        key = _attributes_to_key(attributes)
+        if key not in self._aggregations:
+            self._aggregations[key] = _HistogramAggregation(self.boundaries)
+        self._aggregations[key].record(amount)
 
-    def get_histogram_data(self):
-        return {
-            'count': self._count,
-            'sum': self._sum,
-            'min': self._min if self._count > 0 else 0.0,
-            'max': self._max if self._count > 0 else 0.0,
-            'bucket_counts': self.bucket_counts,
-            'explicit_bounds': self.boundaries,
-        }
+    def get_all_histogram_data(self) -> dict[tuple, dict]:
+        """Return histogram data for all attribute combinations."""
+        return {key: agg.get_data() for key, agg in self._aggregations.items()}
 
 
 class ObservableGaugeInstrument(ApiObservableGauge):

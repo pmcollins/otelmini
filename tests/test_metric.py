@@ -127,6 +127,97 @@ class FakeExporter(Exporter):
         return self.exports
 
 
+# Attribute Aggregation Tests
+
+def test_counter_with_attributes():
+    """Test that counter aggregates by attribute combination."""
+    exporter = FakeExporter()
+    reader = ManualExportingMetricReader(exporter)
+    meter_provider = MeterProvider(metric_readers=(reader,))
+    meter = meter_provider.get_meter(name="my-meter")
+    counter = meter.create_counter(name="requests")
+
+    counter.add(1, {"method": "GET"})
+    counter.add(2, {"method": "POST"})
+    counter.add(3, {"method": "GET"})
+
+    reader.force_flush()
+
+    metrics_data = exporter.get_exports()[0]
+    metric = metrics_data.resource_metrics[0].scope_metrics[0].metrics[0]
+    data_points = {
+        tuple(sorted(dp.attributes.items())): dp.value
+        for dp in metric.data.data_points
+    }
+
+    assert len(data_points) == 2
+    assert data_points[(("method", "GET"),)] == 4  # 1 + 3
+    assert data_points[(("method", "POST"),)] == 2
+
+
+def test_counter_no_attributes_separate_from_with_attributes():
+    """Test that no-attribute calls aggregate separately."""
+    exporter = FakeExporter()
+    reader = ManualExportingMetricReader(exporter)
+    meter_provider = MeterProvider(metric_readers=(reader,))
+    meter = meter_provider.get_meter(name="my-meter")
+    counter = meter.create_counter(name="requests")
+
+    counter.add(10)  # No attributes
+    counter.add(5, {"region": "us"})
+    counter.add(3)  # No attributes
+
+    reader.force_flush()
+
+    metrics_data = exporter.get_exports()[0]
+    metric = metrics_data.resource_metrics[0].scope_metrics[0].metrics[0]
+    data_points = {
+        tuple(sorted(dp.attributes.items())): dp.value
+        for dp in metric.data.data_points
+    }
+
+    assert len(data_points) == 2
+    assert data_points[()] == 13  # 10 + 3
+    assert data_points[(("region", "us"),)] == 5
+
+
+def test_histogram_with_attributes():
+    """Test that histogram aggregates by attribute combination."""
+    exporter = FakeExporter()
+    reader = ManualExportingMetricReader(exporter)
+    meter_provider = MeterProvider(metric_readers=(reader,))
+    meter = meter_provider.get_meter(name="my-meter")
+    histogram = meter.create_histogram(
+        name="latency",
+        explicit_bucket_boundaries_advisory=[10, 100]
+    )
+
+    histogram.record(5, {"endpoint": "/api"})
+    histogram.record(50, {"endpoint": "/api"})
+    histogram.record(200, {"endpoint": "/health"})
+
+    reader.force_flush()
+
+    metrics_data = exporter.get_exports()[0]
+    metric = metrics_data.resource_metrics[0].scope_metrics[0].metrics[0]
+    data_points = {
+        tuple(sorted(dp.attributes.items())): dp
+        for dp in metric.data.data_points
+    }
+
+    assert len(data_points) == 2
+
+    api_dp = data_points[(("endpoint", "/api"),)]
+    assert api_dp.count == 2
+    assert api_dp.sum == 55
+    assert api_dp.min == 5
+    assert api_dp.max == 50
+
+    health_dp = data_points[(("endpoint", "/health"),)]
+    assert health_dp.count == 1
+    assert health_dp.sum == 200
+
+
 # UpDownCounter Tests
 
 def test_up_down_counter_increment_decrement():
@@ -244,6 +335,8 @@ def test_histogram_custom_boundaries():
         explicit_bucket_boundaries_advisory=custom_boundaries
     )
 
+    # Must record at least one value to produce a data point
+    histogram.record(3)
     reader.force_flush()
 
     metrics_data = exporter.get_exports()[0]
