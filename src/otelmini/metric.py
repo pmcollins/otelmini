@@ -14,25 +14,20 @@ from opentelemetry.metrics import MeterProvider as ApiMeterProvider
 from opentelemetry.metrics import ObservableCounter as ApiObservableCounter
 from opentelemetry.metrics import ObservableGauge as ApiObservableGauge
 from opentelemetry.metrics import ObservableUpDownCounter as ApiObservableUpDownCounter
+from opentelemetry.metrics import UpDownCounter as ApiUpDownCounter
 
 from otelmini._lib import Exporter, ExportResult, _HttpExporter
 from otelmini.encode import encode_metrics_request
 from otelmini.point import AggregationTemporality
 from otelmini.point import MetricsData, Metric, ResourceMetrics, ScopeMetrics, Sum, NumberDataPoint
 from otelmini.point import Histogram as HistogramData, HistogramDataPoint, Gauge
+from otelmini.resource import create_default_resource
 from otelmini.types import Resource, InstrumentationScope
-
-from opentelemetry.metrics import UpDownCounter as ApiUpDownCounter
 
 if TYPE_CHECKING:
     from opentelemetry.context import Context
     from opentelemetry.metrics import CallbackT
     from opentelemetry.util.types import Attributes
-
-
-class MetricExportResult(Enum):
-    SUCCESS = 0
-    FAILURE = 1
 
 
 class InstrumentType(Enum):
@@ -106,9 +101,6 @@ class ManualExportingMetricReader(MetricReader):
 
     def shutdown(self, timeout_millis: float = 30_000, **kwargs) -> None:
         pass
-
-
-from otelmini.resource import create_default_resource
 
 
 def _time_ns() -> int:

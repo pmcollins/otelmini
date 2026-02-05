@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import random
-import typing
 from typing import TYPE_CHECKING, Iterator, Optional, Sequence
 
 from opentelemetry import trace
@@ -35,8 +34,6 @@ def _generate_span_id() -> int:
     return random.getrandbits(64)
 
 
-
-
 class MiniTracerProvider(TracerProvider):
     def __init__(self, span_processor=None, resource: Resource = None):
         self.span_processor = span_processor
@@ -45,9 +42,9 @@ class MiniTracerProvider(TracerProvider):
     def get_tracer(
         self,
         instrumenting_module_name: str,
-        instrumenting_library_version: typing.Optional[str] = None,
-        schema_url: typing.Optional[str] = None,
-        attributes: typing.Optional[types.Attributes] = None,
+        instrumenting_library_version: Optional[str] = None,
+        schema_url: Optional[str] = None,
+        attributes: Optional[types.Attributes] = None,
     ) -> Tracer:
         scope = InstrumentationScope(instrumenting_module_name, instrumenting_library_version)
         return MiniTracer(self.span_processor, self.resource, scope)

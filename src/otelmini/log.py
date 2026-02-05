@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from enum import Enum
 from typing import Any, Optional, Sequence
 
 from opentelemetry._logs import LogRecord as ApiLogRecord
@@ -13,11 +12,6 @@ from opentelemetry.util.types import Attributes
 
 from otelmini._lib import Exporter, ExportResult, _HttpExporter
 from otelmini.encode import encode_logs_request
-
-
-class LogExportResult(Enum):
-    SUCCESS = 0
-    FAILURE = 1
 
 
 class MiniLogRecord(ApiLogRecord):
