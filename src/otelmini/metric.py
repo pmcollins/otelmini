@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import atexit
 import threading
-import time
 from abc import ABC, abstractmethod
 from enum import Enum
 from typing import TYPE_CHECKING, Optional, Sequence
@@ -22,7 +21,7 @@ from otelmini.point import AggregationTemporality
 from otelmini.point import MetricsData, Metric, ResourceMetrics, ScopeMetrics, Sum, NumberDataPoint
 from otelmini.point import Histogram as HistogramData, HistogramDataPoint, Gauge
 from otelmini.resource import create_default_resource
-from otelmini.types import Resource, InstrumentationScope
+from otelmini.types import Resource, InstrumentationScope, _time_ns
 
 if TYPE_CHECKING:
     from opentelemetry.context import Context
@@ -101,11 +100,6 @@ class ManualExportingMetricReader(MetricReader):
 
     def shutdown(self, timeout_millis: float = 30_000, **kwargs) -> None:
         pass
-
-
-def _time_ns() -> int:
-    """Get current time in nanoseconds."""
-    return time.time_ns()
 
 
 class PeriodicExportingMetricReader(MetricReader):
