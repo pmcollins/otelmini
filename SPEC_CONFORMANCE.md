@@ -81,9 +81,9 @@ Spec reference: https://opentelemetry.io/docs/specs/otel/
 | `create_up_down_counter()` | ✅ | Implemented |
 | `create_histogram()` | ✅ | Implemented |
 | `create_gauge()` | ❌ | Sync gauge not implemented |
-| `create_observable_counter()` | ❌ | Stub only |
+| `create_observable_counter()` | ❌ | Raises NotImplementedError |
 | `create_observable_gauge()` | ✅ | Implemented |
-| `create_observable_up_down_counter()` | ❌ | Stub only |
+| `create_observable_up_down_counter()` | ❌ | Raises NotImplementedError |
 
 ### Instruments
 
