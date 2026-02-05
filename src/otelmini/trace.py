@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import random
 import typing
 from typing import TYPE_CHECKING, Iterator, Optional, Sequence
@@ -34,10 +35,16 @@ def _generate_span_id() -> int:
     return random.getrandbits(64)
 
 
+def _default_resource() -> Resource:
+    """Create a Resource with service.name from OTEL_SERVICE_NAME env var."""
+    service_name = os.environ.get("OTEL_SERVICE_NAME", "unknown_service")
+    return Resource(attributes={"service.name": service_name})
+
+
 class MiniTracerProvider(TracerProvider):
     def __init__(self, span_processor=None, resource: Resource = None):
         self.span_processor = span_processor
-        self.resource = resource or Resource()
+        self.resource = resource or _default_resource()
 
     def get_tracer(
         self,

@@ -46,6 +46,6 @@ if __name__ == '__main__':
     tracer = tp.get_tracer(__name__)
     with tracer.start_as_current_span("ott-manual-spans"):
         for i in range(12):
-            with tracer.start_span(f"span-{i}"):
+            with tracer.start_as_current_span(f"span-{i}"):
                 print(f"main: i={i}")
                 time.sleep(0.2)
