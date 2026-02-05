@@ -14,7 +14,7 @@ from common import (
     SPAN_ATTRIBUTES,
     EVENT_NAME,
     EVENT_ATTRIBUTES,
-    BaseCompareTest,
+    BaseSpanCompareTest,
 )
 
 
@@ -37,7 +37,7 @@ if __name__ == "__main__":
     create_test_span()
 
 
-class SpanOtelminiOtelTest(BaseCompareTest):
+class SpanOtelminiOtelTest(BaseSpanCompareTest):
     def requirements(self) -> Sequence[str]:
         # otelmini package (parent of examples dir)
         parent = str(Path(__file__).resolve().parent.parent.parent)

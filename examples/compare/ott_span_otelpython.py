@@ -9,7 +9,7 @@ from common import (
     SPAN_ATTRIBUTES,
     EVENT_NAME,
     EVENT_ATTRIBUTES,
-    BaseCompareTest,
+    BaseSpanCompareTest,
 )
 
 
@@ -40,7 +40,7 @@ if __name__ == "__main__":
     create_test_span()
 
 
-class SpanOtelpythonOtelTest(BaseCompareTest):
+class SpanOtelpythonOtelTest(BaseSpanCompareTest):
     def requirements(self) -> Sequence[str]:
         return (
             "opentelemetry-sdk",
