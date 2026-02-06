@@ -17,6 +17,7 @@ from otelmini._lib import (
     HttpExporterBase,
 )
 from otelmini.encode import encode_trace_request
+from otelmini.env import Config
 from otelmini.resource import create_default_resource
 from otelmini.sampler import AlwaysOnSampler, Decision, Sampler
 from otelmini.types import InstrumentationScope, MiniSpan, Resource
@@ -39,9 +40,16 @@ def _generate_span_id() -> int:
 
 
 class MiniTracerProvider(TracerProvider):
-    def __init__(self, span_processor=None, resource: Resource = None, sampler: Sampler = None):
+    def __init__(
+        self,
+        span_processor=None,
+        resource: Resource = None,
+        sampler: Sampler = None,
+        config: Config = None,
+    ):
+        self.config = config or Config()
         self.span_processor = span_processor
-        self.resource = resource or create_default_resource()
+        self.resource = resource or create_default_resource(self.config)
         self.sampler = sampler or AlwaysOnSampler()
 
     def get_tracer(

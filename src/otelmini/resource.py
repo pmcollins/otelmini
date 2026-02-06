@@ -1,8 +1,7 @@
 """Resource creation utilities."""
 from __future__ import annotations
 
-import os
-
+from otelmini.env import Config
 from otelmini.types import Resource
 
 
@@ -19,20 +18,19 @@ def parse_resource_attributes(env_value: str) -> dict:
     return attributes
 
 
-def create_default_resource() -> Resource:
+def create_default_resource(config: Config) -> Resource:
     """Create a resource with default SDK attributes and OTEL_RESOURCE_ATTRIBUTES."""
     import otelmini
-    service_name = os.environ.get("OTEL_SERVICE_NAME", "unknown_service")
 
     # Start with env var attributes (lower priority)
-    env_attrs = parse_resource_attributes(os.environ.get("OTEL_RESOURCE_ATTRIBUTES", ""))
+    env_attrs = parse_resource_attributes(config.resource_attributes)
 
     # SDK attributes (higher priority, will override env)
     sdk_attrs = {
         "telemetry.sdk.language": "python",
         "telemetry.sdk.name": "otelmini",
         "telemetry.sdk.version": getattr(otelmini, "__version__", "0.0.1"),
-        "service.name": service_name,
+        "service.name": config.service_name,
     }
 
     # Merge: env first, then SDK overwrites

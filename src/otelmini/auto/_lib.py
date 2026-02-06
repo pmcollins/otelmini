@@ -1,10 +1,10 @@
 import logging
-import os
 from importlib.metadata import entry_points
 from typing import Optional
 
 from opentelemetry import metrics, trace
 
+from otelmini.env import Config
 from otelmini.log import (
     HttpLogExporter,
     LoggerProvider,
@@ -18,63 +18,17 @@ from otelmini.metric import (
 from otelmini.processor import BatchProcessor
 from otelmini.trace import HttpSpanExporter, MiniTracerProvider
 
-pylogger = logging.getLogger(__package__)
-OTEL_MINI_LOG_FORMAT = "OTEL_MINI_LOG_FORMAT"
-
-
-class Env:
-    """
-    Wrapper around a system's environment variables with convenience methods.
-    Defaults to using os.environ but you can pass in a dictionary for testing.
-    """
-
-    def __init__(self, store=None):
-        self.store = os.environ if store is None else store
-
-    def is_true(self, key, default=""):
-        s = self.getval(key, default)
-        return s.strip().lower() == "true"
-
-    def list_append(self, key, value):
-        curr = self.getval(key)
-        if curr:
-            curr += ","
-        self.setval(key, curr + value)
-
-    def getval(self, key, default=""):
-        return self.store.get(key, default)
-
-    def getint(self, key, default=0):
-        val = self.getval(key, str(default))
-        try:
-            return int(val)
-        except ValueError:
-            pylogger.warning("Invalid integer value of '%s' for env var '%s'", val, key)
-            return default
-
-    def setval(self, key, value):
-        self.store[key] = value
-
-    def setdefault(self, key, value):
-        self.store.setdefault(key, value)
-
-
-class Config:
-    def __init__(self, env: Env):
-        self.log_format = env.getval(OTEL_MINI_LOG_FORMAT, logging.BASIC_FORMAT)
-
-    def get_log_format(self):
-        return self.log_format
+_logger = logging.getLogger(__name__)
 
 
 class AutoInstrumentationManager:
-    def __init__(self, env: Env):
+    def __init__(self, config: Config):
+        self.config = config
         self.tracer_provider: Optional[MiniTracerProvider] = None
         self.logger_provider: Optional[LoggerProvider] = None
         self.meter_provider: Optional[MeterProvider] = None
         self.otel_logging_handler: Optional[OtelBridgeLoggingHandler] = None
         self.root_logger: Optional[logging.Logger] = None
-        self.config = Config(env)
 
     def set_up_tracing(self):
         self.tracer_provider = MiniTracerProvider(
@@ -82,7 +36,8 @@ class AutoInstrumentationManager:
                 HttpSpanExporter(),
                 batch_size=144,
                 interval_seconds=12,
-            )
+            ),
+            config=self.config,
         )
         trace.set_tracer_provider(self.tracer_provider)
 
@@ -91,13 +46,14 @@ class AutoInstrumentationManager:
             HttpMetricExporter(),
             export_interval_millis=10_000,
         )
-        self.meter_provider = MeterProvider(metric_readers=(reader,))
+        self.meter_provider = MeterProvider(metric_readers=(reader,), config=self.config)
         metrics.set_meter_provider(self.meter_provider)
 
     def set_up_logging(self):
         self.root_logger = logging.getLogger()
         self.logger_provider = LoggerProvider(
-            BatchProcessor(HttpLogExporter(), batch_size=512, interval_seconds=5)
+            BatchProcessor(HttpLogExporter(), batch_size=512, interval_seconds=5),
+            config=self.config,
         )
         self.otel_logging_handler = OtelBridgeLoggingHandler(self.logger_provider)
         self.root_logger.addHandler(self.otel_logging_handler)
@@ -106,8 +62,7 @@ class AutoInstrumentationManager:
 
     def set_up_console_logging(self):
         stream_handler = logging.StreamHandler()
-        log_format = self.config.get_log_format()
-        stream_handler.setFormatter(logging.Formatter(log_format))
+        stream_handler.setFormatter(logging.Formatter(self.config.mini_log_format))
         self.root_logger.addHandler(stream_handler)
 
     def instrument_libraries(self):
@@ -118,9 +73,9 @@ class AutoInstrumentationManager:
                 instrumentor = instrumentor_cls()
                 if not instrumentor.is_instrumented_by_opentelemetry:
                     instrumentor.instrument()
-                    pylogger.debug("Instrumented %s", ep.name)
+                    _logger.debug("Instrumented %s", ep.name)
             except Exception as e:
-                pylogger.debug("Failed to instrument %s: %s", ep.name, e)
+                _logger.debug("Failed to instrument %s: %s", ep.name, e)
 
     def shutdown(self):
         if self.tracer_provider:

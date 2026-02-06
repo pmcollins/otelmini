@@ -1,6 +1,7 @@
-from otelmini.auto._lib import AutoInstrumentationManager, Env
+from otelmini.auto._lib import AutoInstrumentationManager
+from otelmini.env import Config
 
-manager = AutoInstrumentationManager(Env())
+manager = AutoInstrumentationManager(Config())
 
 
 def set_up_tracing():

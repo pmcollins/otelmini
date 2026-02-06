@@ -1,5 +1,4 @@
-import os
-
+from otelmini.env import Config, Env
 from otelmini.resource import create_default_resource, parse_resource_attributes
 from otelmini.types import Resource
 
@@ -29,11 +28,13 @@ def test_parse_resource_attributes_value_with_equals():
     assert result == {"key": "value=with=equals"}
 
 
-def test_create_default_resource_includes_env_attributes(monkeypatch):
-    monkeypatch.setenv("OTEL_RESOURCE_ATTRIBUTES", "env=prod,region=us-east-1")
-    monkeypatch.setenv("OTEL_SERVICE_NAME", "test-service")
+def test_create_default_resource_includes_env_attributes():
+    config = Config(Env({
+        "OTEL_RESOURCE_ATTRIBUTES": "env=prod,region=us-east-1",
+        "OTEL_SERVICE_NAME": "test-service",
+    }))
 
-    resource = create_default_resource()
+    resource = create_default_resource(config)
     attrs = resource.get_attributes()
 
     # Check env attributes are present
@@ -44,13 +45,15 @@ def test_create_default_resource_includes_env_attributes(monkeypatch):
     assert attrs["telemetry.sdk.name"] == "otelmini"
 
 
-def test_create_default_resource_sdk_attrs_override_env(monkeypatch):
+def test_create_default_resource_sdk_attrs_override_env():
     # If someone sets service.name via OTEL_RESOURCE_ATTRIBUTES,
     # OTEL_SERVICE_NAME should take precedence
-    monkeypatch.setenv("OTEL_RESOURCE_ATTRIBUTES", "service.name=from-env-attrs")
-    monkeypatch.setenv("OTEL_SERVICE_NAME", "from-service-name-var")
+    config = Config(Env({
+        "OTEL_RESOURCE_ATTRIBUTES": "service.name=from-env-attrs",
+        "OTEL_SERVICE_NAME": "from-service-name-var",
+    }))
 
-    resource = create_default_resource()
+    resource = create_default_resource(config)
     attrs = resource.get_attributes()
 
     assert attrs["service.name"] == "from-service-name-var"

@@ -22,6 +22,7 @@ from otelmini._lib import (
     HttpExporterBase,
 )
 from otelmini.encode import encode_logs_request
+from otelmini.env import Config
 from otelmini.resource import create_default_resource
 from otelmini.types import Resource
 
@@ -127,9 +128,15 @@ def _pylog_to_minilog(pylog_record: logging.LogRecord, resource: Resource = None
 
 
 class LoggerProvider(ApiLoggerProvider):
-    def __init__(self, log_processor: Optional[Processor[MiniLogRecord]] = None, resource: Resource = None) -> None:
+    def __init__(
+        self,
+        log_processor: Optional[Processor[MiniLogRecord]] = None,
+        resource: Resource = None,
+        config: Config = None,
+    ) -> None:
+        self.config = config or Config()
         self.log_processor = log_processor
-        self.resource = resource or create_default_resource()
+        self.resource = resource or create_default_resource(self.config)
 
     def get_logger(
         self,

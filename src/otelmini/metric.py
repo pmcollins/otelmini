@@ -27,6 +27,7 @@ from otelmini.encode import encode_metrics_request
 from otelmini.point import AggregationTemporality
 from otelmini.point import MetricsData, Metric, ResourceMetrics, ScopeMetrics, Sum, NumberDataPoint
 from otelmini.point import Histogram as HistogramData, HistogramDataPoint, Gauge
+from otelmini.env import Config
 from otelmini.resource import create_default_resource
 from otelmini.types import Resource, InstrumentationScope, _time_ns
 
@@ -161,8 +162,9 @@ class MetricProducer:
         (InstrumentType.OBSERVABLE_UP_DOWN_COUNTER, "_produce_observable_up_down_counter_metric", {}),
     )
 
-    def __init__(self, resource: Optional[Resource] = None):
-        self.resource = resource or create_default_resource()
+    def __init__(self, config: Config, resource: Optional[Resource] = None):
+        self._config = config
+        self.resource = resource or create_default_resource(self._config)
         self.meters: Dict[str, Dict[InstrumentType, List[Any]]] = {}
         self._start_time_unix_nano = _time_ns()
 
@@ -310,8 +312,10 @@ class MeterProvider(ApiMeterProvider):
         metric_readers: Sequence[MetricReader] = (),
         resource: Optional[Resource] = None,
         metric_producer: Optional[MetricProducer] = None,
+        config: Optional[Config] = None,
     ):
-        self.metric_producer = metric_producer or MetricProducer(resource=resource)
+        self.config = config or Config()
+        self.metric_producer = metric_producer or MetricProducer(self.config, resource=resource)
         self.metric_readers = metric_readers
         for reader in self.metric_readers:
             reader.set_metric_producer(self.metric_producer)
