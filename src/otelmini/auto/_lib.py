@@ -1,5 +1,6 @@
 import logging
 import os
+from importlib.metadata import entry_points
 from typing import Optional
 
 from opentelemetry import metrics, trace
@@ -108,6 +109,18 @@ class AutoInstrumentationManager:
         log_format = self.config.get_log_format()
         stream_handler.setFormatter(logging.Formatter(log_format))
         self.root_logger.addHandler(stream_handler)
+
+    def instrument_libraries(self):
+        """Discover and activate all installed OpenTelemetry instrumentors."""
+        for ep in entry_points(group="opentelemetry_instrumentor"):
+            try:
+                instrumentor_cls = ep.load()
+                instrumentor = instrumentor_cls()
+                if not instrumentor.is_instrumented_by_opentelemetry:
+                    instrumentor.instrument()
+                    pylogger.debug("Instrumented %s", ep.name)
+            except Exception as e:
+                pylogger.debug("Failed to instrument %s: %s", ep.name, e)
 
     def shutdown(self):
         if self.tracer_provider:

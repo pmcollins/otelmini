@@ -13,3 +13,7 @@ def set_up_logging():
 
 def set_up_metrics():
     manager.set_up_metrics()
+
+
+def instrument_libraries():
+    manager.instrument_libraries()

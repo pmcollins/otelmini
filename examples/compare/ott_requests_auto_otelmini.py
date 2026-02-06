@@ -12,11 +12,6 @@ TARGET_URL = "https://httpbin.org/get"
 def run_instrumented_request():
     """Make an HTTP request with auto-instrumentation enabled."""
     import requests
-    from opentelemetry.instrumentation.requests import RequestsInstrumentor
-
-    # Auto-instrumentation sets up the tracer provider, but we need to
-    # manually instrument the requests library
-    RequestsInstrumentor().instrument()
 
     tracer = trace.get_tracer("requests-auto-compare-test")
 
