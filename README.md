@@ -9,6 +9,7 @@ encoding). Ideal for constrained environments like AWS Lambda or anywhere minima
 - OTLP/HTTP with JSON encoding
 - Single dependency: `opentelemetry-api`
 - Batch processing with configurable size and interval
+- Sampling (on, off, or ratio based)
 - Auto-instrumentation support
 - W3C TraceContext and Baggage propagation
 
@@ -65,7 +66,6 @@ Comparing `otelmini` to `opentelemetry-distro` + `opentelemetry-exporter-otlp-pr
 |---------------------------|-------------|----------|
 | Third-party dependencies* | 9           | 0        |
 | Lines of Python           | 43K         | 2K       |
-| Fun                       | 🙂          | 😁       |
 
 \* Excluding opentelemetry packages and Python stdlib backports
 

@@ -59,8 +59,9 @@ Spec reference: https://opentelemetry.io/docs/specs/otel/
 
 | Requirement | Status | Notes |
 |-------------|--------|-------|
-| `ShouldSample()` | ❌ | Not implemented - all spans recorded |
+| `ShouldSample()` | ✅ | Implemented |
 | `GetDescription()` | ❌ | Not implemented |
+| Built-in samplers | ⚠️ | AlwaysOn, AlwaysOff, TraceIdRatioBased; missing ParentBased |
 
 ---
 
@@ -206,7 +207,7 @@ Spec reference: https://opentelemetry.io/docs/specs/otel/
 
 | Signal | Conformance | Notes |
 |--------|-------------|-------|
-| **Traces** | ~75% | Core functionality works, missing sampler, links |
+| **Traces** | ~80% | Core functionality works, missing ParentBasedSampler, links |
 | **Metrics** | ~70% | Missing async instruments, sync Gauge |
 | **Logs** | ~55% | Missing trace correlation, resource in export |
 | **Context/Propagation** | ✅ | W3C TraceContext and Baggage implemented |
@@ -218,5 +219,4 @@ Spec reference: https://opentelemetry.io/docs/specs/otel/
 ## High-Impact Gaps
 
 1. **No trace-log correlation** - Logs don't capture current span context
-2. **No sampling** - All spans are recorded (cannot control overhead)
-3. **Resource not in log export** - Logs cannot be attributed to a service
+2. **Resource not in log export** - Logs cannot be attributed to a service
