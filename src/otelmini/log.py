@@ -16,6 +16,8 @@ if TYPE_CHECKING:
 
 from otelmini._lib import Exporter, ExportResult, _HttpExporter
 from otelmini.encode import encode_logs_request
+from otelmini.resource import create_default_resource
+from otelmini.types import Resource
 
 
 class MiniLogRecord(ApiLogRecord):
@@ -30,6 +32,7 @@ class MiniLogRecord(ApiLogRecord):
         severity_number: Optional[SeverityNumber] = None,
         body: Optional[Any] = None,
         attributes: Optional[Attributes] = None,
+        resource: Optional[Resource] = None,
     ):
         super().__init__(
             timestamp=timestamp,
@@ -42,6 +45,10 @@ class MiniLogRecord(ApiLogRecord):
             body=body,
             attributes=attributes or {},
         )
+        self._resource = resource
+
+    def get_resource(self) -> Optional[Resource]:
+        return self._resource
 
     def __str__(self) -> str:
         return f"MiniLogRecord(severity={self.severity_text}, body='{self.body}')"
@@ -83,11 +90,11 @@ class Logger(ApiLogger):
         self._logger_provider = logger_provider
 
     def emit(self, pylog_record: logging.LogRecord) -> None:
-        mini_log_record = _pylog_to_minilog(pylog_record)
+        mini_log_record = _pylog_to_minilog(pylog_record, self._logger_provider.resource)
         self._logger_provider.log_processor.on_end(mini_log_record)
 
 
-def _pylog_to_minilog(pylog_record: logging.LogRecord) -> MiniLogRecord:
+def _pylog_to_minilog(pylog_record: logging.LogRecord, resource: Resource = None) -> MiniLogRecord:
     span_context = get_current_span().get_span_context()
     if span_context.is_valid:
         trace_id = span_context.trace_id
@@ -119,12 +126,14 @@ def _pylog_to_minilog(pylog_record: logging.LogRecord) -> MiniLogRecord:
             "thread": pylog_record.thread,
             "threadName": pylog_record.threadName,
         },
+        resource=resource,
     )
 
 
 class LoggerProvider(ApiLoggerProvider):
-    def __init__(self, log_processor: Optional[Processor[MiniLogRecord]] = None) -> None:
+    def __init__(self, log_processor: Optional[Processor[MiniLogRecord]] = None, resource: Resource = None) -> None:
         self.log_processor = log_processor
+        self.resource = resource or create_default_resource()
 
     def get_logger(
         self,

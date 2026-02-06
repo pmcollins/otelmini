@@ -150,7 +150,7 @@ Spec reference: https://opentelemetry.io/docs/specs/otel/
 | severity_number/text | ✅ | Implemented |
 | body | ✅ | Implemented |
 | attributes | ✅ | Implemented |
-| resource | ⚠️ | Not included in log export |
+| resource | ✅ | Included in log export |
 
 ### LogRecordProcessor
 
@@ -209,7 +209,7 @@ Spec reference: https://opentelemetry.io/docs/specs/otel/
 |--------|-------------|-------|
 | **Traces** | ~80% | Core functionality works, missing ParentBasedSampler, links |
 | **Metrics** | ~70% | Missing async instruments, sync Gauge |
-| **Logs** | ~65% | Missing resource in export |
+| **Logs** | ~75% | Core functionality implemented |
 | **Context/Propagation** | ✅ | W3C TraceContext and Baggage implemented |
 | **Baggage** | ✅ | API from opentelemetry-api, propagation implemented |
 | **Resource** | ~40% | Basic impl, missing merge, env var parsing |
@@ -218,4 +218,4 @@ Spec reference: https://opentelemetry.io/docs/specs/otel/
 
 ## High-Impact Gaps
 
-1. **Resource not in log export** - Logs cannot be attributed to a service
+None currently identified.

@@ -16,6 +16,7 @@ from otelmini.log import (
 from otelmini.processor import BatchProcessor
 from otelmini.encode import encode_logs_request
 from otelmini.trace import MiniTracerProvider
+from otelmini.types import Resource
 
 
 def test_basic_logging(capsys):
@@ -162,3 +163,67 @@ def test_log_without_span_has_no_trace_context():
         assert mini_log.span_id == 0
     finally:
         context.detach(token)
+
+
+def test_log_includes_resource():
+    """Logs should include resource attributes in export."""
+    resource = Resource(attributes={"service.name": "test-service", "env": "test"})
+    log_record = MiniLogRecord(
+        timestamp=1234567890,
+        severity_text="INFO",
+        severity_number=SeverityNumber.INFO,
+        body="Test message",
+        attributes={},
+        resource=resource,
+    )
+
+    encoded_json = encode_logs_request([log_record])
+    decoded = json.loads(encoded_json)
+
+    # Check resource is present
+    resource_log = decoded["resourceLogs"][0]
+    attrs = {a["key"]: a["value"]["stringValue"] for a in resource_log["resource"]["attributes"]}
+    assert attrs["service.name"] == "test-service"
+    assert attrs["env"] == "test"
+
+
+def test_logger_provider_passes_resource_to_logs():
+    """LoggerProvider should pass its resource to emitted logs."""
+    resource = Resource(attributes={"service.name": "my-service"})
+
+    class CapturingExporter:
+        def __init__(self):
+            self.logs = []
+
+        def export(self, items):
+            self.logs.extend(items)
+            return None
+
+    class CapturingProcessor:
+        def __init__(self, exporter):
+            self.exporter = exporter
+
+        def on_end(self, item):
+            self.exporter.logs.append(item)
+
+        def shutdown(self):
+            pass
+
+    exporter = CapturingExporter()
+    processor = CapturingProcessor(exporter)
+    provider = LoggerProvider(log_processor=processor, resource=resource)
+    logger = provider.get_logger("test")
+
+    log_record = logging.LogRecord(
+        name="test",
+        level=logging.INFO,
+        pathname="",
+        lineno=0,
+        msg="Test message",
+        args=(),
+        exc_info=None,
+    )
+    logger.emit(log_record)
+
+    assert len(exporter.logs) == 1
+    assert exporter.logs[0].get_resource() is resource

@@ -54,14 +54,20 @@ def _encode_resource_spans(spans: Sequence[MiniSpan]) -> list[dict]:
 
 
 def _encode_resource_logs(logs: Sequence[MiniLogRecord]) -> list[dict]:
-    """Encode logs to OTLP structure (simplified: one resource per log)."""
-    resource_logs = []
+    """Group logs by resource, encode to OTLP structure."""
+    grouped = defaultdict(list)
     for log in logs:
+        resource = log.get_resource()
+        grouped[id(resource), resource].append(log)
+
+    resource_logs = []
+    for (_, resource), log_list in grouped.items():
+        encoded_resource = _encode_resource(resource) if resource else {"attributes": []}
         resource_logs.append({
-            "resource": {"attributes": []},
+            "resource": encoded_resource,
             "scopeLogs": [{
                 "scope": {},
-                "logRecords": [_encode_log_record(log)],
+                "logRecords": [_encode_log_record(log) for log in log_list],
             }],
         })
     return resource_logs
