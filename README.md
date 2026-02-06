@@ -38,18 +38,20 @@ Run it with otelmini's auto-instrumentation:
 OTEL_SERVICE_NAME=my-service otel python my_app.py
 ```
 
-That's it—traces are exported to `localhost:4318` via OTLP/HTTP.
+That's it -- traces are exported to `localhost:4318` via OTLP/HTTP.
 
 ## Why otelmini?
 
-The standard OpenTelemetry Python exporters require protobuf at minimum. otelmini uses JSON-OTLP over HTTP, avoiding protobuf and gRPC entirely while remaining OTLP-compliant.
+otelmini was designed with minimalism as a goal, giving you insight into your applications via any of the
+instrumentation libraries writen for OpenTelemetry but staying out of the way of your applications as much as possible.
+The only dependency it requires is the opentelemetry-api, which you have to use anyway if you're using otel at all.
 
 This is useful when:
 
-- **Avoiding dependency conflicts** — your project requires a different version of protobuf, requests, or gRPC than OTel exporters expect
-- **Minimizing package size** — serverless environments like AWS Lambda have size limits
-- **Reducing cold start time** — fewer modules to load means faster Lambda cold starts
-- **Reducing attack surface** — fewer dependencies means less to audit and maintain
+- **Avoiding dependency conflicts** -- your project requires a different version of protobuf, requests, or gRPC than OTel exporters expect
+- **Minimizing package size** -- serverless environments like AWS Lambda have size limits
+- **Reducing cold start time** -- fewer modules to load means faster Lambda cold starts
+- **Reducing attack surface** -- fewer dependencies means less to audit and maintain
 
 ## Comparison with OpenTelemetry Python
 
@@ -63,7 +65,7 @@ Comparing `otelmini` to `opentelemetry-distro` + `opentelemetry-exporter-otlp-pr
 
 \* Excluding opentelemetry packages and Python stdlib backports
 
-Note: Upstream otel-python doesn't support JSON/HTTP—their OTLP exporters require protobuf.
+Note: Upstream otel-python doesn't support JSON/HTTP -- their OTLP exporters require protobuf.
 
 <details>
 <summary>Third-party packages installed by otel-python</summary>
