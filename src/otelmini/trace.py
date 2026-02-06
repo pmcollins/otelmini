@@ -74,8 +74,8 @@ class MiniTracer(Tracer):
         name: str,
         context: Optional[Context] = None,
         kind: SpanKind = SpanKind.INTERNAL,
-        attributes: types.Attributes = None,
-        links: _Links = None,
+        attributes: Optional[types.Attributes] = None,
+        links: Optional[_Links] = None,
         start_time: Optional[int] = None,
         record_exception: bool = True,  # noqa: FBT001, FBT002
         set_status_on_exception: bool = True,  # noqa: FBT001, FBT002
@@ -115,8 +115,8 @@ class MiniTracer(Tracer):
         name: str,
         context: Optional[Context] = None,
         kind: SpanKind = SpanKind.INTERNAL,
-        attributes: types.Attributes = None,
-        links: _Links = None,
+        attributes: Optional[types.Attributes] = None,
+        links: Optional[_Links] = None,
         start_time: Optional[int] = None,
         record_exception: bool = True,  # noqa: FBT001, FBT002
         set_status_on_exception: bool = True,  # noqa: FBT001, FBT002
