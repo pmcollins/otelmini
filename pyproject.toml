@@ -11,7 +11,7 @@ requires-python = ">=3.8"
 license = "Apache-2.0"
 keywords = []
 authors = [
-  { name = "Pablo Collins", email = "pcollins@splunk.com" },
+  { name = "Pablo Collins", email = "pabcolli@cisco.com" },
 ]
 classifiers = [
   "Development Status :: 4 - Beta",
