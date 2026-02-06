@@ -9,6 +9,7 @@ A minimal OpenTelemetry Python SDK with only `opentelemetry-api` as a dependency
 - Single dependency: `opentelemetry-api`
 - Batch processing with configurable size and interval
 - Auto-instrumentation support
+- W3C TraceContext and Baggage propagation
 
 ## Installation
 
@@ -56,3 +57,40 @@ This is useful when:
 - **Avoiding dependency conflicts** — your project requires a different version of protobuf, requests, or gRPC than OTel exporters expect
 - **Minimizing package size** — serverless environments like AWS Lambda have size limits
 - **Reducing attack surface** — fewer dependencies means less to audit and maintain
+
+## Context Propagation
+
+otelmini includes W3C TraceContext and Baggage propagators for distributed tracing:
+
+```python
+from otelmini.propagator import get_default_propagator
+
+propagator = get_default_propagator()
+
+# Extract trace context from incoming request headers
+ctx = propagator.extract(request.headers)
+with tracer.start_as_current_span("handle-request", context=ctx):
+    # your code here
+    pass
+
+# Inject trace context into outgoing request headers
+headers = {}
+propagator.inject(headers)
+requests.get("http://downstream-service/api", headers=headers)
+```
+
+## Spec Conformance
+
+See [SPEC_CONFORMANCE.md](SPEC_CONFORMANCE.md) for details on OpenTelemetry specification compliance.
+
+| Signal | Status |
+|--------|--------|
+| Traces | ~75% |
+| Metrics | ~70% |
+| Logs | ~55% |
+| Context/Propagation | ✅ |
+| Baggage | ✅ |
+
+## License
+
+Apache-2.0
