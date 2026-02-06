@@ -150,6 +150,17 @@ class MetricProducer:
     Spec: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/metrics/sdk.md#metricproducer
     """
 
+    # Dispatch table: instrument type -> (producer method name, kwargs)
+    _PRODUCERS = (
+        (InstrumentType.COUNTER, "_produce_sum_metric", {"is_monotonic": True}),
+        (InstrumentType.UP_DOWN_COUNTER, "_produce_sum_metric", {"is_monotonic": False}),
+        (InstrumentType.HISTOGRAM, "_produce_histogram_metric", {}),
+        (InstrumentType.GAUGE, "_produce_sync_gauge_metric", {}),
+        (InstrumentType.OBSERVABLE_COUNTER, "_produce_observable_counter_metric", {}),
+        (InstrumentType.OBSERVABLE_GAUGE, "_produce_observable_gauge_metric", {}),
+        (InstrumentType.OBSERVABLE_UP_DOWN_COUNTER, "_produce_observable_up_down_counter_metric", {}),
+    )
+
     def __init__(self, resource: Optional[Resource] = None):
         self.resource = resource or create_default_resource()
         self.meters: Dict[str, Dict[InstrumentType, List[Any]]] = {}
@@ -179,18 +190,8 @@ class MetricProducer:
         """Produce metrics from all instruments in a meter."""
         metrics: List[Metric] = []
 
-        # Dispatch table: instrument type -> (producer method, kwargs)
-        producers = [
-            (InstrumentType.COUNTER, self._produce_sum_metric, {"is_monotonic": True}),
-            (InstrumentType.UP_DOWN_COUNTER, self._produce_sum_metric, {"is_monotonic": False}),
-            (InstrumentType.HISTOGRAM, self._produce_histogram_metric, {}),
-            (InstrumentType.GAUGE, self._produce_sync_gauge_metric, {}),
-            (InstrumentType.OBSERVABLE_COUNTER, self._produce_observable_counter_metric, {}),
-            (InstrumentType.OBSERVABLE_GAUGE, self._produce_observable_gauge_metric, {}),
-            (InstrumentType.OBSERVABLE_UP_DOWN_COUNTER, self._produce_observable_up_down_counter_metric, {}),
-        ]
-
-        for instr_type, producer, kwargs in producers:
+        for instr_type, producer_name, kwargs in self._PRODUCERS:
+            producer = getattr(self, producer_name)
             for instrument in instruments[instr_type]:
                 if metric := producer(instrument, time_unix_nano, **kwargs):
                     metrics.append(metric)
