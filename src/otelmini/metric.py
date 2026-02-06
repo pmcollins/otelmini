@@ -7,6 +7,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple
 
 from opentelemetry.metrics import Counter as ApiCounter
+from opentelemetry.metrics import _Gauge as ApiGauge
 from opentelemetry.metrics import Histogram as ApiHistogram
 from opentelemetry.metrics import Meter as ApiMeter
 from opentelemetry.metrics import MeterProvider as ApiMeterProvider
@@ -34,6 +35,7 @@ class InstrumentType(Enum):
     COUNTER = "counter"
     UP_DOWN_COUNTER = "up_down_counter"
     HISTOGRAM = "histogram"
+    GAUGE = "gauge"
     OBSERVABLE_GAUGE = "observable_gauge"
 
 
@@ -186,8 +188,12 @@ class MetricProducer:
             if metric := self._produce_histogram_metric(instrument, time_unix_nano):
                 metrics.append(metric)
 
+        for instrument in instruments[InstrumentType.GAUGE]:
+            if metric := self._produce_sync_gauge_metric(instrument, time_unix_nano):
+                metrics.append(metric)
+
         for instrument in instruments[InstrumentType.OBSERVABLE_GAUGE]:
-            metrics.append(self._produce_gauge_metric(instrument, time_unix_nano))
+            metrics.append(self._produce_observable_gauge_metric(instrument, time_unix_nano))
 
         return metrics
 
@@ -239,10 +245,28 @@ class MetricProducer:
         )
         return Metric(instrument.name, instrument.description, instrument.unit, histogram_data)
 
-    def _produce_gauge_metric(
+    def _produce_sync_gauge_metric(
+        self, instrument: GaugeInstrument, time_unix_nano: int
+    ) -> Optional[Metric]:
+        """Produce a Gauge metric from a sync Gauge instrument."""
+        data_points = [
+            NumberDataPoint(
+                _key_to_attributes(attr_key),
+                self._start_time_unix_nano,
+                time_unix_nano,
+                value
+            )
+            for attr_key, value in instrument.get_values().items()
+        ]
+        if not data_points:
+            return None
+        gauge_data = Gauge(data_points)
+        return Metric(instrument.name, instrument.description, instrument.unit, gauge_data)
+
+    def _produce_observable_gauge_metric(
         self, instrument: ObservableGaugeInstrument, time_unix_nano: int
     ) -> Metric:
-        """Produce a Gauge metric."""
+        """Produce a Gauge metric from an observable Gauge."""
         data_point = NumberDataPoint(
             {}, self._start_time_unix_nano, time_unix_nano, instrument.get_value()
         )
@@ -320,6 +344,29 @@ class UpDownCounter(_SumInstrument, ApiUpDownCounter):
 
     def __init__(self, name: str, unit: str = "", description: str = ""):
         super().__init__(name, unit, description, monotonic=False)
+
+
+class GaugeInstrument(ApiGauge):
+    """Synchronous Gauge instrument - records last value per attribute set."""
+
+    def __init__(self, name: str, unit: str = "", description: str = ""):
+        self.name = name
+        self.unit = unit
+        self.description = description
+        self._values: Dict[Tuple[Tuple[str, Any], ...], float] = {}
+
+    def set(
+        self,
+        amount: float,
+        attributes: Optional[Attributes] = None,
+        context: Optional[Context] = None,
+    ) -> None:
+        key = _attributes_to_key(attributes)
+        self._values[key] = amount
+
+    def get_values(self) -> Dict[Tuple[Tuple[str, Any], ...], float]:
+        """Return all values keyed by attribute tuple."""
+        return self._values
 
 
 class _HistogramAggregation:
@@ -453,6 +500,11 @@ class Meter(ApiMeter):
         )
         self.meter_provider._register_instrument(histogram, InstrumentType.HISTOGRAM, self._name)
         return histogram
+
+    def create_gauge(self, name: str, unit: str = "", description: str = "") -> ApiGauge:
+        gauge = GaugeInstrument(name=name, unit=unit, description=description)
+        self.meter_provider._register_instrument(gauge, InstrumentType.GAUGE, self._name)
+        return gauge
 
     def create_observable_gauge(
         self, name: str, callbacks: Optional[Sequence[CallbackT]] = None, unit: str = "", description: str = ""

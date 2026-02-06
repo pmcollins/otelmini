@@ -411,6 +411,71 @@ def test_observable_gauge_no_callback():
     assert metric.data.data_points[0].value == 0.0
 
 
+# Sync Gauge Tests
+
+def test_sync_gauge_set_value():
+    exporter = FakeExporter()
+    reader = ManualExportingMetricReader(exporter)
+    meter_provider = MeterProvider(metric_readers=(reader,))
+    meter = meter_provider.get_meter(name="my-meter")
+    gauge = meter.create_gauge(name="temperature", unit="C", description="Current temperature")
+
+    gauge.set(25.5)
+
+    reader.force_flush()
+
+    metrics_data = exporter.get_exports()[0]
+    metric = metrics_data.resource_metrics[0].scope_metrics[0].metrics[0]
+
+    assert metric.name == "temperature"
+    assert metric.unit == "C"
+    assert metric.description == "Current temperature"
+    assert metric.data.data_points[0].value == 25.5
+
+
+def test_sync_gauge_overwrites_previous_value():
+    exporter = FakeExporter()
+    reader = ManualExportingMetricReader(exporter)
+    meter_provider = MeterProvider(metric_readers=(reader,))
+    meter = meter_provider.get_meter(name="my-meter")
+    gauge = meter.create_gauge(name="queue_size")
+
+    gauge.set(10)
+    gauge.set(20)
+    gauge.set(15)  # Last value wins
+
+    reader.force_flush()
+
+    metrics_data = exporter.get_exports()[0]
+    metric = metrics_data.resource_metrics[0].scope_metrics[0].metrics[0]
+    assert metric.data.data_points[0].value == 15
+
+
+def test_sync_gauge_with_attributes():
+    exporter = FakeExporter()
+    reader = ManualExportingMetricReader(exporter)
+    meter_provider = MeterProvider(metric_readers=(reader,))
+    meter = meter_provider.get_meter(name="my-meter")
+    gauge = meter.create_gauge(name="cpu_temp")
+
+    gauge.set(65.0, {"core": "0"})
+    gauge.set(70.0, {"core": "1"})
+    gauge.set(68.0, {"core": "0"})  # Overwrites core 0's value
+
+    reader.force_flush()
+
+    metrics_data = exporter.get_exports()[0]
+    metric = metrics_data.resource_metrics[0].scope_metrics[0].metrics[0]
+    data_points = {
+        tuple(sorted(dp.attributes.items())): dp
+        for dp in metric.data.data_points
+    }
+
+    assert len(data_points) == 2
+    assert data_points[(("core", "0"),)].value == 68.0
+    assert data_points[(("core", "1"),)].value == 70.0
+
+
 # PeriodicExportingMetricReader Tests
 
 def test_periodic_reader_exports_on_shutdown():
