@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import random
 from typing import TYPE_CHECKING, Iterator, Optional, Sequence
 
@@ -27,8 +26,6 @@ if TYPE_CHECKING:
     from opentelemetry.util import types
 
     from otelmini.processor import Processor
-
-_pylogger = logging.getLogger(__package__)
 
 
 def _generate_trace_id() -> int:

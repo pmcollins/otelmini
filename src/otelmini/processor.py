@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import atexit
-import logging
 import os
 import threading
 from abc import ABC, abstractmethod
@@ -9,8 +8,6 @@ from typing import TYPE_CHECKING, Callable, Generic, List, Optional, Type, TypeV
 
 if TYPE_CHECKING:
     from otelmini._lib import Exporter
-
-_pylogger = logging.getLogger(__package__)
 
 T = TypeVar("T")
 
