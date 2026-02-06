@@ -281,12 +281,14 @@ class MeterProvider(ApiMeterProvider):
             reader.shutdown(timeout_millis)
 
 
-class Counter(ApiCounter):
+class _SumInstrument:
+    """Base class for Counter and UpDownCounter instruments."""
 
-    def __init__(self, name: str, unit: str = "", description: str = ""):
+    def __init__(self, name: str, unit: str = "", description: str = "", *, monotonic: bool = False):
         self.name = name
         self.unit = unit
         self.description = description
+        self._monotonic = monotonic
         self._values: dict[tuple, float] = {}  # attribute_key -> value
 
     def add(
@@ -295,7 +297,7 @@ class Counter(ApiCounter):
         attributes: Optional[Attributes] = None,
         context: Optional[Context] = None,
     ) -> None:
-        if amount < 0:
+        if self._monotonic and amount < 0:
             raise CounterError
         key = _attributes_to_key(attributes)
         self._values[key] = self._values.get(key, 0.0) + amount
@@ -305,26 +307,16 @@ class Counter(ApiCounter):
         return self._values
 
 
-class UpDownCounter(ApiUpDownCounter):
+class Counter(_SumInstrument, ApiCounter):
 
     def __init__(self, name: str, unit: str = "", description: str = ""):
-        self.name = name
-        self.unit = unit
-        self.description = description
-        self._values: dict[tuple, float] = {}  # attribute_key -> value
+        super().__init__(name, unit, description, monotonic=True)
 
-    def add(
-        self,
-        amount: float,
-        attributes: Optional[Attributes] = None,
-        context: Optional[Context] = None,
-    ) -> None:
-        key = _attributes_to_key(attributes)
-        self._values[key] = self._values.get(key, 0.0) + amount
 
-    def get_values(self) -> dict[tuple, float]:
-        """Return all values keyed by attribute tuple."""
-        return self._values
+class UpDownCounter(_SumInstrument, ApiUpDownCounter):
+
+    def __init__(self, name: str, unit: str = "", description: str = ""):
+        super().__init__(name, unit, description, monotonic=False)
 
 
 class _HistogramAggregation:
