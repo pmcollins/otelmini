@@ -10,7 +10,13 @@ from opentelemetry.trace import SpanKind, Tracer, TracerProvider, _Links
 from opentelemetry.trace.span import SpanContext, TraceFlags
 from opentelemetry.util._decorator import _agnosticcontextmanager
 
-from otelmini._lib import Exporter, ExportResult, _HttpExporter
+from otelmini._lib import (
+    DEFAULT_EXPORTER_TIMEOUT,
+    DEFAULT_TRACE_ENDPOINT,
+    Exporter,
+    ExportResult,
+    _HttpExporter,
+)
 from otelmini.encode import encode_trace_request
 from otelmini.resource import create_default_resource
 from otelmini.sampler import AlwaysOnSampler, Decision, Sampler
@@ -128,7 +134,7 @@ class ConsoleSpanExporter(Exporter[MiniSpan]):
 
 
 class HttpSpanExporter(Exporter[MiniSpan]):
-    def __init__(self, endpoint="http://localhost:4318/v1/traces", timeout=30):
+    def __init__(self, endpoint: str = DEFAULT_TRACE_ENDPOINT, timeout: int = DEFAULT_EXPORTER_TIMEOUT):
         self._exporter = _HttpExporter(endpoint, timeout)
 
     def export(self, items: Sequence[MiniSpan]) -> ExportResult:

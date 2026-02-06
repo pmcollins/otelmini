@@ -14,7 +14,13 @@ from opentelemetry.util.types import Attributes
 if TYPE_CHECKING:
     from otelmini.processor import Processor
 
-from otelmini._lib import Exporter, ExportResult, _HttpExporter
+from otelmini._lib import (
+    DEFAULT_EXPORTER_TIMEOUT,
+    DEFAULT_LOG_ENDPOINT,
+    Exporter,
+    ExportResult,
+    _HttpExporter,
+)
 from otelmini.encode import encode_logs_request
 from otelmini.resource import create_default_resource
 from otelmini.types import Resource
@@ -66,7 +72,7 @@ class ConsoleLogExporter(Exporter[MiniLogRecord]):
 
 
 class HttpLogExporter(Exporter[MiniLogRecord]):
-    def __init__(self, endpoint="http://localhost:4318/v1/logs", timeout=30):
+    def __init__(self, endpoint: str = DEFAULT_LOG_ENDPOINT, timeout: int = DEFAULT_EXPORTER_TIMEOUT):
         self._exporter = _HttpExporter(endpoint, timeout)
 
     def export(self, logs: Sequence[MiniLogRecord]) -> ExportResult:

@@ -16,7 +16,13 @@ from opentelemetry.metrics import ObservableGauge as ApiObservableGauge
 from opentelemetry.metrics import ObservableUpDownCounter as ApiObservableUpDownCounter
 from opentelemetry.metrics import UpDownCounter as ApiUpDownCounter
 
-from otelmini._lib import Exporter, ExportResult, _HttpExporter
+from otelmini._lib import (
+    DEFAULT_EXPORTER_TIMEOUT,
+    DEFAULT_METRICS_ENDPOINT,
+    Exporter,
+    ExportResult,
+    _HttpExporter,
+)
 from otelmini.encode import encode_metrics_request
 from otelmini.point import AggregationTemporality
 from otelmini.point import MetricsData, Metric, ResourceMetrics, ScopeMetrics, Sum, NumberDataPoint
@@ -59,7 +65,7 @@ def _key_to_attributes(key: Tuple[Tuple[str, Any], ...]) -> Dict[str, Any]:
 
 
 class HttpMetricExporter(Exporter[MetricsData]):
-    def __init__(self, endpoint: str = "http://localhost:4318/v1/metrics", timeout: int = 30):
+    def __init__(self, endpoint: str = DEFAULT_METRICS_ENDPOINT, timeout: int = DEFAULT_EXPORTER_TIMEOUT):
         self._exporter = _HttpExporter(endpoint, timeout)
 
     def export(self, metrics_data: MetricsData) -> ExportResult:
