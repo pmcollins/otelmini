@@ -155,18 +155,6 @@ class MetricProducer:
             self.meters[meter_name] = {itype: [] for itype in InstrumentType}
         return self.meters[meter_name]
 
-    def _register_counter(self, counter: Counter, meter_name: str) -> None:
-        self._get_meter_instruments(meter_name)[InstrumentType.COUNTER].append(counter)
-
-    def _register_up_down_counter(self, up_down_counter: UpDownCounter, meter_name: str) -> None:
-        self._get_meter_instruments(meter_name)[InstrumentType.UP_DOWN_COUNTER].append(up_down_counter)
-
-    def _register_histogram(self, histogram: HistogramInstrument, meter_name: str) -> None:
-        self._get_meter_instruments(meter_name)[InstrumentType.HISTOGRAM].append(histogram)
-
-    def _register_observable_gauge(self, gauge: ObservableGaugeInstrument, meter_name: str) -> None:
-        self._get_meter_instruments(meter_name)[InstrumentType.OBSERVABLE_GAUGE].append(gauge)
-
     def produce(self) -> MetricsData:
         time_unix_nano = _time_ns()
         scope_metrics_list: List[ScopeMetrics] = []
@@ -284,17 +272,9 @@ class MeterProvider(ApiMeterProvider):
     ) -> ApiMeter:
         return Meter(self, name, version, schema_url)
 
-    def _register_counter(self, counter: Counter, meter_name: str) -> None:
-        self.metric_producer._register_counter(counter, meter_name)
-
-    def _register_up_down_counter(self, up_down_counter: UpDownCounter, meter_name: str) -> None:
-        self.metric_producer._register_up_down_counter(up_down_counter, meter_name)
-
-    def _register_histogram(self, histogram: HistogramInstrument, meter_name: str) -> None:
-        self.metric_producer._register_histogram(histogram, meter_name)
-
-    def _register_observable_gauge(self, gauge: ObservableGaugeInstrument, meter_name: str) -> None:
-        self.metric_producer._register_observable_gauge(gauge, meter_name)
+    def _register_instrument(self, instrument: Any, instrument_type: InstrumentType, meter_name: str) -> None:
+        """Register an instrument with the metric producer."""
+        self.metric_producer._get_meter_instruments(meter_name)[instrument_type].append(instrument)
 
     def produce_metrics(self) -> MetricsData:
         return self.metric_producer.produce()
@@ -444,14 +424,12 @@ class Meter(ApiMeter):
 
     def create_counter(self, name: str, unit: str = "", description: str = "") -> ApiCounter:
         counter = Counter(name=name, unit=unit, description=description)
-        self._register_instrument(name, Counter, unit, description)
-        self.meter_provider._register_counter(counter, self._name)
+        self.meter_provider._register_instrument(counter, InstrumentType.COUNTER, self._name)
         return counter
 
     def create_up_down_counter(self, name: str, unit: str = "", description: str = "") -> ApiUpDownCounter:
         up_down_counter = UpDownCounter(name=name, unit=unit, description=description)
-        self._register_instrument(name, UpDownCounter, unit, description)
-        self.meter_provider._register_up_down_counter(up_down_counter, self._name)
+        self.meter_provider._register_instrument(up_down_counter, InstrumentType.UP_DOWN_COUNTER, self._name)
         return up_down_counter
 
     def create_observable_counter(
@@ -473,8 +451,7 @@ class Meter(ApiMeter):
             description=description,
             explicit_bucket_boundaries=explicit_bucket_boundaries_advisory,
         )
-        self._register_instrument(name, HistogramInstrument, unit, description)
-        self.meter_provider._register_histogram(histogram, self._name)
+        self.meter_provider._register_instrument(histogram, InstrumentType.HISTOGRAM, self._name)
         return histogram
 
     def create_observable_gauge(
@@ -486,8 +463,7 @@ class Meter(ApiMeter):
             unit=unit,
             description=description,
         )
-        self._register_instrument(name, ObservableGaugeInstrument, unit, description)
-        self.meter_provider._register_observable_gauge(gauge, self._name)
+        self.meter_provider._register_instrument(gauge, InstrumentType.OBSERVABLE_GAUGE, self._name)
         return gauge
 
     def create_observable_up_down_counter(
