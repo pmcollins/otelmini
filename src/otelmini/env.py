@@ -24,6 +24,18 @@ import logging
 import os
 from typing import Optional
 
+# Environment variable names
+OTEL_SERVICE_NAME = "OTEL_SERVICE_NAME"
+OTEL_RESOURCE_ATTRIBUTES = "OTEL_RESOURCE_ATTRIBUTES"
+OTEL_BSP_MAX_EXPORT_BATCH_SIZE = "OTEL_BSP_MAX_EXPORT_BATCH_SIZE"
+OTEL_BSP_SCHEDULE_DELAY = "OTEL_BSP_SCHEDULE_DELAY"
+OTEL_EXPORTER_OTLP_ENDPOINT = "OTEL_EXPORTER_OTLP_ENDPOINT"
+OTEL_EXPORTER_OTLP_TRACES_ENDPOINT = "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"
+OTEL_EXPORTER_OTLP_METRICS_ENDPOINT = "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT"
+OTEL_EXPORTER_OTLP_LOGS_ENDPOINT = "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT"
+OTEL_METRIC_EXPORT_INTERVAL = "OTEL_METRIC_EXPORT_INTERVAL"
+OTEL_MINI_LOG_FORMAT = "OTEL_MINI_LOG_FORMAT"
+
 
 class Env:
     """Wrapper around environment variables with typed accessors."""
@@ -66,26 +78,24 @@ class Config:
             env = Env()
 
         # Resource
-        self.service_name = env.get("OTEL_SERVICE_NAME", "unknown_service")
-        self.resource_attributes = env.get("OTEL_RESOURCE_ATTRIBUTES", "")
+        self.service_name = env.get(OTEL_SERVICE_NAME, "unknown_service")
+        self.resource_attributes = env.get(OTEL_RESOURCE_ATTRIBUTES, "")
 
         # Batch Span Processor
-        self.bsp_batch_size = env.get_int("OTEL_BSP_MAX_EXPORT_BATCH_SIZE", 512)
-        self.bsp_schedule_delay_ms = env.get_int("OTEL_BSP_SCHEDULE_DELAY", 5000)
+        self.bsp_batch_size = env.get_int(OTEL_BSP_MAX_EXPORT_BATCH_SIZE, 512)
+        self.bsp_schedule_delay_ms = env.get_int(OTEL_BSP_SCHEDULE_DELAY, 5000)
 
         # Exporter
-        self.exporter_endpoint = env.get(
-            "OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318"
-        )
-        self.exporter_traces_endpoint = env.get("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "")
-        self.exporter_metrics_endpoint = env.get("OTEL_EXPORTER_OTLP_METRICS_ENDPOINT", "")
-        self.exporter_logs_endpoint = env.get("OTEL_EXPORTER_OTLP_LOGS_ENDPOINT", "")
+        self.exporter_endpoint = env.get(OTEL_EXPORTER_OTLP_ENDPOINT, "http://localhost:4318")
+        self.exporter_traces_endpoint = env.get(OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, "")
+        self.exporter_metrics_endpoint = env.get(OTEL_EXPORTER_OTLP_METRICS_ENDPOINT, "")
+        self.exporter_logs_endpoint = env.get(OTEL_EXPORTER_OTLP_LOGS_ENDPOINT, "")
 
         # Metric reader
-        self.metric_export_interval_ms = env.get_int("OTEL_METRIC_EXPORT_INTERVAL", 10000)
+        self.metric_export_interval_ms = env.get_int(OTEL_METRIC_EXPORT_INTERVAL, 10000)
 
         # otelmini-specific
-        self.mini_log_format = env.get("OTEL_MINI_LOG_FORMAT", logging.BASIC_FORMAT)
+        self.mini_log_format = env.get(OTEL_MINI_LOG_FORMAT, logging.BASIC_FORMAT)
 
     def as_dict(self) -> dict:
         """Return all configuration values as a dictionary."""

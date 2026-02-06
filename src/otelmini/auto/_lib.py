@@ -30,12 +30,27 @@ class AutoInstrumentationManager:
         self.otel_logging_handler: Optional[OtelBridgeLoggingHandler] = None
         self.root_logger: Optional[logging.Logger] = None
 
+    def _get_traces_endpoint(self) -> str:
+        if self.config.exporter_traces_endpoint:
+            return self.config.exporter_traces_endpoint
+        return f"{self.config.exporter_endpoint}/v1/traces"
+
+    def _get_metrics_endpoint(self) -> str:
+        if self.config.exporter_metrics_endpoint:
+            return self.config.exporter_metrics_endpoint
+        return f"{self.config.exporter_endpoint}/v1/metrics"
+
+    def _get_logs_endpoint(self) -> str:
+        if self.config.exporter_logs_endpoint:
+            return self.config.exporter_logs_endpoint
+        return f"{self.config.exporter_endpoint}/v1/logs"
+
     def set_up_tracing(self):
         self.tracer_provider = MiniTracerProvider(
             BatchProcessor(
-                HttpSpanExporter(),
-                batch_size=144,
-                interval_seconds=12,
+                HttpSpanExporter(endpoint=self._get_traces_endpoint()),
+                batch_size=self.config.bsp_batch_size,
+                interval_seconds=self.config.bsp_schedule_delay_ms / 1000,
             ),
             config=self.config,
         )
@@ -43,8 +58,8 @@ class AutoInstrumentationManager:
 
     def set_up_metrics(self):
         reader = PeriodicExportingMetricReader(
-            HttpMetricExporter(),
-            export_interval_millis=10_000,
+            HttpMetricExporter(endpoint=self._get_metrics_endpoint()),
+            export_interval_millis=self.config.metric_export_interval_ms,
         )
         self.meter_provider = MeterProvider(metric_readers=(reader,), config=self.config)
         metrics.set_meter_provider(self.meter_provider)
@@ -52,7 +67,11 @@ class AutoInstrumentationManager:
     def set_up_logging(self):
         self.root_logger = logging.getLogger()
         self.logger_provider = LoggerProvider(
-            BatchProcessor(HttpLogExporter(), batch_size=512, interval_seconds=5),
+            BatchProcessor(
+                HttpLogExporter(endpoint=self._get_logs_endpoint()),
+                batch_size=self.config.bsp_batch_size,
+                interval_seconds=self.config.bsp_schedule_delay_ms / 1000,
+            ),
             config=self.config,
         )
         self.otel_logging_handler = OtelBridgeLoggingHandler(self.logger_provider)
