@@ -19,34 +19,26 @@ pip install otelmini
 
 ## Quick Start
 
+Write your application using the OpenTelemetry API:
+
 ```python
-import os
+# my_app.py
 from opentelemetry import trace
-from otelmini.processor import BatchProcessor
-from otelmini.trace import HttpSpanExporter, MiniTracerProvider
 
-os.environ["OTEL_SERVICE_NAME"] = "my-service"
-
-tp = MiniTracerProvider(BatchProcessor(HttpSpanExporter()))
-trace.set_tracer_provider(tp)
 tracer = trace.get_tracer(__name__)
 
 with tracer.start_as_current_span("my-operation"):
     # your code here
     pass
-
-tp.shutdown()
 ```
 
-## Auto-Instrumentation
-
-Use the `otel` command to automatically instrument any application that uses the OpenTelemetry API:
+Run it with otelmini's auto-instrumentation:
 
 ```bash
-otel python my_app.py
+OTEL_SERVICE_NAME=my-service otel python my_app.py
 ```
 
-This works with any code already instrumented via `opentelemetry-api`—no code changes required.
+That's it—traces are exported to `localhost:4318` via OTLP/HTTP.
 
 ## Why otelmini?
 
@@ -65,58 +57,24 @@ Comparing `otelmini` to `opentelemetry-distro` + `opentelemetry-exporter-otlp-pr
 
 | Metric | otelmini | otel-python | Reduction |
 |--------|----------|-------------|-----------|
-| Third-party dependencies | 3 | 12 | 75% fewer |
+| Third-party dependencies | 0 | 9 | 100% fewer |
 | Install size | 9.7 MB | 17 MB | 43% smaller |
 | Lines of Python | 8K | 43K | 81% fewer |
 
-Note: This comparison slightly favors otelmini—upstream otel-python requires protobuf even for HTTP/JSON export.
+Note: Upstream otel-python doesn't support JSON/HTTP—their OTLP exporters require protobuf.
 
 <details>
-<summary>Third-party packages installed by each</summary>
+<summary>Third-party packages installed by otel-python</summary>
 
-**otelmini:**
-- importlib_metadata, typing_extensions, zipp
-
-**otel-python:**
 - protobuf, googleapis-common-protos
 - requests, urllib3, certifi, charset-normalizer, idna
 - wrapt, packaging
-- importlib_metadata, typing_extensions, zipp
 
 </details>
-
-## Context Propagation
-
-otelmini includes W3C TraceContext and Baggage propagators for distributed tracing:
-
-```python
-from otelmini.propagator import get_default_propagator
-
-propagator = get_default_propagator()
-
-# Extract trace context from incoming request headers
-ctx = propagator.extract(request.headers)
-with tracer.start_as_current_span("handle-request", context=ctx):
-    # your code here
-    pass
-
-# Inject trace context into outgoing request headers
-headers = {}
-propagator.inject(headers)
-requests.get("http://downstream-service/api", headers=headers)
-```
 
 ## Spec Conformance
 
 See [SPEC_CONFORMANCE.md](SPEC_CONFORMANCE.md) for details on OpenTelemetry specification compliance.
-
-| Signal | Status |
-|--------|--------|
-| Traces | ~75% |
-| Metrics | ~70% |
-| Logs | ~55% |
-| Context/Propagation | ✅ |
-| Baggage | ✅ |
 
 ## License
 
