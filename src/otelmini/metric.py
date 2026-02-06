@@ -17,9 +17,9 @@ from opentelemetry.metrics import ObservableUpDownCounter as ApiObservableUpDown
 from opentelemetry.metrics import UpDownCounter as ApiUpDownCounter
 
 from otelmini._lib import (
+    ConsoleExporterBase,
     DEFAULT_EXPORTER_TIMEOUT,
     DEFAULT_METRICS_ENDPOINT,
-    Exporter,
     ExportResult,
     HttpExporterBase,
 )
@@ -69,10 +69,9 @@ class HttpMetricExporter(HttpExporterBase[MetricsData]):
         super().__init__(endpoint, timeout, encode_metrics_request)
 
 
-class ConsoleMetricExporter(Exporter[MetricsData]):
-    def export(self, items: MetricsData) -> ExportResult:
-        print(encode_metrics_request(items))  # noqa: T201
-        return ExportResult.SUCCESS
+class ConsoleMetricExporter(ConsoleExporterBase[MetricsData]):
+    def __init__(self):
+        super().__init__(encode_metrics_request)
 
 
 class MetricReader(ABC):

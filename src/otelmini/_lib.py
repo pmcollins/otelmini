@@ -150,3 +150,14 @@ class HttpExporterBase(Exporter[T]):
     def export(self, items: T) -> ExportResult:
         data = self._encoder(items)
         return self._exporter.export(data)
+
+
+class ConsoleExporterBase(Exporter[T]):
+    """Base class for console exporters that prints encoded telemetry to stdout."""
+
+    def __init__(self, encoder: Callable[[T], str]) -> None:
+        self._encoder = encoder
+
+    def export(self, items: T) -> ExportResult:
+        print(self._encoder(items))  # noqa: T201
+        return ExportResult.SUCCESS

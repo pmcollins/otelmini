@@ -15,9 +15,9 @@ if TYPE_CHECKING:
     from otelmini.processor import Processor
 
 from otelmini._lib import (
+    ConsoleExporterBase,
     DEFAULT_EXPORTER_TIMEOUT,
     DEFAULT_LOG_ENDPOINT,
-    Exporter,
     ExportResult,
     HttpExporterBase,
 )
@@ -65,10 +65,9 @@ class LogExportError(Exception):
         super().__init__(message)
 
 
-class ConsoleLogExporter(Exporter[MiniLogRecord]):
-    def export(self, items: Sequence[MiniLogRecord]) -> ExportResult:
-        print(encode_logs_request(items))  # noqa: T201
-        return ExportResult.SUCCESS
+class ConsoleLogExporter(ConsoleExporterBase[Sequence[MiniLogRecord]]):
+    def __init__(self):
+        super().__init__(encode_logs_request)
 
 
 class HttpLogExporter(HttpExporterBase[Sequence[MiniLogRecord]]):

@@ -10,9 +10,9 @@ from opentelemetry.trace.span import SpanContext, TraceFlags
 from opentelemetry.util._decorator import _agnosticcontextmanager
 
 from otelmini._lib import (
+    ConsoleExporterBase,
     DEFAULT_EXPORTER_TIMEOUT,
     DEFAULT_TRACE_ENDPOINT,
-    Exporter,
     ExportResult,
     HttpExporterBase,
 )
@@ -124,10 +124,9 @@ class MiniTracer(Tracer):
             yield active_span
 
 
-class ConsoleSpanExporter(Exporter[MiniSpan]):
-    def export(self, items: Sequence[MiniSpan]) -> ExportResult:
-        print(encode_trace_request(items))  # noqa: T201
-        return ExportResult.SUCCESS
+class ConsoleSpanExporter(ConsoleExporterBase[Sequence[MiniSpan]]):
+    def __init__(self):
+        super().__init__(encode_trace_request)
 
 
 class HttpSpanExporter(HttpExporterBase[Sequence[MiniSpan]]):
