@@ -92,6 +92,20 @@ Note: Upstream otel-python doesn't support JSON/HTTP -- their OTLP exporters req
 
 </details>
 
+## Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `OTEL_SERVICE_NAME` | Service name for resource | `unknown_service` |
+| `OTEL_RESOURCE_ATTRIBUTES` | Additional resource attributes (`key=value,key2=value2`) | |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | Base OTLP endpoint | `http://localhost:4318` |
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | Traces endpoint (overrides base) | |
+| `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT` | Metrics endpoint (overrides base) | |
+| `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` | Logs endpoint (overrides base) | |
+| `OTEL_BSP_MAX_EXPORT_BATCH_SIZE` | Batch processor max batch size | `512` |
+| `OTEL_BSP_SCHEDULE_DELAY` | Batch processor schedule delay (ms) | `5000` |
+| `OTEL_METRIC_EXPORT_INTERVAL` | Metric export interval (ms) | `10000` |
+
 ## Spec Conformance
 
 See [SPEC_CONFORMANCE.md](SPEC_CONFORMANCE.md) for details on OpenTelemetry specification compliance.
