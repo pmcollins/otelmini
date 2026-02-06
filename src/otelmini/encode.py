@@ -171,22 +171,32 @@ def _encode_attributes(attributes: Optional[Mapping[str, Any]]) -> list[dict]:
 
 def _encode_value(value: Any) -> dict:
     """Encode a single attribute value to OTLP AnyValue format."""
+    # Check bool before int since bool is a subclass of int
     if isinstance(value, bool):
         return {"boolValue": value}
-    if isinstance(value, str):
-        return {"stringValue": value}
-    if isinstance(value, int):
-        return {"intValue": str(value)}
-    if isinstance(value, float):
-        return {"doubleValue": value}
-    if isinstance(value, bytes):
-        return {"bytesValue": value.decode("utf-8", errors="replace")}
+
+    # Use type-based dispatch for common types
+    encoder = _VALUE_ENCODERS.get(type(value))
+    if encoder:
+        return encoder(value)
+
+    # Handle container types that need isinstance checks
     if isinstance(value, (list, tuple)):
         return {"arrayValue": {"values": [_encode_value(v) for v in value]}}
     if isinstance(value, Mapping):
         return {"kvlistValue": {"values": [{"key": str(k), "value": _encode_value(v)} for k, v in value.items()]}}
+
     # Fallback to string
     return {"stringValue": str(value)}
+
+
+# Type-based dispatch table for scalar types
+_VALUE_ENCODERS: dict[type, Any] = {
+    str: lambda v: {"stringValue": v},
+    int: lambda v: {"intValue": str(v)},
+    float: lambda v: {"doubleValue": v},
+    bytes: lambda v: {"bytesValue": v.decode("utf-8", errors="replace")},
+}
 
 
 def _encode_trace_id(trace_id: int) -> str:
