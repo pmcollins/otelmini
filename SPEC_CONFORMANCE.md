@@ -189,7 +189,7 @@ Spec reference: https://opentelemetry.io/docs/specs/otel/
 | `inject()` | ✅ | Implemented |
 | `extract()` | ✅ | Implemented |
 | W3C TraceContext propagation | ✅ | `traceparent` header supported |
-| W3C Baggage propagation | ❌ | Not implemented |
+| W3C Baggage propagation | ✅ | Implemented |
 
 ---
 
@@ -208,7 +208,7 @@ Spec reference: https://opentelemetry.io/docs/specs/otel/
 | **Traces** | ~75% | Core functionality works, missing sampler, links |
 | **Metrics** | ~70% | Missing async instruments, sync Gauge |
 | **Logs** | ~55% | Missing trace correlation, resource in export |
-| **Context/Propagation** | ~80% | W3C TraceContext implemented, Baggage not |
+| **Context/Propagation** | ✅ | W3C TraceContext and Baggage implemented |
 | **Baggage** | 0% | Not implemented |
 | **Resource** | ~40% | Basic impl, missing merge, env var parsing |
 
@@ -219,4 +219,3 @@ Spec reference: https://opentelemetry.io/docs/specs/otel/
 1. **No trace-log correlation** - Logs don't capture current span context
 2. **No sampling** - All spans are recorded (cannot control overhead)
 3. **Resource not in log export** - Logs cannot be attributed to a service
-4. **No Baggage propagation** - Cannot propagate application-defined context

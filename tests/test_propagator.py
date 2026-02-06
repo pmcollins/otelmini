@@ -1,14 +1,18 @@
-"""Tests for W3C TraceContext propagator."""
+"""Tests for W3C TraceContext and Baggage propagators."""
 
 import pytest
-from opentelemetry import trace
+from opentelemetry import baggage, trace
 from opentelemetry.trace import SpanContext, TraceFlags, NonRecordingSpan
 
 from otelmini.propagator import (
+    BAGGAGE_HEADER,
+    TRACEPARENT_HEADER,
+    BaggagePropagator,
+    CompositePropagator,
     TraceContextPropagator,
     _format_traceparent,
     _parse_traceparent,
-    TRACEPARENT_HEADER,
+    get_default_propagator,
 )
 
 
@@ -221,3 +225,225 @@ class TestTraceContextPropagator:
         assert extracted_sc.span_id == original_sc.span_id
         assert extracted_sc.trace_flags == original_sc.trace_flags
         assert extracted_sc.is_remote is True  # Extracted contexts are always remote
+
+
+class TestBaggagePropagator:
+    def test_fields(self):
+        propagator = BaggagePropagator()
+        assert "baggage" in propagator.fields
+
+    def test_inject_single_entry(self):
+        propagator = BaggagePropagator()
+        carrier = {}
+
+        ctx = baggage.set_baggage("userId", "alice")
+
+        propagator.inject(carrier, context=ctx)
+
+        assert carrier[BAGGAGE_HEADER] == "userId=alice"
+
+    def test_inject_multiple_entries(self):
+        propagator = BaggagePropagator()
+        carrier = {}
+
+        ctx = baggage.set_baggage("userId", "alice")
+        ctx = baggage.set_baggage("region", "us-east", context=ctx)
+
+        propagator.inject(carrier, context=ctx)
+
+        # Order may vary, so check both entries are present
+        header = carrier[BAGGAGE_HEADER]
+        assert "userId=alice" in header
+        assert "region=us-east" in header
+        assert "," in header
+
+    def test_inject_url_encodes_values(self):
+        propagator = BaggagePropagator()
+        carrier = {}
+
+        ctx = baggage.set_baggage("query", "hello world")
+
+        propagator.inject(carrier, context=ctx)
+
+        assert carrier[BAGGAGE_HEADER] == "query=hello+world"
+
+    def test_inject_special_characters(self):
+        propagator = BaggagePropagator()
+        carrier = {}
+
+        ctx = baggage.set_baggage("data", "a=b&c=d")
+
+        propagator.inject(carrier, context=ctx)
+
+        assert carrier[BAGGAGE_HEADER] == "data=a%3Db%26c%3Dd"
+
+    def test_inject_empty_baggage_does_nothing(self):
+        propagator = BaggagePropagator()
+        carrier = {}
+
+        propagator.inject(carrier)
+
+        assert BAGGAGE_HEADER not in carrier
+
+    def test_extract_single_entry(self):
+        propagator = BaggagePropagator()
+        carrier = {BAGGAGE_HEADER: "userId=alice"}
+
+        ctx = propagator.extract(carrier)
+
+        assert baggage.get_baggage("userId", ctx) == "alice"
+
+    def test_extract_multiple_entries(self):
+        propagator = BaggagePropagator()
+        carrier = {BAGGAGE_HEADER: "userId=alice,region=us-east"}
+
+        ctx = propagator.extract(carrier)
+
+        assert baggage.get_baggage("userId", ctx) == "alice"
+        assert baggage.get_baggage("region", ctx) == "us-east"
+
+    def test_extract_url_decodes_values(self):
+        propagator = BaggagePropagator()
+        carrier = {BAGGAGE_HEADER: "query=hello+world"}
+
+        ctx = propagator.extract(carrier)
+
+        assert baggage.get_baggage("query", ctx) == "hello world"
+
+    def test_extract_special_characters(self):
+        propagator = BaggagePropagator()
+        carrier = {BAGGAGE_HEADER: "data=a%3Db%26c%3Dd"}
+
+        ctx = propagator.extract(carrier)
+
+        assert baggage.get_baggage("data", ctx) == "a=b&c=d"
+
+    def test_extract_with_properties_strips_them(self):
+        """Properties after semicolon should be stripped."""
+        propagator = BaggagePropagator()
+        carrier = {BAGGAGE_HEADER: "userId=alice;property=value"}
+
+        ctx = propagator.extract(carrier)
+
+        assert baggage.get_baggage("userId", ctx) == "alice"
+
+    def test_extract_whitespace_is_trimmed(self):
+        propagator = BaggagePropagator()
+        carrier = {BAGGAGE_HEADER: " userId = alice , region = us-east "}
+
+        ctx = propagator.extract(carrier)
+
+        assert baggage.get_baggage("userId", ctx) == "alice"
+        assert baggage.get_baggage("region", ctx) == "us-east"
+
+    def test_extract_missing_header_returns_original_context(self):
+        propagator = BaggagePropagator()
+        carrier = {}
+
+        ctx = propagator.extract(carrier)
+
+        assert baggage.get_all(ctx) == {}
+
+    def test_extract_empty_entries_are_skipped(self):
+        propagator = BaggagePropagator()
+        carrier = {BAGGAGE_HEADER: "userId=alice,,region=us-east"}
+
+        ctx = propagator.extract(carrier)
+
+        assert baggage.get_baggage("userId", ctx) == "alice"
+        assert baggage.get_baggage("region", ctx) == "us-east"
+
+    def test_extract_entries_without_equals_are_skipped(self):
+        propagator = BaggagePropagator()
+        carrier = {BAGGAGE_HEADER: "userId=alice,invalid,region=us-east"}
+
+        ctx = propagator.extract(carrier)
+
+        assert baggage.get_baggage("userId", ctx) == "alice"
+        assert baggage.get_baggage("region", ctx) == "us-east"
+        assert baggage.get_baggage("invalid", ctx) is None
+
+    def test_roundtrip(self):
+        propagator = BaggagePropagator()
+
+        # Set original baggage
+        ctx = baggage.set_baggage("userId", "alice")
+        ctx = baggage.set_baggage("data", "a=b&c=d", context=ctx)
+
+        # Inject
+        carrier = {}
+        propagator.inject(carrier, context=ctx)
+
+        # Extract
+        extracted_ctx = propagator.extract(carrier)
+
+        # Verify
+        assert baggage.get_baggage("userId", extracted_ctx) == "alice"
+        assert baggage.get_baggage("data", extracted_ctx) == "a=b&c=d"
+
+
+class TestCompositePropagator:
+    def test_fields_combines_all(self):
+        propagator = CompositePropagator([
+            TraceContextPropagator(),
+            BaggagePropagator(),
+        ])
+
+        fields = propagator.fields
+        assert "traceparent" in fields
+        assert "tracestate" in fields
+        assert "baggage" in fields
+
+    def test_inject_calls_all_propagators(self):
+        propagator = CompositePropagator([
+            TraceContextPropagator(),
+            BaggagePropagator(),
+        ])
+        carrier = {}
+
+        # Set up context with span and baggage
+        sc = SpanContext(
+            trace_id=0x4BF92F3577B34DA6A3CE929D0E0E4736,
+            span_id=0x00F067AA0BA902B7,
+            is_remote=False,
+            trace_flags=TraceFlags.SAMPLED,
+        )
+        span = NonRecordingSpan(sc)
+        ctx = trace.set_span_in_context(span)
+        ctx = baggage.set_baggage("userId", "alice", context=ctx)
+
+        propagator.inject(carrier, context=ctx)
+
+        assert TRACEPARENT_HEADER in carrier
+        assert BAGGAGE_HEADER in carrier
+        assert carrier[BAGGAGE_HEADER] == "userId=alice"
+
+    def test_extract_calls_all_propagators(self):
+        propagator = CompositePropagator([
+            TraceContextPropagator(),
+            BaggagePropagator(),
+        ])
+        carrier = {
+            TRACEPARENT_HEADER: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+            BAGGAGE_HEADER: "userId=alice",
+        }
+
+        ctx = propagator.extract(carrier)
+
+        # Check trace context
+        span = trace.get_current_span(ctx)
+        sc = span.get_span_context()
+        assert sc.is_valid
+        assert sc.trace_id == 0x4BF92F3577B34DA6A3CE929D0E0E4736
+
+        # Check baggage
+        assert baggage.get_baggage("userId", ctx) == "alice"
+
+
+class TestGetDefaultPropagator:
+    def test_returns_composite_with_tracecontext_and_baggage(self):
+        propagator = get_default_propagator()
+
+        assert isinstance(propagator, CompositePropagator)
+        assert "traceparent" in propagator.fields
+        assert "baggage" in propagator.fields

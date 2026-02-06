@@ -1,17 +1,20 @@
-"""W3C TraceContext propagator for distributed tracing.
+"""W3C TraceContext and Baggage propagators for distributed tracing.
 
-Implements the W3C Trace Context specification for propagating trace context
-across service boundaries via HTTP headers.
+Implements the W3C Trace Context and Baggage specifications for propagating
+trace context and application-defined key-value pairs across service boundaries.
 
-Spec: https://www.w3.org/TR/trace-context/
+Specs:
+- https://www.w3.org/TR/trace-context/
+- https://www.w3.org/TR/baggage/
 """
 
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING, Optional, Set
+from typing import TYPE_CHECKING, Iterable, Optional, Set
+from urllib.parse import quote_plus, unquote_plus
 
-from opentelemetry import trace
+from opentelemetry import baggage, trace
 from opentelemetry.context import Context, get_current, set_value
 from opentelemetry.propagators.textmap import (
     CarrierT,
@@ -28,6 +31,7 @@ if TYPE_CHECKING:
 
 TRACEPARENT_HEADER = "traceparent"
 TRACESTATE_HEADER = "tracestate"
+BAGGAGE_HEADER = "baggage"
 
 # traceparent format: {version}-{trace_id}-{span_id}-{trace_flags}
 # Example: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
@@ -150,3 +154,145 @@ def _parse_traceparent(traceparent: str) -> Optional[SpanContext]:
         is_remote=True,
         trace_flags=trace_flags,
     )
+
+
+class BaggagePropagator(TextMapPropagator):
+    """Propagator implementing W3C Baggage format.
+
+    Injects and extracts baggage (key-value pairs) via the 'baggage' header.
+    """
+
+    # Max header size per W3C spec recommendation
+    _MAX_HEADER_LENGTH = 8192
+    _MAX_PAIRS = 180
+    _MAX_PAIR_LENGTH = 4096
+
+    @property
+    def fields(self) -> Set[str]:
+        return {BAGGAGE_HEADER}
+
+    def inject(
+        self,
+        carrier: CarrierT,
+        context: Optional[Context] = None,
+        setter: Setter[CarrierT] = default_setter,
+    ) -> None:
+        """Inject baggage into carrier (e.g., HTTP headers).
+
+        Args:
+            carrier: The carrier to inject into (dict-like for headers)
+            context: The context to read baggage from, or current context if None
+            setter: How to set values in the carrier
+        """
+        baggage_entries = baggage.get_all(context)
+        if not baggage_entries:
+            return
+
+        pairs = []
+        for key, value in baggage_entries.items():
+            encoded_value = quote_plus(str(value))
+            pair = f"{key}={encoded_value}"
+            if len(pair) <= self._MAX_PAIR_LENGTH:
+                pairs.append(pair)
+            if len(pairs) >= self._MAX_PAIRS:
+                break
+
+        if pairs:
+            header_value = ",".join(pairs)
+            if len(header_value) <= self._MAX_HEADER_LENGTH:
+                setter.set(carrier, BAGGAGE_HEADER, header_value)
+
+    def extract(
+        self,
+        carrier: CarrierT,
+        context: Optional[Context] = None,
+        getter: Getter[CarrierT] = default_getter,
+    ) -> Context:
+        """Extract baggage from carrier (e.g., HTTP headers).
+
+        Args:
+            carrier: The carrier to extract from (dict-like for headers)
+            context: The context to add baggage to, or current context if None
+            getter: How to get values from the carrier
+
+        Returns:
+            A new Context with the extracted baggage, or the original
+            context if no valid baggage header is found.
+        """
+        if context is None:
+            context = get_current()
+
+        header_value = getter.get(carrier, BAGGAGE_HEADER)
+        if header_value is None:
+            return context
+
+        # Handle list return from some getter implementations
+        if isinstance(header_value, list):
+            if not header_value:
+                return context
+            header_value = header_value[0]
+
+        # Parse baggage entries
+        for entry in header_value.split(","):
+            entry = entry.strip()
+            if not entry:
+                continue
+
+            # Split on first '=' only (value may contain '=')
+            if "=" not in entry:
+                continue
+
+            key, value = entry.split("=", 1)
+            key = key.strip()
+
+            # Strip optional properties (;property=value)
+            if ";" in value:
+                value = value.split(";", 1)[0]
+
+            value = unquote_plus(value.strip())
+
+            if key:
+                context = baggage.set_baggage(key, value, context)
+
+        return context
+
+
+class CompositePropagator(TextMapPropagator):
+    """Combines multiple propagators into one.
+
+    Useful for propagating both trace context and baggage together.
+    """
+
+    def __init__(self, propagators: Iterable[TextMapPropagator]):
+        self._propagators = list(propagators)
+
+    @property
+    def fields(self) -> Set[str]:
+        fields: Set[str] = set()
+        for propagator in self._propagators:
+            fields.update(propagator.fields)
+        return fields
+
+    def inject(
+        self,
+        carrier: CarrierT,
+        context: Optional[Context] = None,
+        setter: Setter[CarrierT] = default_setter,
+    ) -> None:
+        for propagator in self._propagators:
+            propagator.inject(carrier, context, setter)
+
+    def extract(
+        self,
+        carrier: CarrierT,
+        context: Optional[Context] = None,
+        getter: Getter[CarrierT] = default_getter,
+    ) -> Context:
+        for propagator in self._propagators:
+            context = propagator.extract(carrier, context, getter)
+        return context
+
+
+def get_default_propagator() -> CompositePropagator:
+    """Return a propagator that handles both TraceContext and Baggage."""
+    return CompositePropagator([TraceContextPropagator(), BaggagePropagator()])
