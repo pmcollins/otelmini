@@ -1,22 +1,14 @@
 import logging
 from importlib.metadata import entry_points
-from typing import Optional
+from typing import Optional, Type
 
 from opentelemetry import metrics, trace
 
 from otelmini.env import Config
-from otelmini.log import (
-    HttpLogExporter,
-    LoggerProvider,
-    OtelBridgeLoggingHandler,
-)
-from otelmini.metric import (
-    HttpMetricExporter,
-    MeterProvider,
-    PeriodicExportingMetricReader,
-)
+from otelmini.log import LoggerProvider, OtelBridgeLoggingHandler
+from otelmini.metric import MeterProvider, PeriodicExportingMetricReader
 from otelmini.processor import BatchProcessor
-from otelmini.trace import HttpSpanExporter, MiniTracerProvider
+from otelmini.trace import MiniTracerProvider
 
 _logger = logging.getLogger(__name__)
 
@@ -27,6 +19,36 @@ def _get_endpoint(config: Config, signal: str) -> str:
     if override:
         return override
     return f"{config.exporter_endpoint}/v1/{signal}"
+
+
+def _load_exporter(signal: str, exporter_name: str) -> Optional[Type]:
+    """Load an exporter class by name from entry points.
+
+    Args:
+        signal: One of "traces", "metrics", "logs"
+        exporter_name: Entry point name (e.g., "otlp", "console", "none")
+
+    Returns:
+        Exporter class, or None if exporter_name is "none"
+
+    Raises:
+        RuntimeError: If the requested exporter is not found
+    """
+    if exporter_name == "none":
+        return None
+
+    group = f"opentelemetry_{signal}_exporter"
+    eps = entry_points(group=group)
+
+    for ep in eps:
+        if ep.name == exporter_name:
+            return ep.load()
+
+    available = [ep.name for ep in eps]
+    raise RuntimeError(
+        f"Exporter '{exporter_name}' not found for {signal}. "
+        f"Available: {available}"
+    )
 
 
 def _discover_instrumentors():
@@ -48,9 +70,15 @@ class Tracing:
         self.provider: Optional[MiniTracerProvider] = None
 
     def set_up(self):
+        exporter_cls = _load_exporter("traces", self.config.traces_exporter)
+        if exporter_cls is None:
+            _logger.debug("Traces exporter disabled (none)")
+            return
+
+        exporter = exporter_cls(endpoint=_get_endpoint(self.config, "traces"))
         self.provider = MiniTracerProvider(
             BatchProcessor(
-                HttpSpanExporter(endpoint=_get_endpoint(self.config, "traces")),
+                exporter,
                 batch_size=self.config.bsp_batch_size,
                 interval_seconds=self.config.bsp_schedule_delay_ms / 1000,
             ),
@@ -69,8 +97,14 @@ class Metrics:
         self.provider: Optional[MeterProvider] = None
 
     def set_up(self):
+        exporter_cls = _load_exporter("metrics", self.config.metrics_exporter)
+        if exporter_cls is None:
+            _logger.debug("Metrics exporter disabled (none)")
+            return
+
+        exporter = exporter_cls(endpoint=_get_endpoint(self.config, "metrics"))
         reader = PeriodicExportingMetricReader(
-            HttpMetricExporter(endpoint=_get_endpoint(self.config, "metrics")),
+            exporter,
             export_interval_millis=self.config.metric_export_interval_ms,
         )
         self.provider = MeterProvider(metric_readers=(reader,), config=self.config)
@@ -90,9 +124,17 @@ class Logging:
 
     def set_up(self):
         self.root_logger = logging.getLogger()
+        self._set_up_console()
+
+        exporter_cls = _load_exporter("logs", self.config.logs_exporter)
+        if exporter_cls is None:
+            _logger.debug("Logs exporter disabled (none)")
+            return
+
+        exporter = exporter_cls(endpoint=_get_endpoint(self.config, "logs"))
         self.provider = LoggerProvider(
             BatchProcessor(
-                HttpLogExporter(endpoint=_get_endpoint(self.config, "logs")),
+                exporter,
                 batch_size=self.config.bsp_batch_size,
                 interval_seconds=self.config.bsp_schedule_delay_ms / 1000,
             ),
@@ -100,7 +142,6 @@ class Logging:
         )
         self.handler = OtelBridgeLoggingHandler(self.provider)
         self.root_logger.addHandler(self.handler)
-        self._set_up_console()
 
     def _set_up_console(self):
         stream_handler = logging.StreamHandler()

@@ -71,7 +71,7 @@ class HttpMetricExporter(HttpExporterBase[MetricsData]):
 
 
 class ConsoleMetricExporter(ConsoleExporterBase[MetricsData]):
-    def __init__(self):
+    def __init__(self, **kwargs):
         super().__init__(encode_metrics_request)
 
 

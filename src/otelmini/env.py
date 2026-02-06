@@ -33,6 +33,9 @@ OTEL_EXPORTER_OTLP_ENDPOINT = "OTEL_EXPORTER_OTLP_ENDPOINT"
 OTEL_EXPORTER_OTLP_TRACES_ENDPOINT = "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"
 OTEL_EXPORTER_OTLP_METRICS_ENDPOINT = "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT"
 OTEL_EXPORTER_OTLP_LOGS_ENDPOINT = "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT"
+OTEL_TRACES_EXPORTER = "OTEL_TRACES_EXPORTER"
+OTEL_METRICS_EXPORTER = "OTEL_METRICS_EXPORTER"
+OTEL_LOGS_EXPORTER = "OTEL_LOGS_EXPORTER"
 OTEL_METRIC_EXPORT_INTERVAL = "OTEL_METRIC_EXPORT_INTERVAL"
 OTEL_MINI_LOG_FORMAT = "OTEL_MINI_LOG_FORMAT"
 
@@ -85,11 +88,16 @@ class Config:
         self.bsp_batch_size = env.get_int(OTEL_BSP_MAX_EXPORT_BATCH_SIZE, 512)
         self.bsp_schedule_delay_ms = env.get_int(OTEL_BSP_SCHEDULE_DELAY, 5000)
 
-        # Exporter
+        # Exporter endpoints
         self.exporter_endpoint = env.get(OTEL_EXPORTER_OTLP_ENDPOINT, "http://localhost:4318")
         self.exporter_traces_endpoint = env.get(OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, "")
         self.exporter_metrics_endpoint = env.get(OTEL_EXPORTER_OTLP_METRICS_ENDPOINT, "")
         self.exporter_logs_endpoint = env.get(OTEL_EXPORTER_OTLP_LOGS_ENDPOINT, "")
+
+        # Exporter selection
+        self.traces_exporter = env.get(OTEL_TRACES_EXPORTER, "otlp")
+        self.metrics_exporter = env.get(OTEL_METRICS_EXPORTER, "otlp")
+        self.logs_exporter = env.get(OTEL_LOGS_EXPORTER, "otlp")
 
         # Metric reader
         self.metric_export_interval_ms = env.get_int(OTEL_METRIC_EXPORT_INTERVAL, 10000)
@@ -108,6 +116,9 @@ class Config:
             "exporter_traces_endpoint": self.exporter_traces_endpoint,
             "exporter_metrics_endpoint": self.exporter_metrics_endpoint,
             "exporter_logs_endpoint": self.exporter_logs_endpoint,
+            "traces_exporter": self.traces_exporter,
+            "metrics_exporter": self.metrics_exporter,
+            "logs_exporter": self.logs_exporter,
             "metric_export_interval_ms": self.metric_export_interval_ms,
             "mini_log_format": self.mini_log_format,
         }

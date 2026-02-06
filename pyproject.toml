@@ -90,6 +90,21 @@ markers = ["slow: slow running tests (any test that doesn't feel instantaneous)"
 testpaths = ["tests"]
 pythonpath = ["."]
 
+[project.entry-points.opentelemetry_traces_exporter]
+otlp = "otelmini.trace:HttpSpanExporter"
+otlp_json_http = "otelmini.trace:HttpSpanExporter"
+console = "otelmini.trace:ConsoleSpanExporter"
+
+[project.entry-points.opentelemetry_metrics_exporter]
+otlp = "otelmini.metric:HttpMetricExporter"
+otlp_json_http = "otelmini.metric:HttpMetricExporter"
+console = "otelmini.metric:ConsoleMetricExporter"
+
+[project.entry-points.opentelemetry_logs_exporter]
+otlp = "otelmini.log:HttpLogExporter"
+otlp_json_http = "otelmini.log:HttpLogExporter"
+console = "otelmini.log:ConsoleLogExporter"
+
 [tool.ruff]
 exclude = ["examples/", "tests/"]
 lint.ignore = ["UP007", "FA100", "EM101", "W293", "ARG002"]

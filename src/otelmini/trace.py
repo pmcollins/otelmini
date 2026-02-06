@@ -133,7 +133,7 @@ class MiniTracer(Tracer):
 
 
 class ConsoleSpanExporter(ConsoleExporterBase[Sequence[MiniSpan]]):
-    def __init__(self):
+    def __init__(self, **kwargs):
         super().__init__(encode_trace_request)
 
 

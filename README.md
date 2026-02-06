@@ -98,6 +98,9 @@ Note: Upstream otel-python doesn't support JSON/HTTP -- their OTLP exporters req
 |----------|-------------|---------|
 | `OTEL_SERVICE_NAME` | Service name for resource | `unknown_service` |
 | `OTEL_RESOURCE_ATTRIBUTES` | Additional resource attributes (`key=value,key2=value2`) | |
+| `OTEL_TRACES_EXPORTER` | Traces exporter (`otlp`, `console`, `none`) | `otlp` |
+| `OTEL_METRICS_EXPORTER` | Metrics exporter (`otlp`, `console`, `none`) | `otlp` |
+| `OTEL_LOGS_EXPORTER` | Logs exporter (`otlp`, `console`, `none`) | `otlp` |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Base OTLP endpoint | `http://localhost:4318` |
 | `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | Traces endpoint (overrides base) | |
 | `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT` | Metrics endpoint (overrides base) | |
@@ -105,6 +108,54 @@ Note: Upstream otel-python doesn't support JSON/HTTP -- their OTLP exporters req
 | `OTEL_BSP_MAX_EXPORT_BATCH_SIZE` | Batch processor max batch size | `512` |
 | `OTEL_BSP_SCHEDULE_DELAY` | Batch processor schedule delay (ms) | `5000` |
 | `OTEL_METRIC_EXPORT_INTERVAL` | Metric export interval (ms) | `10000` |
+
+Third-party exporters can be installed and will be discovered via entry points. Use `otlp_json_http` for explicit JSON/HTTP selection.
+
+## Custom Exporters
+
+To create a custom exporter, implement the `Exporter` interface and register via entry points.
+
+### Interface
+
+```python
+from otelmini._lib import Exporter, ExportResult
+
+class MySpanExporter(Exporter):
+    def __init__(self, **kwargs):
+        # Accept endpoint and other kwargs
+        self.endpoint = kwargs.get("endpoint")
+
+    def export(self, items):
+        # items is Sequence[MiniSpan] for traces
+        # Return ExportResult.SUCCESS or ExportResult.FAILURE
+        return ExportResult.SUCCESS
+```
+
+Data types passed to `export()`:
+- **Traces**: `Sequence[MiniSpan]` from `otelmini.types`
+- **Metrics**: `MetricsData` from `otelmini.point`
+- **Logs**: `Sequence[MiniLogRecord]` from `otelmini.log`
+
+### Registration
+
+In your package's `pyproject.toml`:
+
+```toml
+[project.entry-points.opentelemetry_traces_exporter]
+my_exporter = "my_package:MySpanExporter"
+
+[project.entry-points.opentelemetry_metrics_exporter]
+my_exporter = "my_package:MyMetricExporter"
+
+[project.entry-points.opentelemetry_logs_exporter]
+my_exporter = "my_package:MyLogExporter"
+```
+
+Then users can select it via environment variable:
+
+```bash
+OTEL_TRACES_EXPORTER=my_exporter otel python app.py
+```
 
 ## Spec Conformance
 
