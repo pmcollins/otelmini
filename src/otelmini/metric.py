@@ -4,7 +4,7 @@ import atexit
 import threading
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import TYPE_CHECKING, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple
 
 from opentelemetry.metrics import Counter as ApiCounter
 from opentelemetry.metrics import Histogram as ApiHistogram
@@ -42,20 +42,20 @@ class CounterError(Exception):
         super().__init__("Counter cannot be decremented (amount must be non-negative)")
 
 
-def _attributes_to_key(attributes: Optional[Attributes]) -> tuple:
+def _attributes_to_key(attributes: Optional[Attributes]) -> Tuple[Tuple[str, Any], ...]:
     """Convert attributes dict to a hashable key for aggregation."""
     if not attributes:
         return ()
     return tuple(sorted(attributes.items()))
 
 
-def _key_to_attributes(key: tuple) -> dict:
+def _key_to_attributes(key: Tuple[Tuple[str, Any], ...]) -> Dict[str, Any]:
     """Convert hashable key back to attributes dict."""
     return dict(key)
 
 
 class HttpMetricExporter(Exporter[MetricsData]):
-    def __init__(self, endpoint="http://localhost:4318/v1/metrics", timeout=30):
+    def __init__(self, endpoint: str = "http://localhost:4318/v1/metrics", timeout: int = 30):
         self._exporter = _HttpExporter(endpoint, timeout)
 
     def export(self, metrics_data: MetricsData) -> ExportResult:
@@ -72,7 +72,7 @@ class ConsoleMetricExporter(Exporter[MetricsData]):
 class MetricReader(ABC):
 
     @abstractmethod
-    def set_metric_producer(self, metric_producer):
+    def set_metric_producer(self, metric_producer: MetricProducer) -> None:
         pass
 
     @abstractmethod
@@ -87,10 +87,10 @@ class MetricReader(ABC):
 class ManualExportingMetricReader(MetricReader):
 
     def __init__(self, exporter: Exporter[MetricsData]):
-        self.metric_producer = None
+        self.metric_producer: Optional[MetricProducer] = None
         self.exporter = exporter
 
-    def set_metric_producer(self, metric_producer):
+    def set_metric_producer(self, metric_producer: MetricProducer) -> None:
         self.metric_producer = metric_producer
 
     def force_flush(self, timeout_millis: float = 10_000) -> bool:
@@ -110,7 +110,7 @@ class PeriodicExportingMetricReader(MetricReader):
         exporter: Exporter[MetricsData],
         export_interval_millis: float = 60_000,
     ):
-        self.metric_producer = None
+        self.metric_producer: Optional[MetricProducer] = None
         self.exporter = exporter
         self.export_interval_seconds = export_interval_millis / 1000
         self._stop = threading.Event()
@@ -118,16 +118,16 @@ class PeriodicExportingMetricReader(MetricReader):
         self._thread.start()
         atexit.register(self.shutdown)
 
-    def _run(self):
+    def _run(self) -> None:
         while not self._stop.wait(self.export_interval_seconds):
             self._export()
 
-    def _export(self):
+    def _export(self) -> None:
         if self.metric_producer:
             metrics = self.metric_producer.produce()
             self.exporter.export(metrics)
 
-    def set_metric_producer(self, metric_producer):
+    def set_metric_producer(self, metric_producer: MetricProducer) -> None:
         self.metric_producer = metric_producer
 
     def force_flush(self, timeout_millis: float = 10_000) -> bool:
@@ -145,12 +145,12 @@ class MetricProducer:
     Spec: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/metrics/sdk.md#metricproducer
     """
 
-    def __init__(self, resource: Resource = None):
+    def __init__(self, resource: Optional[Resource] = None):
         self.resource = resource or create_default_resource()
-        self.meters = {}  # meter_name -> {InstrumentType -> list of instruments}
+        self.meters: Dict[str, Dict[InstrumentType, List[Any]]] = {}
         self._start_time_unix_nano = _time_ns()
 
-    def _get_meter_instruments(self, meter_name: str) -> dict:
+    def _get_meter_instruments(self, meter_name: str) -> Dict[InstrumentType, List[Any]]:
         if meter_name not in self.meters:
             self.meters[meter_name] = {itype: [] for itype in InstrumentType}
         return self.meters[meter_name]
@@ -244,8 +244,8 @@ class MeterProvider(ApiMeterProvider):
     def __init__(
         self,
         metric_readers: Sequence[MetricReader] = (),
-        resource: Resource = None,
-        metric_producer: MetricProducer = None,
+        resource: Optional[Resource] = None,
+        metric_producer: Optional[MetricProducer] = None,
     ):
         self.metric_producer = metric_producer or MetricProducer(resource=resource)
         self.metric_readers = metric_readers
@@ -273,7 +273,7 @@ class MeterProvider(ApiMeterProvider):
     def _register_observable_gauge(self, gauge: ObservableGaugeInstrument, meter_name: str) -> None:
         self.metric_producer._register_observable_gauge(gauge, meter_name)
 
-    def produce_metrics(self):
+    def produce_metrics(self) -> MetricsData:
         return self.metric_producer.produce()
 
     def shutdown(self, timeout_millis: float = 30_000) -> None:
@@ -289,7 +289,7 @@ class _SumInstrument:
         self.unit = unit
         self.description = description
         self._monotonic = monotonic
-        self._values: dict[tuple, float] = {}  # attribute_key -> value
+        self._values: Dict[Tuple[Tuple[str, Any], ...], float] = {}
 
     def add(
         self,
@@ -302,7 +302,7 @@ class _SumInstrument:
         key = _attributes_to_key(attributes)
         self._values[key] = self._values.get(key, 0.0) + amount
 
-    def get_values(self) -> dict[tuple, float]:
+    def get_values(self) -> Dict[Tuple[Tuple[str, Any], ...], float]:
         """Return all values keyed by attribute tuple."""
         return self._values
 
@@ -322,13 +322,13 @@ class UpDownCounter(_SumInstrument, ApiUpDownCounter):
 class _HistogramAggregation:
     """Aggregation state for a single attribute combination."""
 
-    def __init__(self, boundaries: list):
+    def __init__(self, boundaries: List[float]):
         self.boundaries = boundaries
-        self.bucket_counts = [0] * (len(boundaries) + 1)
-        self._sum = 0.0
-        self._count = 0
-        self._min = float('inf')
-        self._max = float('-inf')
+        self.bucket_counts: List[int] = [0] * (len(boundaries) + 1)
+        self._sum: float = 0.0
+        self._count: int = 0
+        self._min: float = float('inf')
+        self._max: float = float('-inf')
 
     def record(self, amount: float) -> None:
         self._sum += amount
@@ -341,7 +341,7 @@ class _HistogramAggregation:
                 return
         self.bucket_counts[-1] += 1
 
-    def get_data(self) -> dict:
+    def get_data(self) -> Dict[str, Any]:
         return {
             'count': self._count,
             'sum': self._sum,
@@ -353,7 +353,7 @@ class _HistogramAggregation:
 
 
 class HistogramInstrument(ApiHistogram):
-    DEFAULT_BOUNDARIES = [0, 5, 10, 25, 50, 75, 100, 250, 500, 750, 1000, 2500, 5000, 7500, 10000]
+    DEFAULT_BOUNDARIES: List[float] = [0, 5, 10, 25, 50, 75, 100, 250, 500, 750, 1000, 2500, 5000, 7500, 10000]
 
     def __init__(
         self,
@@ -365,8 +365,8 @@ class HistogramInstrument(ApiHistogram):
         self.name = name
         self.unit = unit
         self.description = description
-        self.boundaries = list(explicit_bucket_boundaries) if explicit_bucket_boundaries else self.DEFAULT_BOUNDARIES
-        self._aggregations: dict[tuple, _HistogramAggregation] = {}  # attribute_key -> aggregation
+        self.boundaries: List[float] = list(explicit_bucket_boundaries) if explicit_bucket_boundaries else self.DEFAULT_BOUNDARIES
+        self._aggregations: Dict[Tuple[Tuple[str, Any], ...], _HistogramAggregation] = {}
 
     def record(
         self,
@@ -379,7 +379,7 @@ class HistogramInstrument(ApiHistogram):
             self._aggregations[key] = _HistogramAggregation(self.boundaries)
         self._aggregations[key].record(amount)
 
-    def get_all_histogram_data(self) -> dict[tuple, dict]:
+    def get_all_histogram_data(self) -> Dict[Tuple[Tuple[str, Any], ...], Dict[str, Any]]:
         """Return histogram data for all attribute combinations."""
         return {key: agg.get_data() for key, agg in self._aggregations.items()}
 
@@ -389,16 +389,16 @@ class ObservableGaugeInstrument(ApiObservableGauge):
     def __init__(
         self,
         name: str,
-        callbacks: Optional[Sequence] = None,
+        callbacks: Optional[Sequence[CallbackT]] = None,
         unit: str = "",
         description: str = "",
     ):
         self.name = name
         self.unit = unit
         self.description = description
-        self.callbacks = list(callbacks) if callbacks else []
+        self.callbacks: List[CallbackT] = list(callbacks) if callbacks else []
 
-    def get_value(self):
+    def get_value(self) -> float:
         # Invoke callbacks, return latest observation value
         for callback in self.callbacks:
             for obs in callback():

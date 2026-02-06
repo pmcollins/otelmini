@@ -5,7 +5,7 @@ import logging
 import os
 import threading
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Callable, Generic, List, Optional, TypeVar
+from typing import TYPE_CHECKING, Callable, Generic, List, Optional, Type, TypeVar
 
 if TYPE_CHECKING:
     from otelmini._lib import Exporter
@@ -16,11 +16,11 @@ T = TypeVar("T")
 
 
 class ForkAware(ABC):
-    def register_at_fork(self):
+    def register_at_fork(self) -> None:
         os.register_at_fork(after_in_child=self.reinitialize_at_fork)
 
     @abstractmethod
-    def reinitialize_at_fork(self):
+    def reinitialize_at_fork(self) -> None:
         pass
 
 
@@ -50,28 +50,28 @@ class BatchProcessor(Processor[T], ForkAware):
 
     def __init__(
         self,
-        exporter: Exporter,
+        exporter: Exporter[T],
         batch_size: int = 512,
         interval_seconds: float = 5,
-        batcher_factory=None,
-        timer_factory=None,
+        batcher_factory: Optional[Type[Batcher[T]]] = None,
+        timer_factory: Optional[Type[Timer]] = None,
     ):
         self.exporter = exporter
         self._batch_size = batch_size
         self._interval_seconds = interval_seconds
-        self._batcher_factory = batcher_factory or Batcher
-        self._timer_factory = timer_factory or Timer
+        self._batcher_factory: Type[Batcher[T]] = batcher_factory or Batcher
+        self._timer_factory: Type[Timer] = timer_factory or Timer
 
-        self.batcher = self._batcher_factory(batch_size)
+        self.batcher: Batcher[T] = self._batcher_factory(batch_size)
         self.stop = threading.Event()
 
-        self.timer = self._timer_factory(self._export, interval_seconds)
+        self.timer: Timer = self._timer_factory(self._export, interval_seconds)
         self.thread = threading.Thread(target=self.timer.run, daemon=True)
         self.thread.start()
 
         self.register_at_fork()
 
-    def reinitialize_at_fork(self):
+    def reinitialize_at_fork(self) -> None:
         self.shutdown()
 
         self.stop.clear()
@@ -87,7 +87,7 @@ class BatchProcessor(Processor[T], ForkAware):
             if batched:
                 self.timer.notify_sleeper()
 
-    def _export(self):
+    def _export(self) -> None:
         batch = self.batcher.pop()
         if batch is not None and len(batch) > 0:
             self.exporter.export(batch)
