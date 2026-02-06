@@ -89,12 +89,13 @@ class MiniSpan(ApiSpan):
         start_time: Optional[int] = None,
         links: Optional[list] = None,
         kind: SpanKind = SpanKind.INTERNAL,
+        attributes: Optional[Attributes] = None,
     ):
         self._name = name
         self._span_context = span_context
         self._resource = resource
         self._instrumentation_scope = instrumentation_scope
-        self._attributes = {}
+        self._attributes = dict(attributes) if attributes else {}
         self._events = []
         self._links = links or []
         self._status = None
