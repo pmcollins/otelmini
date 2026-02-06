@@ -4,7 +4,7 @@ import atexit
 import threading
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Any, Optional, Sequence, Tuple
 
 from opentelemetry.metrics import Counter as ApiCounter
 from opentelemetry.metrics import _Gauge as ApiGauge
@@ -60,7 +60,7 @@ def _attributes_to_key(attributes: Optional[Attributes]) -> Tuple[Tuple[str, Any
     return tuple(sorted(attributes.items()))
 
 
-def _key_to_attributes(key: Tuple[Tuple[str, Any], ...]) -> Dict[str, Any]:
+def _key_to_attributes(key: Tuple[Tuple[str, Any], ...]) -> dict[str, Any]:
     """Convert hashable key back to attributes dict."""
     return dict(key)
 
@@ -165,17 +165,17 @@ class MetricProducer:
     def __init__(self, config: Config, resource: Optional[Resource] = None):
         self._config = config
         self.resource = resource or create_default_resource(self._config)
-        self.meters: Dict[str, Dict[InstrumentType, List[Any]]] = {}
+        self.meters: dict[str, dict[InstrumentType, list[Any]]] = {}
         self._start_time_unix_nano = _time_ns()
 
-    def _get_meter_instruments(self, meter_name: str) -> Dict[InstrumentType, List[Any]]:
+    def _get_meter_instruments(self, meter_name: str) -> dict[InstrumentType, list[Any]]:
         if meter_name not in self.meters:
             self.meters[meter_name] = {itype: [] for itype in InstrumentType}
         return self.meters[meter_name]
 
     def produce(self) -> MetricsData:
         time_unix_nano = _time_ns()
-        scope_metrics_list: List[ScopeMetrics] = []
+        scope_metrics_list: list[ScopeMetrics] = []
 
         for meter_name, instruments in self.meters.items():
             metrics = self._produce_metrics_for_meter(instruments, time_unix_nano)
@@ -187,10 +187,10 @@ class MetricProducer:
         return MetricsData([rm])
 
     def _produce_metrics_for_meter(
-        self, instruments: Dict[InstrumentType, List[Any]], time_unix_nano: int
-    ) -> List[Metric]:
+        self, instruments: dict[InstrumentType, list[Any]], time_unix_nano: int
+    ) -> list[Metric]:
         """Produce metrics from all instruments in a meter."""
-        metrics: List[Metric] = []
+        metrics: list[Metric] = []
 
         for instr_type, producer_name, kwargs in self._PRODUCERS:
             producer = getattr(self, producer_name)
@@ -349,7 +349,7 @@ class _SumInstrument:
         self.unit = unit
         self.description = description
         self._monotonic = monotonic
-        self._values: Dict[Tuple[Tuple[str, Any], ...], float] = {}
+        self._values: dict[Tuple[Tuple[str, Any], ...], float] = {}
 
     def add(
         self,
@@ -362,7 +362,7 @@ class _SumInstrument:
         key = _attributes_to_key(attributes)
         self._values[key] = self._values.get(key, 0.0) + amount
 
-    def get_values(self) -> Dict[Tuple[Tuple[str, Any], ...], float]:
+    def get_values(self) -> dict[Tuple[Tuple[str, Any], ...], float]:
         """Return all values keyed by attribute tuple."""
         return self._values
 
@@ -386,7 +386,7 @@ class GaugeInstrument(ApiGauge):
         self.name = name
         self.unit = unit
         self.description = description
-        self._values: Dict[Tuple[Tuple[str, Any], ...], float] = {}
+        self._values: dict[Tuple[Tuple[str, Any], ...], float] = {}
 
     def set(
         self,
@@ -397,7 +397,7 @@ class GaugeInstrument(ApiGauge):
         key = _attributes_to_key(attributes)
         self._values[key] = amount
 
-    def get_values(self) -> Dict[Tuple[Tuple[str, Any], ...], float]:
+    def get_values(self) -> dict[Tuple[Tuple[str, Any], ...], float]:
         """Return all values keyed by attribute tuple."""
         return self._values
 
@@ -405,9 +405,9 @@ class GaugeInstrument(ApiGauge):
 class _HistogramAggregation:
     """Aggregation state for a single attribute combination."""
 
-    def __init__(self, boundaries: List[float]):
+    def __init__(self, boundaries: list[float]):
         self.boundaries = boundaries
-        self.bucket_counts: List[int] = [0] * (len(boundaries) + 1)
+        self.bucket_counts: list[int] = [0] * (len(boundaries) + 1)
         self._sum: float = 0.0
         self._count: int = 0
         self._min: float = float('inf')
@@ -424,7 +424,7 @@ class _HistogramAggregation:
                 return
         self.bucket_counts[-1] += 1
 
-    def get_data(self) -> Dict[str, Any]:
+    def get_data(self) -> dict[str, Any]:
         return {
             'count': self._count,
             'sum': self._sum,
@@ -436,7 +436,7 @@ class _HistogramAggregation:
 
 
 class Histogram(ApiHistogram):
-    DEFAULT_BOUNDARIES: List[float] = [0, 5, 10, 25, 50, 75, 100, 250, 500, 750, 1000, 2500, 5000, 7500, 10000]
+    DEFAULT_BOUNDARIES: list[float] = [0, 5, 10, 25, 50, 75, 100, 250, 500, 750, 1000, 2500, 5000, 7500, 10000]
 
     def __init__(
         self,
@@ -448,8 +448,8 @@ class Histogram(ApiHistogram):
         self.name = name
         self.unit = unit
         self.description = description
-        self.boundaries: List[float] = list(explicit_bucket_boundaries) if explicit_bucket_boundaries else self.DEFAULT_BOUNDARIES
-        self._aggregations: Dict[Tuple[Tuple[str, Any], ...], _HistogramAggregation] = {}
+        self.boundaries: list[float] = list(explicit_bucket_boundaries) if explicit_bucket_boundaries else self.DEFAULT_BOUNDARIES
+        self._aggregations: dict[Tuple[Tuple[str, Any], ...], _HistogramAggregation] = {}
 
     def record(
         self,
@@ -462,7 +462,7 @@ class Histogram(ApiHistogram):
             self._aggregations[key] = _HistogramAggregation(self.boundaries)
         self._aggregations[key].record(amount)
 
-    def get_all_histogram_data(self) -> Dict[Tuple[Tuple[str, Any], ...], Dict[str, Any]]:
+    def get_all_histogram_data(self) -> dict[Tuple[Tuple[str, Any], ...], dict[str, Any]]:
         """Return histogram data for all attribute combinations."""
         return {key: agg.get_data() for key, agg in self._aggregations.items()}
 
@@ -480,7 +480,7 @@ class _ObservableInstrument:
         self.name = name
         self.unit = unit
         self.description = description
-        self.callbacks: List[CallbackT] = list(callbacks) if callbacks else []
+        self.callbacks: list[CallbackT] = list(callbacks) if callbacks else []
 
     def get_value(self) -> float:
         """Invoke callbacks and return the first observation value."""
