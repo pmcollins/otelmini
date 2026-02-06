@@ -10,8 +10,16 @@ if TYPE_CHECKING:
     from otelmini.point import MetricsData, Sum
     from otelmini.types import MiniSpan, Resource, InstrumentationScope
 
-# OTLP Span Kind values
-_SPAN_KIND_INTERNAL = 1
+from opentelemetry.trace import SpanKind
+
+# OTLP Span Kind values (proto enum)
+_SPAN_KIND_MAP = {
+    SpanKind.INTERNAL: "SPAN_KIND_INTERNAL",
+    SpanKind.SERVER: "SPAN_KIND_SERVER",
+    SpanKind.CLIENT: "SPAN_KIND_CLIENT",
+    SpanKind.PRODUCER: "SPAN_KIND_PRODUCER",
+    SpanKind.CONSUMER: "SPAN_KIND_CONSUMER",
+}
 
 
 def encode_trace_request(spans: Sequence[MiniSpan]) -> str:
@@ -124,11 +132,12 @@ def _encode_event(event: tuple) -> dict:
 def _encode_span(span: MiniSpan) -> dict:
     """Encode a single span to OTLP format."""
     ctx = span.get_span_context()
+    kind = _SPAN_KIND_MAP.get(span.get_kind(), "SPAN_KIND_INTERNAL")
     result = {
         "traceId": _encode_trace_id(ctx.trace_id),
         "spanId": _encode_span_id(ctx.span_id),
         "name": span.get_name(),
-        "kind": _SPAN_KIND_INTERNAL,
+        "kind": kind,
         "startTimeUnixNano": str(span.get_start_time()),
         "endTimeUnixNano": str(span.get_end_time() or 0),
         "attributes": _encode_attributes(span.get_attributes()),

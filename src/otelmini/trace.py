@@ -97,6 +97,7 @@ class MiniTracer(Tracer):
             name, span_context, self.resource, self.scope, self.span_processor.on_end,
             parent_span_id=parent_span_id,
             links=list(links) if links else None,
+            kind=kind,
         )
         self.span_processor.on_start(span)
         return span

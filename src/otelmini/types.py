@@ -3,7 +3,7 @@ import time
 from typing import Any, Callable, Optional
 import json
 
-from opentelemetry.trace import Span as ApiSpan
+from opentelemetry.trace import Span as ApiSpan, SpanKind
 from opentelemetry.trace.span import SpanContext
 from opentelemetry.util.types import Attributes
 
@@ -88,6 +88,7 @@ class MiniSpan(ApiSpan):
         parent_span_id: Optional[int] = None,
         start_time: Optional[int] = None,
         links: Optional[list] = None,
+        kind: SpanKind = SpanKind.INTERNAL,
     ):
         self._name = name
         self._span_context = span_context
@@ -102,6 +103,7 @@ class MiniSpan(ApiSpan):
         self._parent_span_id = parent_span_id
         self._start_time = start_time if start_time is not None else _time_ns()
         self._end_time: Optional[int] = None
+        self._kind = kind
 
     def get_parent_span_id(self) -> Optional[int]:
         return self._parent_span_id
@@ -138,6 +140,9 @@ class MiniSpan(ApiSpan):
 
     def get_links(self):
         return self._links
+
+    def get_kind(self) -> SpanKind:
+        return self._kind
 
     def get_status(self):
         return self._status
