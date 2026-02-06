@@ -20,7 +20,7 @@ Spec reference: https://opentelemetry.io/docs/specs/otel/
 
 | Requirement | Status | Notes |
 |-------------|--------|-------|
-| `start_span(name, context, kind, attributes, links, start_time)` | ⚠️ | Links not stored/used; context param works for propagation |
+| `start_span(name, context, kind, attributes, links, start_time)` | ✅ | Implemented including links |
 | `start_as_current_span()` | ✅ | Implemented |
 | `Enabled()` | ❌ | Not implemented |
 
@@ -61,7 +61,7 @@ Spec reference: https://opentelemetry.io/docs/specs/otel/
 |-------------|--------|-------|
 | `ShouldSample()` | ✅ | Implemented |
 | `GetDescription()` | ❌ | Not implemented |
-| Built-in samplers | ⚠️ | AlwaysOn, AlwaysOff, TraceIdRatioBased; missing ParentBased |
+| Built-in samplers | ✅ | AlwaysOn, AlwaysOff, TraceIdRatioBased, ParentBased |
 
 ---
 
@@ -81,10 +81,10 @@ Spec reference: https://opentelemetry.io/docs/specs/otel/
 | `create_counter()` | ✅ | Implemented |
 | `create_up_down_counter()` | ✅ | Implemented |
 | `create_histogram()` | ✅ | Implemented |
-| `create_gauge()` | ❌ | Sync gauge not implemented |
-| `create_observable_counter()` | ❌ | Raises NotImplementedError |
+| `create_gauge()` | ✅ | Implemented |
+| `create_observable_counter()` | ✅ | Implemented |
 | `create_observable_gauge()` | ✅ | Implemented |
-| `create_observable_up_down_counter()` | ❌ | Raises NotImplementedError |
+| `create_observable_up_down_counter()` | ✅ | Implemented |
 
 ### Instruments
 
@@ -93,6 +93,7 @@ Spec reference: https://opentelemetry.io/docs/specs/otel/
 | `Counter.add(value, attributes)` | ✅ | Aggregates by attribute combination |
 | `UpDownCounter.add(value, attributes)` | ✅ | Aggregates by attribute combination |
 | `Histogram.record(value, attributes)` | ✅ | Aggregates by attribute combination |
+| `Gauge.set(value, attributes)` | ✅ | Last value per attribute combination |
 | `Enabled()` on instruments | ❌ | Not implemented |
 
 ### MetricReader
@@ -115,8 +116,8 @@ Spec reference: https://opentelemetry.io/docs/specs/otel/
 
 | Requirement | Status | Notes |
 |-------------|--------|-------|
-| Sum | ✅ | For Counter/UpDownCounter |
-| Gauge | ✅ | For ObservableGauge |
+| Sum | ✅ | For Counter/UpDownCounter/ObservableCounter/ObservableUpDownCounter |
+| Gauge | ✅ | For Gauge/ObservableGauge |
 | Histogram | ✅ | Explicit bucket |
 | ExponentialHistogram | ❌ | Not implemented |
 | Drop | ❌ | Not implemented |
@@ -175,8 +176,8 @@ Spec reference: https://opentelemetry.io/docs/specs/otel/
 | Requirement | Status | Notes |
 |-------------|--------|-------|
 | SDK-provided default attributes | ⚠️ | Has `telemetry.sdk.*`, `service.name` but missing others |
-| `OTEL_RESOURCE_ATTRIBUTES` env var | ❌ | Not implemented |
-| Resource merge operation | ❌ | Not implemented |
+| `OTEL_RESOURCE_ATTRIBUTES` env var | ✅ | Implemented |
+| Resource merge operation | ✅ | Implemented |
 | `schema_url` support | ✅ | Implemented |
 | Immutability | ❌ | Resource is mutable |
 
@@ -207,12 +208,12 @@ Spec reference: https://opentelemetry.io/docs/specs/otel/
 
 | Signal | Conformance | Notes |
 |--------|-------------|-------|
-| **Traces** | ~80% | Core functionality works, missing ParentBasedSampler, links |
-| **Metrics** | ~70% | Missing async instruments, sync Gauge |
+| **Traces** | ~90% | Core functionality works, missing AddLink after creation |
+| **Metrics** | ~90% | All instruments implemented, missing ExponentialHistogram |
 | **Logs** | ~75% | Core functionality implemented |
 | **Context/Propagation** | ✅ | W3C TraceContext and Baggage implemented |
 | **Baggage** | ✅ | API from opentelemetry-api, propagation implemented |
-| **Resource** | ~40% | Basic impl, missing merge, env var parsing |
+| **Resource** | ~70% | Merge and env var support added |
 
 ---
 
