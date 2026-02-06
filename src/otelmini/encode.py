@@ -10,6 +10,9 @@ if TYPE_CHECKING:
     from otelmini.point import MetricsData, Sum
     from otelmini.types import MiniSpan, Resource, InstrumentationScope
 
+# OTLP Span Kind values
+_SPAN_KIND_INTERNAL = 1
+
 
 def encode_trace_request(spans: Sequence[MiniSpan]) -> str:
     """Encode spans to OTLP JSON format."""
@@ -119,7 +122,7 @@ def _encode_span(span: MiniSpan) -> dict:
         "traceId": _encode_trace_id(ctx.trace_id),
         "spanId": _encode_span_id(ctx.span_id),
         "name": span.get_name(),
-        "kind": 1,  # SPAN_KIND_INTERNAL
+        "kind": _SPAN_KIND_INTERNAL,
         "startTimeUnixNano": str(span.get_start_time()),
         "endTimeUnixNano": str(span.get_end_time() or 0),
         "attributes": _encode_attributes(span.get_attributes()),

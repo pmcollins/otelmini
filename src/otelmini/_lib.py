@@ -69,7 +69,11 @@ class Retrier:
         return RetrierResult.MAX_ATTEMPTS_REACHED
 
 
-# Default retryable HTTP status codes per OTLP spec
+# Default retry configuration per OTLP spec
+DEFAULT_MAX_RETRIES = 4
+DEFAULT_RETRY_BASE_SECONDS = 1.0
+
+# Retryable HTTP status codes per OTLP spec
 DEFAULT_RETRYABLE_STATUS_CODES = frozenset([429, 502, 503, 504])  # TOO_MANY_REQUESTS, BAD_GATEWAY, SERVICE_UNAVAILABLE, GATEWAY_TIMEOUT
 
 
@@ -111,7 +115,7 @@ class _HttpExporter:
         from urllib.parse import urlparse
         self.parsed_url = urlparse(endpoint)
         self.timeout = timeout
-        self.retrier = retrier or Retrier(4)
+        self.retrier = retrier or Retrier(DEFAULT_MAX_RETRIES)
         self.retryable_status_codes = retryable_status_codes or DEFAULT_RETRYABLE_STATUS_CODES
 
     def export(self, data: str) -> ExportResult:
