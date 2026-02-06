@@ -60,11 +60,6 @@ class MiniLogRecord(ApiLogRecord):
         return f"MiniLogRecord(severity={self.severity_text}, body='{self.body}')"
 
 
-class LogExportError(Exception):
-    def __init__(self, message: str = "Error exporting logs"):
-        super().__init__(message)
-
-
 class ConsoleLogExporter(ConsoleExporterBase[Sequence[MiniLogRecord]]):
     def __init__(self):
         super().__init__(encode_logs_request)
