@@ -9,9 +9,10 @@ from opentelemetry._logs import LoggerProvider as ApiLoggerProvider
 from opentelemetry._logs import SeverityNumber
 from opentelemetry.trace import TraceFlags
 
+from opentelemetry.util.types import Attributes
+
 if TYPE_CHECKING:
     from otelmini.processor import Processor
-from opentelemetry.util.types import Attributes
 
 from otelmini._lib import Exporter, ExportResult, _HttpExporter
 from otelmini.encode import encode_logs_request

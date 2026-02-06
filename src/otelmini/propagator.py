@@ -11,11 +11,11 @@ Specs:
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING, Iterable, Optional, Set
+from typing import Iterable, Optional, Set
 from urllib.parse import quote_plus, unquote_plus
 
 from opentelemetry import baggage, trace
-from opentelemetry.context import Context, get_current, set_value
+from opentelemetry.context import Context, get_current
 from opentelemetry.propagators.textmap import (
     CarrierT,
     Getter,
@@ -26,8 +26,6 @@ from opentelemetry.propagators.textmap import (
 )
 from opentelemetry.trace import NonRecordingSpan, SpanContext, TraceFlags
 
-if TYPE_CHECKING:
-    pass
 
 TRACEPARENT_HEADER = "traceparent"
 TRACESTATE_HEADER = "tracestate"
