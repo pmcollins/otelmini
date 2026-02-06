@@ -87,6 +87,7 @@ class MiniSpan(ApiSpan):
         on_end_callback: Callable[["MiniSpan"], None],
         parent_span_id: Optional[int] = None,
         start_time: Optional[int] = None,
+        links: Optional[list] = None,
     ):
         self._name = name
         self._span_context = span_context
@@ -94,6 +95,7 @@ class MiniSpan(ApiSpan):
         self._instrumentation_scope = instrumentation_scope
         self._attributes = {}
         self._events = []
+        self._links = links or []
         self._status = None
         self._status_description = None
         self._on_end_callback = on_end_callback
@@ -133,6 +135,9 @@ class MiniSpan(ApiSpan):
 
     def get_events(self):
         return self._events
+
+    def get_links(self):
+        return self._links
 
     def get_status(self):
         return self._status

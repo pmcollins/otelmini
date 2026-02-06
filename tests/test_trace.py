@@ -1,3 +1,5 @@
+from opentelemetry.trace import Link
+
 from otelmini._lib import Retrier, RetrierResult
 from otelmini.trace import MiniSpan, Resource, InstrumentationScope, SpanContext
 from otelmini.encode import _encode_span, _encode_event
@@ -106,3 +108,56 @@ def test_encode_span_without_events():
 
     encoded = _encode_span(span)
     assert "events" not in encoded
+
+
+def test_span_with_links():
+    linked_ctx = SpanContext(trace_id=0xABCDEF, span_id=0x123456, is_remote=True)
+    link = Link(context=linked_ctx, attributes={"link.type": "parent"})
+
+    span = MiniSpan(
+        name="test-span",
+        span_context=SpanContext(trace_id=1, span_id=2, is_remote=False),
+        resource=Resource(""),
+        instrumentation_scope=InstrumentationScope("", ""),
+        on_end_callback=lambda s: None,
+        links=[link],
+    )
+
+    assert len(span.get_links()) == 1
+    assert span.get_links()[0].context.trace_id == 0xABCDEF
+
+
+def test_encode_span_with_links():
+    linked_ctx = SpanContext(trace_id=0xABCDEF123456, span_id=0x789ABC, is_remote=True)
+    link = Link(context=linked_ctx, attributes={"reason": "follows-from"})
+
+    span = MiniSpan(
+        name="test-span",
+        span_context=SpanContext(trace_id=1, span_id=2, is_remote=False),
+        resource=Resource(""),
+        instrumentation_scope=InstrumentationScope("", ""),
+        on_end_callback=lambda s: None,
+        links=[link],
+    )
+    span.end()
+
+    encoded = _encode_span(span)
+    assert "links" in encoded
+    assert len(encoded["links"]) == 1
+    assert encoded["links"][0]["traceId"] == "00000000000000000000abcdef123456"
+    assert encoded["links"][0]["spanId"] == "0000000000789abc"
+    assert encoded["links"][0]["attributes"] == [{"key": "reason", "value": {"stringValue": "follows-from"}}]
+
+
+def test_encode_span_without_links():
+    span = MiniSpan(
+        name="test-span",
+        span_context=SpanContext(trace_id=1, span_id=2, is_remote=False),
+        resource=Resource(""),
+        instrumentation_scope=InstrumentationScope("", ""),
+        on_end_callback=lambda s: None
+    )
+    span.end()
+
+    encoded = _encode_span(span)
+    assert "links" not in encoded

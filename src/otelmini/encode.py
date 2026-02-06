@@ -140,6 +140,21 @@ def _encode_span(span: MiniSpan) -> dict:
     events = span.get_events()
     if events:
         result["events"] = [_encode_event(e) for e in events]
+    links = span.get_links()
+    if links:
+        result["links"] = [_encode_link(link) for link in links]
+    return result
+
+
+def _encode_link(link) -> dict:
+    """Encode a span link to OTLP format."""
+    ctx = link.context
+    result = {
+        "traceId": _encode_trace_id(ctx.trace_id),
+        "spanId": _encode_span_id(ctx.span_id),
+    }
+    if link.attributes:
+        result["attributes"] = _encode_attributes(dict(link.attributes))
     return result
 
 
