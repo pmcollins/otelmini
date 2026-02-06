@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Mapping, Optional, Sequence
 
 from otelmini.auto import set_up_logging
-from otelmini.auto._lib import OTEL_MINI_LOG_FORMAT
+from otelmini.env import OTEL_MINI_LOG_FORMAT
 
 
 class LogsOtelTest:
