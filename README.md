@@ -56,30 +56,28 @@ This is useful when:
 
 - **Avoiding dependency conflicts** — your project requires a different version of protobuf, requests, or gRPC than OTel exporters expect
 - **Minimizing package size** — serverless environments like AWS Lambda have size limits
+- **Reducing cold start time** — fewer modules to load means faster Lambda cold starts
 - **Reducing attack surface** — fewer dependencies means less to audit and maintain
 
 ## Comparison with OpenTelemetry Python
 
-Comparing `otelmini` to the equivalent OpenTelemetry Python setup (`opentelemetry-sdk` + `opentelemetry-exporter-otlp-proto-http` + `opentelemetry-instrumentation`):
+Comparing `otelmini` to `opentelemetry-distro` + `opentelemetry-exporter-otlp-proto-http`:
 
 | Metric | otelmini | otel-python | Reduction |
 |--------|----------|-------------|-----------|
-| Dependencies | 5 | 19 | 74% fewer |
+| Third-party dependencies | 3 | 12 | 75% fewer |
 | Install size | 9.7 MB | 17 MB | 43% smaller |
-| Lines of code | 8K | 43K | 81% less |
+| Lines of Python | 8K | 43K | 81% fewer |
+
+Note: This comparison slightly favors otelmini—upstream otel-python requires protobuf even for HTTP/JSON export.
 
 <details>
-<summary>Packages installed by each</summary>
+<summary>Third-party packages installed by each</summary>
 
 **otelmini:**
-- opentelemetry-api
-- otelmini
 - importlib_metadata, typing_extensions, zipp
 
 **otel-python:**
-- opentelemetry-api, opentelemetry-sdk, opentelemetry-proto
-- opentelemetry-exporter-otlp-proto-common, opentelemetry-exporter-otlp-proto-http
-- opentelemetry-instrumentation, opentelemetry-semantic-conventions
 - protobuf, googleapis-common-protos
 - requests, urllib3, certifi, charset-normalizer, idna
 - wrapt, packaging
