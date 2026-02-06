@@ -15,7 +15,7 @@ from otelmini._lib import (
     DEFAULT_TRACE_ENDPOINT,
     Exporter,
     ExportResult,
-    _HttpExporter,
+    HttpExporterBase,
 )
 from otelmini.encode import encode_trace_request
 from otelmini.resource import create_default_resource
@@ -133,10 +133,6 @@ class ConsoleSpanExporter(Exporter[MiniSpan]):
         return ExportResult.SUCCESS
 
 
-class HttpSpanExporter(Exporter[MiniSpan]):
+class HttpSpanExporter(HttpExporterBase[Sequence[MiniSpan]]):
     def __init__(self, endpoint: str = DEFAULT_TRACE_ENDPOINT, timeout: int = DEFAULT_EXPORTER_TIMEOUT):
-        self._exporter = _HttpExporter(endpoint, timeout)
-
-    def export(self, items: Sequence[MiniSpan]) -> ExportResult:
-        data = encode_trace_request(items)
-        return self._exporter.export(data)
+        super().__init__(endpoint, timeout, encode_trace_request)

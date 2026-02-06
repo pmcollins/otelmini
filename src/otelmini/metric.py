@@ -21,7 +21,7 @@ from otelmini._lib import (
     DEFAULT_METRICS_ENDPOINT,
     Exporter,
     ExportResult,
-    _HttpExporter,
+    HttpExporterBase,
 )
 from otelmini.encode import encode_metrics_request
 from otelmini.point import AggregationTemporality
@@ -64,13 +64,9 @@ def _key_to_attributes(key: Tuple[Tuple[str, Any], ...]) -> Dict[str, Any]:
     return dict(key)
 
 
-class HttpMetricExporter(Exporter[MetricsData]):
+class HttpMetricExporter(HttpExporterBase[MetricsData]):
     def __init__(self, endpoint: str = DEFAULT_METRICS_ENDPOINT, timeout: int = DEFAULT_EXPORTER_TIMEOUT):
-        self._exporter = _HttpExporter(endpoint, timeout)
-
-    def export(self, metrics_data: MetricsData) -> ExportResult:
-        data = encode_metrics_request(metrics_data)
-        return self._exporter.export(data)
+        super().__init__(endpoint, timeout, encode_metrics_request)
 
 
 class ConsoleMetricExporter(Exporter[MetricsData]):

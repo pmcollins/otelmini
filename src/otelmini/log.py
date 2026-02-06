@@ -19,7 +19,7 @@ from otelmini._lib import (
     DEFAULT_LOG_ENDPOINT,
     Exporter,
     ExportResult,
-    _HttpExporter,
+    HttpExporterBase,
 )
 from otelmini.encode import encode_logs_request
 from otelmini.resource import create_default_resource
@@ -71,13 +71,9 @@ class ConsoleLogExporter(Exporter[MiniLogRecord]):
         return ExportResult.SUCCESS
 
 
-class HttpLogExporter(Exporter[MiniLogRecord]):
+class HttpLogExporter(HttpExporterBase[Sequence[MiniLogRecord]]):
     def __init__(self, endpoint: str = DEFAULT_LOG_ENDPOINT, timeout: int = DEFAULT_EXPORTER_TIMEOUT):
-        self._exporter = _HttpExporter(endpoint, timeout)
-
-    def export(self, logs: Sequence[MiniLogRecord]) -> ExportResult:
-        data = encode_logs_request(logs)
-        return self._exporter.export(data)
+        super().__init__(endpoint, timeout, encode_logs_request)
 
 
 class Logger(ApiLogger):

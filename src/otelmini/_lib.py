@@ -133,3 +133,20 @@ class _HttpExporter:
         )
         retry_result = self.retrier.retry(attempt.export)
         return ExportResult.SUCCESS if retry_result == RetrierResult.SUCCESS else ExportResult.FAILURE
+
+
+class HttpExporterBase(Exporter[T]):
+    """Base class for HTTP exporters that handles common init and export pattern."""
+
+    def __init__(
+        self,
+        endpoint: str,
+        timeout: int,
+        encoder: Callable[[T], str],
+    ) -> None:
+        self._exporter = _HttpExporter(endpoint, timeout)
+        self._encoder = encoder
+
+    def export(self, items: T) -> ExportResult:
+        data = self._encoder(items)
+        return self._exporter.export(data)
