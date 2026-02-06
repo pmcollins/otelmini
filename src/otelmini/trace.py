@@ -57,7 +57,7 @@ class MiniTracerProvider(TracerProvider):
         scope = InstrumentationScope(instrumenting_module_name, instrumenting_library_version)
         return MiniTracer(self.span_processor, self.resource, scope, self.sampler)
 
-    def shutdown(self):
+    def shutdown(self, timeout_millis: float = 30_000) -> None:
         if self.span_processor:
             self.span_processor.shutdown()
 

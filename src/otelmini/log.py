@@ -152,7 +152,7 @@ class LoggerProvider(ApiLoggerProvider):
             attributes=attributes,
         )
 
-    def shutdown(self) -> None:
+    def shutdown(self, timeout_millis: float = 30_000) -> None:
         if self.log_processor:
             self.log_processor.shutdown()
 
