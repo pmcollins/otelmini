@@ -19,6 +19,8 @@ from json import dumps, loads
 from typing import Optional, Sequence, Union
 from enum import Enum
 
+from otelmini.encode import _encode_attributes
+
 from opentelemetry.util.types import Attributes
 
 from otelmini.types import InstrumentationScope, Resource
@@ -109,7 +111,7 @@ class ExponentialHistogram:
 def _encode_number_data_point(point: NumberDataPoint) -> dict:
     """Encode a NumberDataPoint to OTLP format."""
     dp = {
-        "attributes": _encode_attributes_list(point.attributes),
+        "attributes": _encode_attributes(point.attributes),
         "startTimeUnixNano": str(point.start_time_unix_nano),
         "timeUnixNano": str(point.time_unix_nano),
     }
@@ -119,25 +121,6 @@ def _encode_number_data_point(point: NumberDataPoint) -> dict:
     else:
         dp["asDouble"] = point.value
     return dp
-
-
-def _encode_attributes_list(attributes) -> list:
-    """Encode attributes to OTLP format."""
-    if not attributes:
-        return []
-    result = []
-    for k, v in attributes.items():
-        if isinstance(v, bool):
-            result.append({"key": k, "value": {"boolValue": v}})
-        elif isinstance(v, str):
-            result.append({"key": k, "value": {"stringValue": v}})
-        elif isinstance(v, int):
-            result.append({"key": k, "value": {"intValue": str(v)}})
-        elif isinstance(v, float):
-            result.append({"key": k, "value": {"doubleValue": v}})
-        else:
-            result.append({"key": k, "value": {"stringValue": str(v)}})
-    return result
 
 
 @dataclass(frozen=True)
@@ -218,7 +201,7 @@ class Histogram:
         data_points = []
         for p in self.data_points:
             data_points.append({
-                "attributes": _encode_attributes_list(p.attributes),
+                "attributes": _encode_attributes(p.attributes),
                 "startTimeUnixNano": str(p.start_time_unix_nano),
                 "timeUnixNano": str(p.time_unix_nano),
                 "count": str(p.count),
