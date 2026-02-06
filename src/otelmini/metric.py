@@ -219,7 +219,7 @@ class MetricProducer:
         return Metric(instrument.name, instrument.description, instrument.unit, sum_data)
 
     def _produce_histogram_metric(
-        self, instrument: HistogramInstrument, time_unix_nano: int
+        self, instrument: Histogram, time_unix_nano: int
     ) -> Optional[Metric]:
         """Produce a Histogram metric."""
         data_points = [
@@ -291,7 +291,7 @@ class MetricProducer:
         return Metric(instrument.name, instrument.description, instrument.unit, sum_data)
 
     def _produce_observable_gauge_metric(
-        self, instrument: ObservableGaugeInstrument, time_unix_nano: int
+        self, instrument: ObservableGauge, time_unix_nano: int
     ) -> Metric:
         """Produce a Gauge metric from an observable Gauge."""
         data_point = NumberDataPoint(
@@ -429,7 +429,7 @@ class _HistogramAggregation:
         }
 
 
-class HistogramInstrument(ApiHistogram):
+class Histogram(ApiHistogram):
     DEFAULT_BOUNDARIES: List[float] = [0, 5, 10, 25, 50, 75, 100, 250, 500, 750, 1000, 2500, 5000, 7500, 10000]
 
     def __init__(
@@ -484,7 +484,7 @@ class _ObservableInstrument:
         return 0.0
 
 
-class ObservableGaugeInstrument(_ObservableInstrument, ApiObservableGauge):
+class ObservableGauge(_ObservableInstrument, ApiObservableGauge):
     """Observable gauge - invokes callbacks to get current values."""
     pass
 
@@ -542,7 +542,7 @@ class Meter(ApiMeter):
         *,
         explicit_bucket_boundaries_advisory: Optional[Sequence[float]] = None,
     ) -> ApiHistogram:
-        histogram = HistogramInstrument(
+        histogram = Histogram(
             name=name,
             unit=unit,
             description=description,
@@ -559,7 +559,7 @@ class Meter(ApiMeter):
     def create_observable_gauge(
         self, name: str, callbacks: Optional[Sequence[CallbackT]] = None, unit: str = "", description: str = ""
     ) -> ApiObservableGauge:
-        gauge = ObservableGaugeInstrument(
+        gauge = ObservableGauge(
             name=name,
             callbacks=callbacks,
             unit=unit,
