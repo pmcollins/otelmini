@@ -204,6 +204,17 @@ Spec reference: https://opentelemetry.io/docs/specs/otel/
 
 ---
 
+## Auto-Instrumentation
+
+| Requirement | Status | Notes |
+|-------------|--------|-------|
+| CLI entry point | ✅ | `otel` command via `otelmini.distro:auto_instrument` |
+| Automatic provider setup | ✅ | TracerProvider, MeterProvider, LoggerProvider |
+| Instrumentor discovery | ✅ | Via `opentelemetry_instrumentor` entry points |
+| Automatic library instrumentation | ✅ | All installed instrumentors activated |
+
+---
+
 ## Summary
 
 | Signal | Conformance | Notes |
@@ -214,6 +225,7 @@ Spec reference: https://opentelemetry.io/docs/specs/otel/
 | **Context/Propagation** | ✅ | W3C TraceContext and Baggage implemented |
 | **Baggage** | ✅ | API from opentelemetry-api, propagation implemented |
 | **Resource** | ~70% | Merge and env var support added |
+| **Auto-Instrumentation** | ✅ | CLI and instrumentor discovery implemented |
 
 ---
 

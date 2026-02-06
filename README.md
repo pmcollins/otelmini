@@ -43,6 +43,17 @@ OTEL_SERVICE_NAME=my-service otel python my_app.py
 
 That's it -- traces are exported to `localhost:4318` via OTLP/HTTP (JSON).
 
+### Using Instrumentation Libraries
+
+otelmini automatically discovers and activates any installed OpenTelemetry instrumentation libraries:
+
+```bash
+pip install otelmini opentelemetry-instrumentation-requests
+OTEL_SERVICE_NAME=my-service otel python my_app.py
+```
+
+All HTTP requests made with the `requests` library will now be traced automatically. This works with any instrumentation from [opentelemetry-python-contrib](https://github.com/open-telemetry/opentelemetry-python-contrib/tree/main/instrumentation).
+
 ## Why otelmini?
 
 otelmini was designed with minimalism as a goal, giving you insight into your applications via any of the
