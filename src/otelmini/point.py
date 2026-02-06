@@ -38,7 +38,6 @@ class NumberDataPoint:
     start_time_unix_nano: int
     time_unix_nano: int
     value: Union[int, float]
-    # exemplars: Sequence[Exemplar] = field(default_factory=list)
 
     def to_json(self, indent: Optional[int] = 4) -> str:
         return dumps(asdict(self), indent=indent)
@@ -56,7 +55,6 @@ class HistogramDataPoint:
     explicit_bounds: Sequence[float]
     min: float
     max: float
-    # exemplars: Sequence[Exemplar] = field(default_factory=list)
 
     def to_json(self, indent: Optional[int] = 4) -> str:
         return dumps(asdict(self), indent=indent)
@@ -83,7 +81,6 @@ class ExponentialHistogramDataPoint:
     flags: int
     min: float
     max: float
-    # exemplars: Sequence[Exemplar] = field(default_factory=list)
 
     def to_json(self, indent: Optional[int] = 4) -> str:
         return dumps(asdict(self), indent=indent)
