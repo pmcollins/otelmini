@@ -2,7 +2,7 @@ import threading
 import time
 from typing import List, Sequence
 
-from otelmini._lib import Exporter, ExportResult
+from otelmini.export import Exporter, ExportResult
 from otelmini.processor import BatchProcessor, Batcher, Timer
 from tests._lib import mk_span
 

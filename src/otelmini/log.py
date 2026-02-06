@@ -14,7 +14,7 @@ from opentelemetry.util.types import Attributes
 if TYPE_CHECKING:
     from otelmini.processor import Processor
 
-from otelmini._lib import (
+from otelmini.export import (
     ConsoleExporterBase,
     DEFAULT_EXPORTER_TIMEOUT,
     DEFAULT_LOG_ENDPOINT,

@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Callable, Generic, List, Optional, Type, TypeVar
 
 if TYPE_CHECKING:
-    from otelmini._lib import Exporter
+    from otelmini.export import Exporter
 
 T = TypeVar("T")
 

@@ -118,7 +118,7 @@ To create a custom exporter, implement the `Exporter` interface and register via
 ### Interface
 
 ```python
-from otelmini._lib import Exporter, ExportResult
+from otelmini.export import Exporter, ExportResult
 
 class MySpanExporter(Exporter):
     def __init__(self, **kwargs):

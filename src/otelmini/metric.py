@@ -16,7 +16,7 @@ from opentelemetry.metrics import ObservableGauge as ApiObservableGauge
 from opentelemetry.metrics import ObservableUpDownCounter as ApiObservableUpDownCounter
 from opentelemetry.metrics import UpDownCounter as ApiUpDownCounter
 
-from otelmini._lib import (
+from otelmini.export import (
     ConsoleExporterBase,
     DEFAULT_EXPORTER_TIMEOUT,
     DEFAULT_METRICS_ENDPOINT,

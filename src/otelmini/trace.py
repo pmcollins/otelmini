@@ -9,7 +9,7 @@ from opentelemetry.trace import SpanKind, Tracer, TracerProvider, _Links
 from opentelemetry.trace.span import SpanContext, TraceFlags
 from opentelemetry.util._decorator import _agnosticcontextmanager
 
-from otelmini._lib import (
+from otelmini.export import (
     ConsoleExporterBase,
     DEFAULT_EXPORTER_TIMEOUT,
     DEFAULT_TRACE_ENDPOINT,

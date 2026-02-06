@@ -1,6 +1,6 @@
 from opentelemetry.trace import SpanContext
 
-from otelmini._lib import SingleAttemptResult
+from otelmini.export import SingleAttemptResult
 from otelmini.trace import InstrumentationScope, MiniSpan, Resource
 
 

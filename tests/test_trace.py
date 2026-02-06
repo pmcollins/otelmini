@@ -1,6 +1,6 @@
 from opentelemetry.trace import Link
 
-from otelmini._lib import Retrier, RetrierResult
+from otelmini.export import Retrier, RetrierResult
 from otelmini.trace import MiniSpan, Resource, InstrumentationScope, SpanContext
 from otelmini.encode import _encode_span, _encode_event
 from tests._lib import StubbornRunner, FakeSleeper

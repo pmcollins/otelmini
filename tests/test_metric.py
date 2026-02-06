@@ -1,7 +1,7 @@
 import json
 from typing import Sequence
 
-from otelmini._lib import Exporter, T, ExportResult
+from otelmini.export import Exporter, T, ExportResult
 from otelmini.metric import ManualExportingMetricReader, MeterProvider, PeriodicExportingMetricReader
 from otelmini.encode import encode_metrics_request
 from otelmini.point import (
