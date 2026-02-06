@@ -6,6 +6,9 @@ from typing import TYPE_CHECKING, Optional
 if TYPE_CHECKING:
     from opentelemetry.trace.span import SpanContext
 
+# Maximum value for 64-bit trace ID sampling bound
+_MAX_TRACE_ID_BOUND = 2**64 - 1
+
 
 class Decision(Enum):
     DROP = 0
@@ -42,7 +45,7 @@ class TraceIdRatioBasedSampler(Sampler):
     def __init__(self, ratio: float):
         if not 0.0 <= ratio <= 1.0:
             raise ValueError("ratio must be between 0.0 and 1.0")
-        self._bound = int(ratio * (2**64 - 1))
+        self._bound = int(ratio * _MAX_TRACE_ID_BOUND)
 
     def should_sample(
         self, trace_id: int, name: str, parent_context: Optional[SpanContext] = None
