@@ -39,6 +39,9 @@ OTEL_LOGS_EXPORTER = "OTEL_LOGS_EXPORTER"
 OTEL_METRIC_EXPORT_INTERVAL = "OTEL_METRIC_EXPORT_INTERVAL"
 OTEL_MINI_LOG_FORMAT = "OTEL_MINI_LOG_FORMAT"
 
+# Default OTLP endpoint (single source of truth)
+DEFAULT_OTLP_ENDPOINT = "http://localhost:4318"
+
 
 class Env:
     """Wrapper around environment variables with typed accessors."""
@@ -89,7 +92,7 @@ class Config:
         self.bsp_schedule_delay_ms = env.get_int(OTEL_BSP_SCHEDULE_DELAY, 5000)
 
         # Exporter endpoints
-        self.exporter_endpoint = env.get(OTEL_EXPORTER_OTLP_ENDPOINT, "http://localhost:4318")
+        self.exporter_endpoint = env.get(OTEL_EXPORTER_OTLP_ENDPOINT, DEFAULT_OTLP_ENDPOINT)
         self.exporter_traces_endpoint = env.get(OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, "")
         self.exporter_metrics_endpoint = env.get(OTEL_EXPORTER_OTLP_METRICS_ENDPOINT, "")
         self.exporter_logs_endpoint = env.get(OTEL_EXPORTER_OTLP_LOGS_ENDPOINT, "")
