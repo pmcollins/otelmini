@@ -1,6 +1,7 @@
 # otelmini
 
-A minimal OpenTelemetry Python SDK with only `opentelemetry-api` as a dependency. Exports traces, metrics, and logs via JSON-OTLP over HTTP. Ideal for constrained environments like AWS Lambda or anywhere minimal production impact is valued.
+A minimal OpenTelemetry Python SDK with no extra dependencies. Exports traces, metrics, and logs via JSON-OTLP over
+HTTP. Ideal for constrained environments like AWS Lambda or anywhere minimal production impact is valued.
 
 ## Features
 
@@ -43,15 +44,18 @@ That's it -- traces are exported to `localhost:4318` via OTLP/HTTP.
 ## Why otelmini?
 
 otelmini was designed with minimalism as a goal, giving you insight into your applications via any of the
-instrumentation libraries writen for OpenTelemetry but staying out of the way of your applications as much as possible.
-The only dependency it requires is the opentelemetry-api, which you have to use anyway if you're using otel at all.
+[standard](https://github.com/open-telemetry/opentelemetry-python-contrib/tree/main/instrumentation)
+and [genai](https://github.com/open-telemetry/opentelemetry-python-contrib/tree/main/instrumentation-genai)
+instrumentation libraries while staying out of the way. No dependencies other than opentelemetry-api, which you have to
+use anyway if you're using OTel at all.
 
 This is useful when:
 
-- **Avoiding dependency conflicts** -- your project requires a different version of protobuf, requests, or gRPC than OTel exporters expect
+- **Avoiding dependency conflicts** -- your project requires a different version of protobuf or requests than OTel exporters expect
 - **Minimizing package size** -- serverless environments like AWS Lambda have size limits
 - **Reducing cold start time** -- fewer modules to load means faster Lambda cold starts
 - **Reducing attack surface** -- fewer dependencies means less to audit and maintain
+- **Improving performance** -- less code means potentially lower memory impact and faster execution
 
 ## Comparison with OpenTelemetry Python
 
@@ -60,7 +64,6 @@ Comparing `otelmini` to `opentelemetry-distro` + `opentelemetry-exporter-otlp-pr
 | Metric | otelmini | otel-python | Reduction |
 |--------|----------|-------------|-----------|
 | Third-party dependencies* | 0 | 9 | 100% fewer |
-| Install size | 9.7 MB | 17 MB | 43% smaller |
 | Lines of Python | 2K | 43K | 95% fewer |
 
 \* Excluding opentelemetry packages and Python stdlib backports
