@@ -169,74 +169,97 @@ class MetricProducer:
 
     def produce(self) -> MetricsData:
         time_unix_nano = _time_ns()
-        scope_metrics_list = []
+        scope_metrics_list: List[ScopeMetrics] = []
 
         for meter_name, instruments in self.meters.items():
-            scope = InstrumentationScope(name=meter_name)
-            metrics = []
-            for counter in instruments[InstrumentType.COUNTER]:
-                data_points = []
-                for attr_key, value in counter.get_values().items():
-                    data_points.append(NumberDataPoint(
-                        _key_to_attributes(attr_key),
-                        self._start_time_unix_nano,
-                        time_unix_nano,
-                        value
-                    ))
-                if data_points:
-                    sum_metric = Sum(
-                        data_points,
-                        is_monotonic=True,
-                        aggregation_temporality=AggregationTemporality.CUMULATIVE
-                    )
-                    metrics.append(Metric(counter.name, counter.description, counter.unit, sum_metric))
-            for up_down_counter in instruments[InstrumentType.UP_DOWN_COUNTER]:
-                data_points = []
-                for attr_key, value in up_down_counter.get_values().items():
-                    data_points.append(NumberDataPoint(
-                        _key_to_attributes(attr_key),
-                        self._start_time_unix_nano,
-                        time_unix_nano,
-                        value
-                    ))
-                if data_points:
-                    sum_metric = Sum(
-                        data_points,
-                        is_monotonic=False,
-                        aggregation_temporality=AggregationTemporality.CUMULATIVE
-                    )
-                    metrics.append(Metric(up_down_counter.name, up_down_counter.description, up_down_counter.unit, sum_metric))
-            for histogram in instruments[InstrumentType.HISTOGRAM]:
-                data_points = []
-                for attr_key, h_data in histogram.get_all_histogram_data().items():
-                    data_points.append(HistogramDataPoint(
-                        attributes=_key_to_attributes(attr_key),
-                        start_time_unix_nano=self._start_time_unix_nano,
-                        time_unix_nano=time_unix_nano,
-                        count=h_data['count'],
-                        sum=h_data['sum'],
-                        bucket_counts=h_data['bucket_counts'],
-                        explicit_bounds=h_data['explicit_bounds'],
-                        min=h_data['min'],
-                        max=h_data['max'],
-                    ))
-                if data_points:
-                    histogram_metric = HistogramData(
-                        data_points,
-                        aggregation_temporality=AggregationTemporality.CUMULATIVE
-                    )
-                    metrics.append(Metric(histogram.name, histogram.description, histogram.unit, histogram_metric))
-            for gauge in instruments[InstrumentType.OBSERVABLE_GAUGE]:
-                data_point = NumberDataPoint(
-                    {}, self._start_time_unix_nano, time_unix_nano, gauge.get_value()
-                )
-                gauge_metric = Gauge([data_point])
-                metrics.append(Metric(gauge.name, gauge.description, gauge.unit, gauge_metric))
+            metrics = self._produce_metrics_for_meter(instruments, time_unix_nano)
             if metrics:
+                scope = InstrumentationScope(name=meter_name)
                 scope_metrics_list.append(ScopeMetrics(scope, metrics, ""))
 
         rm = ResourceMetrics(self.resource, scope_metrics_list, "")
         return MetricsData([rm])
+
+    def _produce_metrics_for_meter(
+        self, instruments: Dict[InstrumentType, List[Any]], time_unix_nano: int
+    ) -> List[Metric]:
+        """Produce metrics from all instruments in a meter."""
+        metrics: List[Metric] = []
+
+        for instrument in instruments[InstrumentType.COUNTER]:
+            if metric := self._produce_sum_metric(instrument, time_unix_nano, is_monotonic=True):
+                metrics.append(metric)
+
+        for instrument in instruments[InstrumentType.UP_DOWN_COUNTER]:
+            if metric := self._produce_sum_metric(instrument, time_unix_nano, is_monotonic=False):
+                metrics.append(metric)
+
+        for instrument in instruments[InstrumentType.HISTOGRAM]:
+            if metric := self._produce_histogram_metric(instrument, time_unix_nano):
+                metrics.append(metric)
+
+        for instrument in instruments[InstrumentType.OBSERVABLE_GAUGE]:
+            metrics.append(self._produce_gauge_metric(instrument, time_unix_nano))
+
+        return metrics
+
+    def _produce_sum_metric(
+        self, instrument: _SumInstrument, time_unix_nano: int, *, is_monotonic: bool
+    ) -> Optional[Metric]:
+        """Produce a Sum metric from a Counter or UpDownCounter."""
+        data_points = [
+            NumberDataPoint(
+                _key_to_attributes(attr_key),
+                self._start_time_unix_nano,
+                time_unix_nano,
+                value
+            )
+            for attr_key, value in instrument.get_values().items()
+        ]
+        if not data_points:
+            return None
+        sum_data = Sum(
+            data_points,
+            is_monotonic=is_monotonic,
+            aggregation_temporality=AggregationTemporality.CUMULATIVE
+        )
+        return Metric(instrument.name, instrument.description, instrument.unit, sum_data)
+
+    def _produce_histogram_metric(
+        self, instrument: HistogramInstrument, time_unix_nano: int
+    ) -> Optional[Metric]:
+        """Produce a Histogram metric."""
+        data_points = [
+            HistogramDataPoint(
+                attributes=_key_to_attributes(attr_key),
+                start_time_unix_nano=self._start_time_unix_nano,
+                time_unix_nano=time_unix_nano,
+                count=h_data['count'],
+                sum=h_data['sum'],
+                bucket_counts=h_data['bucket_counts'],
+                explicit_bounds=h_data['explicit_bounds'],
+                min=h_data['min'],
+                max=h_data['max'],
+            )
+            for attr_key, h_data in instrument.get_all_histogram_data().items()
+        ]
+        if not data_points:
+            return None
+        histogram_data = HistogramData(
+            data_points,
+            aggregation_temporality=AggregationTemporality.CUMULATIVE
+        )
+        return Metric(instrument.name, instrument.description, instrument.unit, histogram_data)
+
+    def _produce_gauge_metric(
+        self, instrument: ObservableGaugeInstrument, time_unix_nano: int
+    ) -> Metric:
+        """Produce a Gauge metric."""
+        data_point = NumberDataPoint(
+            {}, self._start_time_unix_nano, time_unix_nano, instrument.get_value()
+        )
+        gauge_data = Gauge([data_point])
+        return Metric(instrument.name, instrument.description, instrument.unit, gauge_data)
 
 
 class MeterProvider(ApiMeterProvider):
