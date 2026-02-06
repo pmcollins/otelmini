@@ -20,7 +20,7 @@ Spec reference: https://opentelemetry.io/docs/specs/otel/
 
 | Requirement | Status | Notes |
 |-------------|--------|-------|
-| `start_span(name, context, kind, attributes, links, start_time)` | ⚠️ | Links not stored/used |
+| `start_span(name, context, kind, attributes, links, start_time)` | ⚠️ | Links not stored/used; context param works for propagation |
 | `start_as_current_span()` | ✅ | Implemented |
 | `Enabled()` | ❌ | Not implemented |
 
@@ -197,7 +197,8 @@ Spec reference: https://opentelemetry.io/docs/specs/otel/
 
 | Requirement | Status | Notes |
 |-------------|--------|-------|
-| Baggage API | ❌ | Not implemented |
+| Baggage API | ✅ | Uses `opentelemetry.baggage` from opentelemetry-api |
+| Baggage propagation | ✅ | `BaggagePropagator` in `propagator.py` |
 
 ---
 
@@ -209,7 +210,7 @@ Spec reference: https://opentelemetry.io/docs/specs/otel/
 | **Metrics** | ~70% | Missing async instruments, sync Gauge |
 | **Logs** | ~55% | Missing trace correlation, resource in export |
 | **Context/Propagation** | ✅ | W3C TraceContext and Baggage implemented |
-| **Baggage** | 0% | Not implemented |
+| **Baggage** | ✅ | API from opentelemetry-api, propagation implemented |
 | **Resource** | ~40% | Basic impl, missing merge, env var parsing |
 
 ---
