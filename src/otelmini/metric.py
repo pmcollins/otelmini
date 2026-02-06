@@ -264,7 +264,7 @@ class MetricProducer:
         return Metric(instrument.name, instrument.description, instrument.unit, gauge_data)
 
     def _produce_observable_counter_metric(
-        self, instrument: ObservableCounterInstrument, time_unix_nano: int
+        self, instrument: ObservableCounter, time_unix_nano: int
     ) -> Metric:
         """Produce a Sum metric from an observable Counter."""
         data_point = NumberDataPoint(
@@ -278,7 +278,7 @@ class MetricProducer:
         return Metric(instrument.name, instrument.description, instrument.unit, sum_data)
 
     def _produce_observable_up_down_counter_metric(
-        self, instrument: ObservableUpDownCounterInstrument, time_unix_nano: int
+        self, instrument: ObservableUpDownCounter, time_unix_nano: int
     ) -> Metric:
         """Produce a Sum metric from an observable UpDownCounter."""
         data_point = NumberDataPoint(
@@ -490,12 +490,12 @@ class ObservableGauge(_ObservableInstrument, ApiObservableGauge):
     pass
 
 
-class ObservableCounterInstrument(_ObservableInstrument, ApiObservableCounter):
+class ObservableCounter(_ObservableInstrument, ApiObservableCounter):
     """Observable counter - invokes callbacks to get cumulative values."""
     pass
 
 
-class ObservableUpDownCounterInstrument(_ObservableInstrument, ApiObservableUpDownCounter):
+class ObservableUpDownCounter(_ObservableInstrument, ApiObservableUpDownCounter):
     """Observable up-down counter - invokes callbacks to get current values."""
     pass
 
@@ -526,7 +526,7 @@ class Meter(ApiMeter):
     def create_observable_counter(
         self, name: str, callbacks: Optional[Sequence[CallbackT]] = None, unit: str = "", description: str = ""
     ) -> ApiObservableCounter:
-        counter = ObservableCounterInstrument(
+        counter = ObservableCounter(
             name=name,
             callbacks=callbacks,
             unit=unit,
@@ -572,7 +572,7 @@ class Meter(ApiMeter):
     def create_observable_up_down_counter(
         self, name: str, callbacks: Optional[Sequence[CallbackT]] = None, unit: str = "", description: str = ""
     ) -> ApiObservableUpDownCounter:
-        counter = ObservableUpDownCounterInstrument(
+        counter = ObservableUpDownCounter(
             name=name,
             callbacks=callbacks,
             unit=unit,
