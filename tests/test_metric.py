@@ -411,6 +411,59 @@ def test_observable_gauge_no_callback():
     assert metric.data.data_points[0].value == 0.0
 
 
+# ObservableCounter Tests
+
+def test_observable_counter_callback_invoked():
+    callback_invoked = []
+
+    def my_callback():
+        callback_invoked.append(True)
+        from opentelemetry.metrics import Observation
+        return [Observation(value=1000)]
+
+    exporter = FakeExporter()
+    reader = ManualExportingMetricReader(exporter)
+    meter_provider = MeterProvider(metric_readers=(reader,))
+    meter = meter_provider.get_meter(name="my-meter")
+    counter = meter.create_observable_counter(
+        name="requests_total",
+        callbacks=[my_callback]
+    )
+
+    reader.force_flush()
+
+    assert len(callback_invoked) == 1
+
+
+def test_observable_counter_value_captured():
+    def my_callback():
+        from opentelemetry.metrics import Observation
+        return [Observation(value=5000)]
+
+    exporter = FakeExporter()
+    reader = ManualExportingMetricReader(exporter)
+    meter_provider = MeterProvider(metric_readers=(reader,))
+    meter = meter_provider.get_meter(name="my-meter")
+    counter = meter.create_observable_counter(
+        name="bytes_received",
+        callbacks=[my_callback],
+        unit="By",
+        description="Total bytes received"
+    )
+
+    reader.force_flush()
+
+    metrics_data = exporter.get_exports()[0]
+    metric = metrics_data.resource_metrics[0].scope_metrics[0].metrics[0]
+
+    assert metric.name == "bytes_received"
+    assert metric.unit == "By"
+    assert metric.description == "Total bytes received"
+    assert metric.data.data_points[0].value == 5000
+    # ObservableCounter produces a Sum that is monotonic and cumulative
+    assert metric.data.is_monotonic is True
+
+
 # Sync Gauge Tests
 
 def test_sync_gauge_set_value():
