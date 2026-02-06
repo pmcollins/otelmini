@@ -43,6 +43,13 @@ class Resource:
     def get_schema_url(self):
         return self._schema_url
 
+    def merge(self, other: "Resource") -> "Resource":
+        """Merge this resource with another. Other's attributes take precedence."""
+        merged_attrs = {**self._attributes, **other._attributes}
+        # Use other's schema_url if set, otherwise keep ours
+        schema_url = other._schema_url if other._schema_url else self._schema_url
+        return Resource(schema_url=schema_url, attributes=merged_attrs)
+
     def to_dict(self):
         return {
             "schema_url": self._schema_url,

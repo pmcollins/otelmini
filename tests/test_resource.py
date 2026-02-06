@@ -1,6 +1,7 @@
 import os
 
 from otelmini.resource import create_default_resource, parse_resource_attributes
+from otelmini.types import Resource
 
 
 def test_parse_resource_attributes_empty():
@@ -53,3 +54,43 @@ def test_create_default_resource_sdk_attrs_override_env(monkeypatch):
     attrs = resource.get_attributes()
 
     assert attrs["service.name"] == "from-service-name-var"
+
+
+def test_resource_merge_attributes():
+    r1 = Resource(attributes={"a": "1", "b": "2"})
+    r2 = Resource(attributes={"b": "override", "c": "3"})
+
+    merged = r1.merge(r2)
+    attrs = merged.get_attributes()
+
+    assert attrs["a"] == "1"
+    assert attrs["b"] == "override"  # r2 takes precedence
+    assert attrs["c"] == "3"
+
+
+def test_resource_merge_schema_url():
+    r1 = Resource(schema_url="https://schema1.example.com", attributes={})
+    r2 = Resource(schema_url="https://schema2.example.com", attributes={})
+
+    merged = r1.merge(r2)
+    assert merged.get_schema_url() == "https://schema2.example.com"
+
+
+def test_resource_merge_schema_url_empty_other():
+    r1 = Resource(schema_url="https://schema1.example.com", attributes={})
+    r2 = Resource(schema_url="", attributes={})
+
+    merged = r1.merge(r2)
+    assert merged.get_schema_url() == "https://schema1.example.com"
+
+
+def test_resource_merge_returns_new_resource():
+    r1 = Resource(attributes={"a": "1"})
+    r2 = Resource(attributes={"b": "2"})
+
+    merged = r1.merge(r2)
+
+    # Original resources should be unchanged
+    assert r1.get_attributes() == {"a": "1"}
+    assert r2.get_attributes() == {"b": "2"}
+    assert merged.get_attributes() == {"a": "1", "b": "2"}
