@@ -38,6 +38,7 @@ class InstrumentType(Enum):
     GAUGE = "gauge"
     OBSERVABLE_COUNTER = "observable_counter"
     OBSERVABLE_GAUGE = "observable_gauge"
+    OBSERVABLE_UP_DOWN_COUNTER = "observable_up_down_counter"
 
 
 class CounterError(Exception):
@@ -199,6 +200,9 @@ class MetricProducer:
         for instrument in instruments[InstrumentType.OBSERVABLE_GAUGE]:
             metrics.append(self._produce_observable_gauge_metric(instrument, time_unix_nano))
 
+        for instrument in instruments[InstrumentType.OBSERVABLE_UP_DOWN_COUNTER]:
+            metrics.append(self._produce_observable_up_down_counter_metric(instrument, time_unix_nano))
+
         return metrics
 
     def _produce_sum_metric(
@@ -277,6 +281,20 @@ class MetricProducer:
         sum_data = Sum(
             [data_point],
             is_monotonic=True,
+            aggregation_temporality=AggregationTemporality.CUMULATIVE
+        )
+        return Metric(instrument.name, instrument.description, instrument.unit, sum_data)
+
+    def _produce_observable_up_down_counter_metric(
+        self, instrument: ObservableUpDownCounterInstrument, time_unix_nano: int
+    ) -> Metric:
+        """Produce a Sum metric from an observable UpDownCounter."""
+        data_point = NumberDataPoint(
+            {}, self._start_time_unix_nano, time_unix_nano, instrument.get_value()
+        )
+        sum_data = Sum(
+            [data_point],
+            is_monotonic=False,  # UpDownCounter is not monotonic
             aggregation_temporality=AggregationTemporality.CUMULATIVE
         )
         return Metric(instrument.name, instrument.description, instrument.unit, sum_data)
@@ -497,6 +515,29 @@ class ObservableCounterInstrument(ApiObservableCounter):
         return 0.0
 
 
+class ObservableUpDownCounterInstrument(ApiObservableUpDownCounter):
+    """Observable up-down counter - invokes callbacks to get current values."""
+
+    def __init__(
+        self,
+        name: str,
+        callbacks: Optional[Sequence[CallbackT]] = None,
+        unit: str = "",
+        description: str = "",
+    ):
+        self.name = name
+        self.unit = unit
+        self.description = description
+        self.callbacks: List[CallbackT] = list(callbacks) if callbacks else []
+
+    def get_value(self) -> float:
+        # Invoke callbacks, return latest observation value
+        for callback in self.callbacks:
+            for obs in callback():
+                return obs.value  # Simplified: first observation
+        return 0.0
+
+
 class Meter(ApiMeter):
 
     def __init__(
@@ -569,4 +610,11 @@ class Meter(ApiMeter):
     def create_observable_up_down_counter(
         self, name: str, callbacks: Optional[Sequence[CallbackT]] = None, unit: str = "", description: str = ""
     ) -> ApiObservableUpDownCounter:
-        raise NotImplementedError("create_observable_up_down_counter is not yet implemented")
+        counter = ObservableUpDownCounterInstrument(
+            name=name,
+            callbacks=callbacks,
+            unit=unit,
+            description=description,
+        )
+        self.meter_provider._register_instrument(counter, InstrumentType.OBSERVABLE_UP_DOWN_COUNTER, self._name)
+        return counter

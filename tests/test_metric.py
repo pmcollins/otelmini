@@ -464,6 +464,59 @@ def test_observable_counter_value_captured():
     assert metric.data.is_monotonic is True
 
 
+# ObservableUpDownCounter Tests
+
+def test_observable_up_down_counter_callback_invoked():
+    callback_invoked = []
+
+    def my_callback():
+        callback_invoked.append(True)
+        from opentelemetry.metrics import Observation
+        return [Observation(value=50)]
+
+    exporter = FakeExporter()
+    reader = ManualExportingMetricReader(exporter)
+    meter_provider = MeterProvider(metric_readers=(reader,))
+    meter = meter_provider.get_meter(name="my-meter")
+    counter = meter.create_observable_up_down_counter(
+        name="active_connections",
+        callbacks=[my_callback]
+    )
+
+    reader.force_flush()
+
+    assert len(callback_invoked) == 1
+
+
+def test_observable_up_down_counter_value_captured():
+    def my_callback():
+        from opentelemetry.metrics import Observation
+        return [Observation(value=-10)]  # Can be negative
+
+    exporter = FakeExporter()
+    reader = ManualExportingMetricReader(exporter)
+    meter_provider = MeterProvider(metric_readers=(reader,))
+    meter = meter_provider.get_meter(name="my-meter")
+    counter = meter.create_observable_up_down_counter(
+        name="queue_depth",
+        callbacks=[my_callback],
+        unit="1",
+        description="Current queue depth"
+    )
+
+    reader.force_flush()
+
+    metrics_data = exporter.get_exports()[0]
+    metric = metrics_data.resource_metrics[0].scope_metrics[0].metrics[0]
+
+    assert metric.name == "queue_depth"
+    assert metric.unit == "1"
+    assert metric.description == "Current queue depth"
+    assert metric.data.data_points[0].value == -10
+    # ObservableUpDownCounter produces a Sum that is NOT monotonic
+    assert metric.data.is_monotonic is False
+
+
 # Sync Gauge Tests
 
 def test_sync_gauge_set_value():
