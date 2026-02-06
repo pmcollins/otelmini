@@ -51,18 +51,13 @@ class LogExportError(Exception):
         super().__init__(message)
 
 
-class LogRecordExporter(Exporter[MiniLogRecord]):
-    """Base class for log record exporters."""
-    pass
-
-
-class ConsoleLogExporter(LogRecordExporter):
+class ConsoleLogExporter(Exporter[MiniLogRecord]):
     def export(self, items: Sequence[MiniLogRecord]) -> ExportResult:
         print(encode_logs_request(items))  # noqa: T201
         return ExportResult.SUCCESS
 
 
-class HttpLogExporter(LogRecordExporter):
+class HttpLogExporter(Exporter[MiniLogRecord]):
     def __init__(self, endpoint="http://localhost:4318/v1/logs", timeout=30):
         self._exporter = _HttpExporter(endpoint, timeout)
 
