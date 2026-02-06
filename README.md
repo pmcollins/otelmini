@@ -58,6 +58,35 @@ This is useful when:
 - **Minimizing package size** — serverless environments like AWS Lambda have size limits
 - **Reducing attack surface** — fewer dependencies means less to audit and maintain
 
+## Comparison with OpenTelemetry Python
+
+Comparing `otelmini` to the equivalent OpenTelemetry Python setup (`opentelemetry-sdk` + `opentelemetry-exporter-otlp-proto-http` + `opentelemetry-instrumentation`):
+
+| Metric | otelmini | otel-python | Reduction |
+|--------|----------|-------------|-----------|
+| Dependencies | 5 | 19 | 74% fewer |
+| Install size | 9.7 MB | 17 MB | 43% smaller |
+| Lines of code | 8K | 43K | 81% less |
+
+<details>
+<summary>Packages installed by each</summary>
+
+**otelmini:**
+- opentelemetry-api
+- otelmini
+- importlib_metadata, typing_extensions, zipp
+
+**otel-python:**
+- opentelemetry-api, opentelemetry-sdk, opentelemetry-proto
+- opentelemetry-exporter-otlp-proto-common, opentelemetry-exporter-otlp-proto-http
+- opentelemetry-instrumentation, opentelemetry-semantic-conventions
+- protobuf, googleapis-common-protos
+- requests, urllib3, certifi, charset-normalizer, idna
+- wrapt, packaging
+- importlib_metadata, typing_extensions, zipp
+
+</details>
+
 ## Context Propagation
 
 otelmini includes W3C TraceContext and Baggage propagators for distributed tracing:
