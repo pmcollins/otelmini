@@ -178,30 +178,21 @@ class MetricProducer:
         """Produce metrics from all instruments in a meter."""
         metrics: List[Metric] = []
 
-        for instrument in instruments[InstrumentType.COUNTER]:
-            if metric := self._produce_sum_metric(instrument, time_unix_nano, is_monotonic=True):
-                metrics.append(metric)
+        # Dispatch table: instrument type -> (producer method, kwargs)
+        producers = [
+            (InstrumentType.COUNTER, self._produce_sum_metric, {"is_monotonic": True}),
+            (InstrumentType.UP_DOWN_COUNTER, self._produce_sum_metric, {"is_monotonic": False}),
+            (InstrumentType.HISTOGRAM, self._produce_histogram_metric, {}),
+            (InstrumentType.GAUGE, self._produce_sync_gauge_metric, {}),
+            (InstrumentType.OBSERVABLE_COUNTER, self._produce_observable_counter_metric, {}),
+            (InstrumentType.OBSERVABLE_GAUGE, self._produce_observable_gauge_metric, {}),
+            (InstrumentType.OBSERVABLE_UP_DOWN_COUNTER, self._produce_observable_up_down_counter_metric, {}),
+        ]
 
-        for instrument in instruments[InstrumentType.UP_DOWN_COUNTER]:
-            if metric := self._produce_sum_metric(instrument, time_unix_nano, is_monotonic=False):
-                metrics.append(metric)
-
-        for instrument in instruments[InstrumentType.HISTOGRAM]:
-            if metric := self._produce_histogram_metric(instrument, time_unix_nano):
-                metrics.append(metric)
-
-        for instrument in instruments[InstrumentType.GAUGE]:
-            if metric := self._produce_sync_gauge_metric(instrument, time_unix_nano):
-                metrics.append(metric)
-
-        for instrument in instruments[InstrumentType.OBSERVABLE_COUNTER]:
-            metrics.append(self._produce_observable_counter_metric(instrument, time_unix_nano))
-
-        for instrument in instruments[InstrumentType.OBSERVABLE_GAUGE]:
-            metrics.append(self._produce_observable_gauge_metric(instrument, time_unix_nano))
-
-        for instrument in instruments[InstrumentType.OBSERVABLE_UP_DOWN_COUNTER]:
-            metrics.append(self._produce_observable_up_down_counter_metric(instrument, time_unix_nano))
+        for instr_type, producer, kwargs in producers:
+            for instrument in instruments[instr_type]:
+                if metric := producer(instrument, time_unix_nano, **kwargs):
+                    metrics.append(metric)
 
         return metrics
 
