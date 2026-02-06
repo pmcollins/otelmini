@@ -57,9 +57,11 @@ Comparing `otelmini` to `opentelemetry-distro` + `opentelemetry-exporter-otlp-pr
 
 | Metric | otelmini | otel-python | Reduction |
 |--------|----------|-------------|-----------|
-| Third-party dependencies | 0 | 9 | 100% fewer |
+| Third-party dependencies* | 0 | 9 | 100% fewer |
 | Install size | 9.7 MB | 17 MB | 43% smaller |
 | Lines of Python | 8K | 43K | 81% fewer |
+
+\* Excluding opentelemetry packages and Python stdlib backports
 
 Note: Upstream otel-python doesn't support JSON/HTTP—their OTLP exporters require protobuf.
 
