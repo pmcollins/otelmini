@@ -1,7 +1,11 @@
+from opentelemetry.trace import TraceFlags
+from opentelemetry.trace.span import SpanContext
+
 from otelmini.sampler import (
     AlwaysOffSampler,
     AlwaysOnSampler,
     Decision,
+    ParentBasedSampler,
     TraceIdRatioBasedSampler,
 )
 
@@ -51,3 +55,66 @@ def test_trace_id_ratio_sampler_invalid_ratio():
         TraceIdRatioBasedSampler(-0.1)
     with pytest.raises(ValueError):
         TraceIdRatioBasedSampler(1.1)
+
+
+# ParentBasedSampler Tests
+
+def test_parent_based_sampler_no_parent_uses_root():
+    # Default root is AlwaysOnSampler
+    sampler = ParentBasedSampler()
+    result = sampler.should_sample(123, "span", None)
+    assert result.decision == Decision.RECORD_AND_SAMPLE
+
+
+def test_parent_based_sampler_custom_root():
+    sampler = ParentBasedSampler(root=AlwaysOffSampler())
+    result = sampler.should_sample(123, "span", None)
+    assert result.decision == Decision.DROP
+
+
+def test_parent_based_sampler_local_sampled_parent():
+    sampler = ParentBasedSampler()
+    parent = SpanContext(
+        trace_id=123, span_id=456, is_remote=False, trace_flags=TraceFlags.SAMPLED
+    )
+    result = sampler.should_sample(123, "span", parent)
+    assert result.decision == Decision.RECORD_AND_SAMPLE
+
+
+def test_parent_based_sampler_local_not_sampled_parent():
+    sampler = ParentBasedSampler()
+    parent = SpanContext(
+        trace_id=123, span_id=456, is_remote=False, trace_flags=TraceFlags.DEFAULT
+    )
+    result = sampler.should_sample(123, "span", parent)
+    assert result.decision == Decision.DROP
+
+
+def test_parent_based_sampler_remote_sampled_parent():
+    sampler = ParentBasedSampler()
+    parent = SpanContext(
+        trace_id=123, span_id=456, is_remote=True, trace_flags=TraceFlags.SAMPLED
+    )
+    result = sampler.should_sample(123, "span", parent)
+    assert result.decision == Decision.RECORD_AND_SAMPLE
+
+
+def test_parent_based_sampler_remote_not_sampled_parent():
+    sampler = ParentBasedSampler()
+    parent = SpanContext(
+        trace_id=123, span_id=456, is_remote=True, trace_flags=TraceFlags.DEFAULT
+    )
+    result = sampler.should_sample(123, "span", parent)
+    assert result.decision == Decision.DROP
+
+
+def test_parent_based_sampler_custom_delegates():
+    # Custom: sample even if remote parent wasn't sampled
+    sampler = ParentBasedSampler(
+        remote_parent_not_sampled=AlwaysOnSampler()
+    )
+    parent = SpanContext(
+        trace_id=123, span_id=456, is_remote=True, trace_flags=TraceFlags.DEFAULT
+    )
+    result = sampler.should_sample(123, "span", parent)
+    assert result.decision == Decision.RECORD_AND_SAMPLE

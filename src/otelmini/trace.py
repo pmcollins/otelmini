@@ -84,7 +84,10 @@ class MiniTracer(Tracer):
             trace_id = _generate_trace_id()
             parent_span_id = None
 
-        result = self.sampler.should_sample(trace_id, name)
+        result = self.sampler.should_sample(
+            trace_id, name,
+            parent_span_context if parent_span_context.is_valid else None
+        )
         if result.decision == Decision.DROP:
             return INVALID_SPAN
 
