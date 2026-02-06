@@ -71,7 +71,9 @@ class MiniTracer(Tracer):
         record_exception: bool = True,  # noqa: FBT001, FBT002
         set_status_on_exception: bool = True,  # noqa: FBT001, FBT002
     ) -> ApiSpan:
-        parent_span_context = trace.get_current_span().get_span_context()
+        # Check explicit context first (e.g., from propagator.extract())
+        # then fall back to implicit current span context
+        parent_span_context = trace.get_current_span(context).get_span_context()
         if parent_span_context.is_valid:
             trace_id = parent_span_context.trace_id
             parent_span_id = parent_span_context.span_id
