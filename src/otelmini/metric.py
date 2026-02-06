@@ -470,7 +470,8 @@ class HistogramInstrument(ApiHistogram):
         return {key: agg.get_data() for key, agg in self._aggregations.items()}
 
 
-class ObservableGaugeInstrument(ApiObservableGauge):
+class _ObservableInstrument:
+    """Base class for observable instruments with callback-based value collection."""
 
     def __init__(
         self,
@@ -485,57 +486,26 @@ class ObservableGaugeInstrument(ApiObservableGauge):
         self.callbacks: List[CallbackT] = list(callbacks) if callbacks else []
 
     def get_value(self) -> float:
-        # Invoke callbacks, return latest observation value
+        """Invoke callbacks and return the first observation value."""
         for callback in self.callbacks:
             for obs in callback():
-                return obs.value  # Simplified: first observation
+                return obs.value
         return 0.0
 
 
-class ObservableCounterInstrument(ApiObservableCounter):
+class ObservableGaugeInstrument(_ObservableInstrument, ApiObservableGauge):
+    """Observable gauge - invokes callbacks to get current values."""
+    pass
+
+
+class ObservableCounterInstrument(_ObservableInstrument, ApiObservableCounter):
     """Observable counter - invokes callbacks to get cumulative values."""
-
-    def __init__(
-        self,
-        name: str,
-        callbacks: Optional[Sequence[CallbackT]] = None,
-        unit: str = "",
-        description: str = "",
-    ):
-        self.name = name
-        self.unit = unit
-        self.description = description
-        self.callbacks: List[CallbackT] = list(callbacks) if callbacks else []
-
-    def get_value(self) -> float:
-        # Invoke callbacks, return latest observation value
-        for callback in self.callbacks:
-            for obs in callback():
-                return obs.value  # Simplified: first observation
-        return 0.0
+    pass
 
 
-class ObservableUpDownCounterInstrument(ApiObservableUpDownCounter):
+class ObservableUpDownCounterInstrument(_ObservableInstrument, ApiObservableUpDownCounter):
     """Observable up-down counter - invokes callbacks to get current values."""
-
-    def __init__(
-        self,
-        name: str,
-        callbacks: Optional[Sequence[CallbackT]] = None,
-        unit: str = "",
-        description: str = "",
-    ):
-        self.name = name
-        self.unit = unit
-        self.description = description
-        self.callbacks: List[CallbackT] = list(callbacks) if callbacks else []
-
-    def get_value(self) -> float:
-        # Invoke callbacks, return latest observation value
-        for callback in self.callbacks:
-            for obs in callback():
-                return obs.value  # Simplified: first observation
-        return 0.0
+    pass
 
 
 class Meter(ApiMeter):
