@@ -1,12 +1,12 @@
 # otelmini
 
-A minimal OpenTelemetry Python SDK with no extra dependencies. Exports traces, metrics, and logs via JSON-OTLP over
-HTTP. Ideal for constrained environments like AWS Lambda or anywhere minimal production impact is valued.
+A minimal OpenTelemetry Python SDK with no extra dependencies. Exports traces, metrics, and logs via OTLP/HTTP (JSON
+encoding). Ideal for constrained environments like AWS Lambda or anywhere minimal production impact is valued.
 
 ## Features
 
 - Traces, metrics, and logs support
-- JSON-OTLP over HTTP (no protobuf, no gRPC)
+- OTLP/HTTP with JSON encoding
 - Single dependency: `opentelemetry-api`
 - Batch processing with configurable size and interval
 - Auto-instrumentation support
@@ -33,19 +33,19 @@ with tracer.start_as_current_span("my-operation"):
     pass
 ```
 
-Run it with otelmini's auto-instrumentation:
+Run it with otelmini's auto-instrumentation using the installed `otel` command:
 
 ```bash
 OTEL_SERVICE_NAME=my-service otel python my_app.py
 ```
 
-That's it -- traces are exported to `localhost:4318` via OTLP/HTTP.
+That's it -- traces are exported to `localhost:4318` via OTLP/HTTP (JSON).
 
 ## Why otelmini?
 
 otelmini was designed with minimalism as a goal, giving you insight into your applications via any of the
 [standard](https://github.com/open-telemetry/opentelemetry-python-contrib/tree/main/instrumentation)
-and [genai](https://github.com/open-telemetry/opentelemetry-python-contrib/tree/main/instrumentation-genai)
+or [genai](https://github.com/open-telemetry/opentelemetry-python-contrib/tree/main/instrumentation-genai)
 instrumentation libraries while staying out of the way. No dependencies other than opentelemetry-api, which you have to
 use anyway if you're using OTel at all.
 
@@ -61,10 +61,11 @@ This is useful when:
 
 Comparing `otelmini` to `opentelemetry-distro` + `opentelemetry-exporter-otlp-proto-http`:
 
-| Metric | otelmini | otel-python | Reduction |
-|--------|----------|-------------|-----------|
-| Third-party dependencies* | 0 | 9 | 100% fewer |
-| Lines of Python | 2K | 43K | 95% fewer |
+| Metric                    | otel-python | otelmini |
+|---------------------------|-------------|----------|
+| Third-party dependencies* | 9           | 0        |
+| Lines of Python           | 43K         | 2K       |
+| Fun                       | 🙂          | 😁       |
 
 \* Excluding opentelemetry packages and Python stdlib backports
 
