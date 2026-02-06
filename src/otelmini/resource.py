@@ -6,13 +6,35 @@ import os
 from otelmini.types import Resource
 
 
+def parse_resource_attributes(env_value: str) -> dict:
+    """Parse OTEL_RESOURCE_ATTRIBUTES format: key1=value1,key2=value2"""
+    if not env_value:
+        return {}
+    attributes = {}
+    for pair in env_value.split(","):
+        pair = pair.strip()
+        if "=" in pair:
+            key, value = pair.split("=", 1)
+            attributes[key.strip()] = value.strip()
+    return attributes
+
+
 def create_default_resource() -> Resource:
-    """Create a resource with default SDK attributes."""
+    """Create a resource with default SDK attributes and OTEL_RESOURCE_ATTRIBUTES."""
     import otelmini
     service_name = os.environ.get("OTEL_SERVICE_NAME", "unknown_service")
-    return Resource(attributes={
+
+    # Start with env var attributes (lower priority)
+    env_attrs = parse_resource_attributes(os.environ.get("OTEL_RESOURCE_ATTRIBUTES", ""))
+
+    # SDK attributes (higher priority, will override env)
+    sdk_attrs = {
         "telemetry.sdk.language": "python",
         "telemetry.sdk.name": "otelmini",
         "telemetry.sdk.version": getattr(otelmini, "__version__", "0.0.1"),
         "service.name": service_name,
-    })
+    }
+
+    # Merge: env first, then SDK overwrites
+    attributes = {**env_attrs, **sdk_attrs}
+    return Resource(attributes=attributes)
