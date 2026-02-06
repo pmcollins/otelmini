@@ -59,7 +59,7 @@ Comparing `otelmini` to `opentelemetry-distro` + `opentelemetry-exporter-otlp-pr
 |--------|----------|-------------|-----------|
 | Third-party dependencies* | 0 | 9 | 100% fewer |
 | Install size | 9.7 MB | 17 MB | 43% smaller |
-| Lines of Python | 8K | 43K | 81% fewer |
+| Lines of Python | 2K | 43K | 95% fewer |
 
 \* Excluding opentelemetry packages and Python stdlib backports
 
