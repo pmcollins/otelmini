@@ -9,7 +9,7 @@ encoding). Ideal for constrained environments like AWS Lambda or anywhere minima
 - OTLP/HTTP with JSON encoding
 - Single dependency: `opentelemetry-api`
 - Batch processing with configurable size and interval
-- Sampling (on, off, or ratio based)
+- Sampling (AlwaysOn, AlwaysOff, TraceIdRatioBased, ParentBased)
 - Trace-log correlation
 - Auto-instrumentation support
 - W3C TraceContext and Baggage propagation
