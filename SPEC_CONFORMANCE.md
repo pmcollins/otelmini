@@ -146,7 +146,7 @@ Spec reference: https://opentelemetry.io/docs/specs/otel/
 |-------------|--------|-------|
 | timestamp | ✅ | Implemented |
 | observed_timestamp | ✅ | Implemented |
-| trace_id/span_id | ⚠️ | Always None (no trace context correlation) |
+| trace_id/span_id | ✅ | Captures current span context |
 | severity_number/text | ✅ | Implemented |
 | body | ✅ | Implemented |
 | attributes | ✅ | Implemented |
@@ -209,7 +209,7 @@ Spec reference: https://opentelemetry.io/docs/specs/otel/
 |--------|-------------|-------|
 | **Traces** | ~80% | Core functionality works, missing ParentBasedSampler, links |
 | **Metrics** | ~70% | Missing async instruments, sync Gauge |
-| **Logs** | ~55% | Missing trace correlation, resource in export |
+| **Logs** | ~65% | Missing resource in export |
 | **Context/Propagation** | ✅ | W3C TraceContext and Baggage implemented |
 | **Baggage** | ✅ | API from opentelemetry-api, propagation implemented |
 | **Resource** | ~40% | Basic impl, missing merge, env var parsing |
@@ -218,5 +218,4 @@ Spec reference: https://opentelemetry.io/docs/specs/otel/
 
 ## High-Impact Gaps
 
-1. **No trace-log correlation** - Logs don't capture current span context
-2. **Resource not in log export** - Logs cannot be attributed to a service
+1. **Resource not in log export** - Logs cannot be attributed to a service

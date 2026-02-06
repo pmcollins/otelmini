@@ -10,6 +10,7 @@ encoding). Ideal for constrained environments like AWS Lambda or anywhere minima
 - Single dependency: `opentelemetry-api`
 - Batch processing with configurable size and interval
 - Sampling (on, off, or ratio based)
+- Trace-log correlation
 - Auto-instrumentation support
 - W3C TraceContext and Baggage propagation
 

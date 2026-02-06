@@ -2,15 +2,20 @@ import json
 import logging
 from io import StringIO
 
+from opentelemetry import trace
+from opentelemetry.trace import TraceFlags
+
 from otelmini.log import (
     ConsoleLogExporter,
     MiniLogRecord,
     Logger,
     LoggerProvider,
     SeverityNumber,
+    _pylog_to_minilog,
 )
 from otelmini.processor import BatchProcessor
 from otelmini.encode import encode_logs_request
+from otelmini.trace import MiniTracerProvider
 
 
 def test_basic_logging(capsys):
@@ -92,3 +97,68 @@ def test_encode_log_record():
     assert len(log_rec["attributes"]) == 1
     assert log_rec["attributes"][0]["key"] == "test.attribute"
     assert log_rec["attributes"][0]["value"]["stringValue"] == "value"
+
+
+class NoOpProcessor:
+    def on_start(self, span):
+        pass
+
+    def on_end(self, span):
+        pass
+
+    def shutdown(self):
+        pass
+
+
+def test_trace_log_correlation():
+    """Logs emitted within a span should capture trace context."""
+    # Set up tracer with a no-op processor
+    tp = MiniTracerProvider(span_processor=NoOpProcessor())
+    tracer = tp.get_tracer(__name__)
+
+    # Create a span and log within it
+    with tracer.start_as_current_span("test-span") as span:
+        span_context = span.get_span_context()
+        log_record = logging.LogRecord(
+            name="test",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="Test message",
+            args=(),
+            exc_info=None,
+        )
+        mini_log = _pylog_to_minilog(log_record)
+
+        # Verify trace context is captured
+        assert mini_log.trace_id == span_context.trace_id
+        assert mini_log.span_id == span_context.span_id
+        assert mini_log.trace_flags == span_context.trace_flags
+
+    tp.shutdown()
+
+
+def test_log_without_span_has_no_trace_context():
+    """Logs emitted outside a span should have no trace context (trace_id=0)."""
+    # Ensure we're outside any span by using a fresh context
+    from opentelemetry import context
+    from opentelemetry.context import Context
+
+    token = context.attach(Context())
+    try:
+        log_record = logging.LogRecord(
+            name="test",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="Test message",
+            args=(),
+            exc_info=None,
+        )
+        mini_log = _pylog_to_minilog(log_record)
+
+        # trace_id/span_id of 0 means "no associated trace" in OTLP
+        assert mini_log.trace_id == 0
+        assert mini_log.span_id == 0
+    finally:
+        context.detach(token)

@@ -7,7 +7,7 @@ from opentelemetry._logs import LogRecord as ApiLogRecord
 from opentelemetry._logs import Logger as ApiLogger
 from opentelemetry._logs import LoggerProvider as ApiLoggerProvider
 from opentelemetry._logs import SeverityNumber
-from opentelemetry.trace import TraceFlags
+from opentelemetry.trace import TraceFlags, get_current_span
 
 from opentelemetry.util.types import Attributes
 
@@ -88,12 +88,22 @@ class Logger(ApiLogger):
 
 
 def _pylog_to_minilog(pylog_record: logging.LogRecord) -> MiniLogRecord:
+    span_context = get_current_span().get_span_context()
+    if span_context.is_valid:
+        trace_id = span_context.trace_id
+        span_id = span_context.span_id
+        trace_flags = span_context.trace_flags
+    else:
+        trace_id = None
+        span_id = None
+        trace_flags = None
+
     return MiniLogRecord(
         timestamp=int(pylog_record.created * 1e9),  # Convert to nanoseconds
         observed_timestamp=int(pylog_record.created * 1e9),
-        trace_id=None,  # LogRecord does not have trace_id
-        span_id=None,  # LogRecord does not have span_id
-        trace_flags=None,  # LogRecord does not have trace_flags
+        trace_id=trace_id,
+        span_id=span_id,
+        trace_flags=trace_flags,
         severity_text=pylog_record.levelname,
         severity_number=_get_severity_number(pylog_record.levelno),
         body=pylog_record.getMessage(),
