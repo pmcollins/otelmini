@@ -26,7 +26,7 @@ from otelmini._lib import (
 from otelmini.encode import encode_metrics_request
 from otelmini.point import AggregationTemporality
 from otelmini.point import MetricsData, Metric, ResourceMetrics, ScopeMetrics, Sum, NumberDataPoint
-from otelmini.point import Histogram as HistogramData, HistogramDataPoint, Gauge
+from otelmini.point import HistogramData, HistogramDataPoint, Gauge
 from otelmini.env import Config
 from otelmini.resource import create_default_resource
 from otelmini.types import Resource, InstrumentationScope, _time_ns

@@ -177,7 +177,7 @@ class Gauge:
 
 
 @dataclass(frozen=True)
-class Histogram:
+class HistogramData:
     data_points: Sequence[HistogramDataPoint]
     aggregation_temporality: AggregationTemporality
 
@@ -217,7 +217,7 @@ class Histogram:
 
 
 # pylint: disable=invalid-name
-DataT = Union[Sum, Gauge, Histogram, ExponentialHistogram]
+DataT = Union[Sum, Gauge, HistogramData, ExponentialHistogram]
 DataPointT = Union[
     NumberDataPoint, HistogramDataPoint, ExponentialHistogramDataPoint
 ]
