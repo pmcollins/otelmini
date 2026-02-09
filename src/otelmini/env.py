@@ -61,7 +61,7 @@ class Env:
         except (ValueError, TypeError):
             return default
 
-    def get_bool(self, key: str, default: bool = False) -> bool:
+    def get_bool(self, key: str, *, default: bool = False) -> bool:
         val = self._store.get(key, "")
         if not val:
             return default

@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import json
 from collections import defaultdict
-from typing import Any, Mapping, Optional, Sequence, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Mapping, Sequence
+
+from opentelemetry.trace import SpanKind
 
 if TYPE_CHECKING:
     from otelmini.log import MiniLogRecord
     from otelmini.point import MetricsData
-    from otelmini.types import MiniSpan, Resource, InstrumentationScope
-
-from opentelemetry.trace import SpanKind
+    from otelmini.types import InstrumentationScope, MiniSpan, Resource
 
 # OTLP Span Kind values (proto enum)
 _SPAN_KIND_MAP = {
@@ -193,7 +193,7 @@ def _encode_log_record(log: MiniLogRecord) -> dict:
     }
 
 
-def _encode_metric(metric) -> Optional[dict]:
+def _encode_metric(metric) -> dict | None:
     """Encode a single metric to OTLP format.
 
     Uses polymorphism: each metric data type implements encode_otlp().
@@ -210,7 +210,7 @@ def _encode_metric(metric) -> Optional[dict]:
     return base
 
 
-def _encode_attributes(attributes: Optional[Mapping[str, Any]]) -> list[dict]:
+def _encode_attributes(attributes: Mapping[str, Any] | None) -> list[dict]:
     """Encode attributes to OTLP format."""
     if not attributes:
         return []
