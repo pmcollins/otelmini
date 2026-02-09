@@ -18,7 +18,6 @@ from otelmini.export import (
     ConsoleExporterBase,
     DEFAULT_EXPORTER_TIMEOUT,
     DEFAULT_LOG_ENDPOINT,
-    ExportResult,
     HttpExporterBase,
 )
 from otelmini.encode import encode_logs_request
@@ -67,7 +66,11 @@ class ConsoleLogExporter(ConsoleExporterBase[Sequence[MiniLogRecord]]):
 
 
 class HttpLogExporter(HttpExporterBase[Sequence[MiniLogRecord]]):
-    def __init__(self, endpoint: str = DEFAULT_LOG_ENDPOINT, timeout: int = DEFAULT_EXPORTER_TIMEOUT):
+    def __init__(
+        self,
+        endpoint: str = DEFAULT_LOG_ENDPOINT,
+        timeout: int = DEFAULT_EXPORTER_TIMEOUT,
+    ):
         super().__init__(endpoint, timeout, encode_logs_request)
 
 
@@ -87,11 +90,15 @@ class Logger(ApiLogger):
         self._logger_provider = logger_provider
 
     def emit(self, pylog_record: logging.LogRecord) -> None:
-        mini_log_record = _pylog_to_minilog(pylog_record, self._logger_provider.resource)
+        mini_log_record = _pylog_to_minilog(
+            pylog_record, self._logger_provider.resource
+        )
         self._logger_provider.log_processor.on_end(mini_log_record)
 
 
-def _pylog_to_minilog(pylog_record: logging.LogRecord, resource: Resource = None) -> MiniLogRecord:
+def _pylog_to_minilog(
+    pylog_record: logging.LogRecord, resource: Resource = None
+) -> MiniLogRecord:
     span_context = get_current_span().get_span_context()
     if span_context.is_valid:
         trace_id = span_context.trace_id
@@ -178,7 +185,9 @@ def _get_severity_number(levelno: int) -> SeverityNumber:
 
 
 class OtelBridgeLoggingHandler(logging.Handler):
-    def __init__(self, logger_provider: LoggerProvider, level: int = logging.NOTSET) -> None:
+    def __init__(
+        self, logger_provider: LoggerProvider, level: int = logging.NOTSET
+    ) -> None:
         super().__init__(level=level)
         self.logger_provider = logger_provider
 

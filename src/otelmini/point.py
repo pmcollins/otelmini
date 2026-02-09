@@ -14,7 +14,7 @@
 
 # pylint: disable=unused-import
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from json import dumps, loads
 from typing import Optional, Sequence, Union
 from enum import Enum
@@ -33,7 +33,6 @@ class AggregationTemporality(Enum):
 
 @dataclass(frozen=True)
 class NumberDataPoint:
-
     attributes: Attributes
     start_time_unix_nano: int
     time_unix_nano: int
@@ -45,7 +44,6 @@ class NumberDataPoint:
 
 @dataclass(frozen=True)
 class HistogramDataPoint:
-
     attributes: Attributes
     start_time_unix_nano: int
     time_unix_nano: int
@@ -68,7 +66,6 @@ class Buckets:
 
 @dataclass(frozen=True)
 class ExponentialHistogramDataPoint:
-
     attributes: Attributes
     start_time_unix_nano: int
     time_unix_nano: int
@@ -88,7 +85,6 @@ class ExponentialHistogramDataPoint:
 
 @dataclass(frozen=True)
 class ExponentialHistogram:
-
     data_points: Sequence[ExponentialHistogramDataPoint]
     aggregation_temporality: AggregationTemporality
 
@@ -113,7 +109,9 @@ def _encode_number_data_point(point: NumberDataPoint) -> dict:
         "timeUnixNano": str(point.time_unix_nano),
     }
     # Use asInt for integers, asDouble for floats
-    if isinstance(point.value, int) or (isinstance(point.value, float) and point.value.is_integer()):
+    if isinstance(point.value, int) or (
+        isinstance(point.value, float) and point.value.is_integer()
+    ):
         dp["asInt"] = str(int(point.value))
     else:
         dp["asDouble"] = point.value
@@ -122,7 +120,6 @@ def _encode_number_data_point(point: NumberDataPoint) -> dict:
 
 @dataclass(frozen=True)
 class Sum:
-
     data_points: Sequence[NumberDataPoint]
     aggregation_temporality: AggregationTemporality
     is_monotonic: bool
@@ -153,7 +150,6 @@ class Sum:
 
 @dataclass(frozen=True)
 class Gauge:
-
     data_points: Sequence[NumberDataPoint]
 
     def to_json(self, indent: Optional[int] = 4) -> str:
@@ -197,17 +193,19 @@ class HistogramData:
         """Encode to OTLP format for JSON export."""
         data_points = []
         for p in self.data_points:
-            data_points.append({
-                "attributes": _encode_attributes(p.attributes),
-                "startTimeUnixNano": str(p.start_time_unix_nano),
-                "timeUnixNano": str(p.time_unix_nano),
-                "count": str(p.count),
-                "sum": p.sum,
-                "bucketCounts": [str(c) for c in p.bucket_counts],
-                "explicitBounds": list(p.explicit_bounds),
-                "min": p.min,
-                "max": p.max,
-            })
+            data_points.append(
+                {
+                    "attributes": _encode_attributes(p.attributes),
+                    "startTimeUnixNano": str(p.start_time_unix_nano),
+                    "timeUnixNano": str(p.time_unix_nano),
+                    "count": str(p.count),
+                    "sum": p.sum,
+                    "bucketCounts": [str(c) for c in p.bucket_counts],
+                    "explicitBounds": list(p.explicit_bounds),
+                    "min": p.min,
+                    "max": p.max,
+                }
+            )
         return {
             "histogram": {
                 "dataPoints": data_points,
@@ -218,9 +216,7 @@ class HistogramData:
 
 # pylint: disable=invalid-name
 DataT = Union[Sum, Gauge, HistogramData, ExponentialHistogram]
-DataPointT = Union[
-    NumberDataPoint, HistogramDataPoint, ExponentialHistogramDataPoint
-]
+DataPointT = Union[NumberDataPoint, HistogramDataPoint, ExponentialHistogramDataPoint]
 
 
 @dataclass(frozen=True)
@@ -253,8 +249,7 @@ class ScopeMetrics:
             {
                 "scope": loads(self.scope.to_json(indent=indent)),
                 "metrics": [
-                    loads(metric.to_json(indent=indent))
-                    for metric in self.metrics
+                    loads(metric.to_json(indent=indent)) for metric in self.metrics
                 ],
                 "schema_url": self.schema_url,
             },

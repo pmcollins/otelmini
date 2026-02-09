@@ -92,9 +92,13 @@ class Config:
         self.bsp_schedule_delay_ms = env.get_int(OTEL_BSP_SCHEDULE_DELAY, 5000)
 
         # Exporter endpoints
-        self.exporter_endpoint = env.get(OTEL_EXPORTER_OTLP_ENDPOINT, DEFAULT_OTLP_ENDPOINT)
+        self.exporter_endpoint = env.get(
+            OTEL_EXPORTER_OTLP_ENDPOINT, DEFAULT_OTLP_ENDPOINT
+        )
         self.exporter_traces_endpoint = env.get(OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, "")
-        self.exporter_metrics_endpoint = env.get(OTEL_EXPORTER_OTLP_METRICS_ENDPOINT, "")
+        self.exporter_metrics_endpoint = env.get(
+            OTEL_EXPORTER_OTLP_METRICS_ENDPOINT, ""
+        )
         self.exporter_logs_endpoint = env.get(OTEL_EXPORTER_OTLP_LOGS_ENDPOINT, "")
 
         # Exporter selection

@@ -74,7 +74,9 @@ class ParentBasedSampler(Sampler):
     ):
         self._root = root or AlwaysOnSampler()
         self._remote_parent_sampled = remote_parent_sampled or AlwaysOnSampler()
-        self._remote_parent_not_sampled = remote_parent_not_sampled or AlwaysOffSampler()
+        self._remote_parent_not_sampled = (
+            remote_parent_not_sampled or AlwaysOffSampler()
+        )
         self._local_parent_sampled = local_parent_sampled or AlwaysOnSampler()
         self._local_parent_not_sampled = local_parent_not_sampled or AlwaysOffSampler()
 
@@ -92,11 +94,19 @@ class ParentBasedSampler(Sampler):
 
         if parent_context.is_remote:
             if parent_sampled:
-                return self._remote_parent_sampled.should_sample(trace_id, name, parent_context)
+                return self._remote_parent_sampled.should_sample(
+                    trace_id, name, parent_context
+                )
             else:
-                return self._remote_parent_not_sampled.should_sample(trace_id, name, parent_context)
+                return self._remote_parent_not_sampled.should_sample(
+                    trace_id, name, parent_context
+                )
         else:
             if parent_sampled:
-                return self._local_parent_sampled.should_sample(trace_id, name, parent_context)
+                return self._local_parent_sampled.should_sample(
+                    trace_id, name, parent_context
+                )
             else:
-                return self._local_parent_not_sampled.should_sample(trace_id, name, parent_context)
+                return self._local_parent_not_sampled.should_sample(
+                    trace_id, name, parent_context
+                )

@@ -46,8 +46,7 @@ def _load_exporter(signal: str, exporter_name: str) -> Optional[Type]:
 
     available = [ep.name for ep in eps]
     raise RuntimeError(
-        f"Exporter '{exporter_name}' not found for {signal}. "
-        f"Available: {available}"
+        f"Exporter '{exporter_name}' not found for {signal}. Available: {available}"
     )
 
 

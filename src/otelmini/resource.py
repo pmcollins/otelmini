@@ -1,4 +1,5 @@
 """Resource creation utilities."""
+
 from __future__ import annotations
 
 from otelmini.env import Config

@@ -13,7 +13,6 @@ from otelmini.export import (
     ConsoleExporterBase,
     DEFAULT_EXPORTER_TIMEOUT,
     DEFAULT_TRACE_ENDPOINT,
-    ExportResult,
     HttpExporterBase,
 )
 from otelmini.encode import encode_trace_request
@@ -59,7 +58,9 @@ class MiniTracerProvider(TracerProvider):
         schema_url: Optional[str] = None,
         attributes: Optional[types.Attributes] = None,
     ) -> Tracer:
-        scope = InstrumentationScope(instrumenting_module_name, instrumenting_library_version)
+        scope = InstrumentationScope(
+            instrumenting_module_name, instrumenting_library_version
+        )
         return MiniTracer(self.span_processor, self.resource, scope, self.sampler)
 
     def shutdown(self, timeout_millis: float = 30_000) -> None:
@@ -68,7 +69,13 @@ class MiniTracerProvider(TracerProvider):
 
 
 class MiniTracer(Tracer):
-    def __init__(self, span_processor: Processor[MiniSpan], resource: Resource, scope: InstrumentationScope, sampler: Sampler):
+    def __init__(
+        self,
+        span_processor: Processor[MiniSpan],
+        resource: Resource,
+        scope: InstrumentationScope,
+        sampler: Sampler,
+    ):
         self.span_processor = span_processor
         self.resource = resource
         self.scope = scope
@@ -96,16 +103,23 @@ class MiniTracer(Tracer):
             parent_span_id = None
 
         result = self.sampler.should_sample(
-            trace_id, name,
-            parent_span_context if parent_span_context.is_valid else None
+            trace_id,
+            name,
+            parent_span_context if parent_span_context.is_valid else None,
         )
         if result.decision == Decision.DROP:
             return INVALID_SPAN
 
         span_id = _generate_span_id()
-        span_context = SpanContext(trace_id, span_id, is_remote=False, trace_flags=TraceFlags.SAMPLED)
+        span_context = SpanContext(
+            trace_id, span_id, is_remote=False, trace_flags=TraceFlags.SAMPLED
+        )
         span = MiniSpan(
-            name, span_context, self.resource, self.scope, self.span_processor.on_end,
+            name,
+            span_context,
+            self.resource,
+            self.scope,
+            self.span_processor.on_end,
             parent_span_id=parent_span_id,
             links=list(links) if links else None,
             kind=kind,
@@ -127,7 +141,9 @@ class MiniTracer(Tracer):
         set_status_on_exception: bool = True,  # noqa: FBT001, FBT002
         end_on_exit: bool = True,  # noqa: FBT001, FBT002
     ) -> Iterator[ApiSpan]:
-        span = self.start_span(name, context, kind, attributes, links, start_time, end_on_exit)
+        span = self.start_span(
+            name, context, kind, attributes, links, start_time, end_on_exit
+        )
         with trace.use_span(span, end_on_exit=True) as active_span:
             yield active_span
 
@@ -138,5 +154,9 @@ class ConsoleSpanExporter(ConsoleExporterBase[Sequence[MiniSpan]]):
 
 
 class HttpSpanExporter(HttpExporterBase[Sequence[MiniSpan]]):
-    def __init__(self, endpoint: str = DEFAULT_TRACE_ENDPOINT, timeout: int = DEFAULT_EXPORTER_TIMEOUT):
+    def __init__(
+        self,
+        endpoint: str = DEFAULT_TRACE_ENDPOINT,
+        timeout: int = DEFAULT_EXPORTER_TIMEOUT,
+    ):
         super().__init__(endpoint, timeout, encode_trace_request)

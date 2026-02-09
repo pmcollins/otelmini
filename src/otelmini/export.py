@@ -3,7 +3,10 @@ from __future__ import annotations
 import time
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import TYPE_CHECKING, Callable, FrozenSet, Generic, Optional, Sequence, TypeVar
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Callable, Generic, TypeVar
+
+from otelmini.env import DEFAULT_OTLP_ENDPOINT
 
 if TYPE_CHECKING:
     from urllib.parse import ParseResult
@@ -56,7 +59,9 @@ class Retrier:
         self.base_seconds = base_seconds
         self.sleep = sleep
 
-    def retry(self, single_attempt_func: Callable[[], SingleAttemptResult]) -> RetrierResult:
+    def retry(
+        self, single_attempt_func: Callable[[], SingleAttemptResult]
+    ) -> RetrierResult:
         for attempt in range(self.max_retries + 1):
             resp = single_attempt_func()
             if resp == SingleAttemptResult.SUCCESS:
@@ -74,11 +79,11 @@ DEFAULT_MAX_RETRIES = 4
 DEFAULT_RETRY_BASE_SECONDS = 1.0
 
 # Retryable HTTP status codes per OTLP spec
-DEFAULT_RETRYABLE_STATUS_CODES = frozenset([429, 502, 503, 504])  # TOO_MANY_REQUESTS, BAD_GATEWAY, SERVICE_UNAVAILABLE, GATEWAY_TIMEOUT
+DEFAULT_RETRYABLE_STATUS_CODES = frozenset(
+    [429, 502, 503, 504]
+)  # TOO_MANY_REQUESTS, BAD_GATEWAY, SERVICE_UNAVAILABLE, GATEWAY_TIMEOUT
 
 # Default OTLP endpoints (base endpoint defined in env.py)
-from otelmini.env import DEFAULT_OTLP_ENDPOINT
-
 DEFAULT_TRACE_ENDPOINT = f"{DEFAULT_OTLP_ENDPOINT}/v1/traces"
 DEFAULT_LOG_ENDPOINT = f"{DEFAULT_OTLP_ENDPOINT}/v1/logs"
 DEFAULT_METRICS_ENDPOINT = f"{DEFAULT_OTLP_ENDPOINT}/v1/metrics"
@@ -94,7 +99,7 @@ class _HttpExporter:
             data: str,
             parsed_url: ParseResult,
             timeout: float,
-            retryable_status_codes: FrozenSet[int],
+            retryable_status_codes: frozenset[int],
         ) -> None:
             self.data = data
             self.parsed_url = parsed_url
@@ -103,9 +108,12 @@ class _HttpExporter:
 
         def export(self) -> SingleAttemptResult:
             from http.client import OK, HTTPConnection
+
             body = self.data.encode("utf-8")
             conn = HTTPConnection(self.parsed_url.netloc, timeout=self.timeout)
-            conn.request("POST", self.parsed_url.path, body, {"Content-Type": "application/json"})
+            conn.request(
+                "POST", self.parsed_url.path, body, {"Content-Type": "application/json"}
+            )
             response = conn.getresponse()
             response.read()
             conn.close()
@@ -119,21 +127,28 @@ class _HttpExporter:
         self,
         endpoint: str,
         timeout: float,
-        retrier: Optional[Retrier] = None,
-        retryable_status_codes: Optional[FrozenSet[int]] = None,
+        retrier: Retrier | None = None,
+        retryable_status_codes: frozenset[int] | None = None,
     ) -> None:
         from urllib.parse import urlparse
+
         self.parsed_url = urlparse(endpoint)
         self.timeout = timeout
         self.retrier = retrier or Retrier(DEFAULT_MAX_RETRIES)
-        self.retryable_status_codes = retryable_status_codes or DEFAULT_RETRYABLE_STATUS_CODES
+        self.retryable_status_codes = (
+            retryable_status_codes or DEFAULT_RETRYABLE_STATUS_CODES
+        )
 
     def export(self, data: str) -> ExportResult:
         attempt = _HttpExporter.SingleHttpAttempt(
             data, self.parsed_url, self.timeout, self.retryable_status_codes
         )
         retry_result = self.retrier.retry(attempt.export)
-        return ExportResult.SUCCESS if retry_result == RetrierResult.SUCCESS else ExportResult.FAILURE
+        return (
+            ExportResult.SUCCESS
+            if retry_result == RetrierResult.SUCCESS
+            else ExportResult.FAILURE
+        )
 
 
 class HttpExporterBase(Exporter[T]):

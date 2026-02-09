@@ -1,4 +1,5 @@
 """OTLP JSON encoding for traces, logs, and metrics."""
+
 from __future__ import annotations
 
 import json
@@ -7,7 +8,7 @@ from typing import Any, Mapping, Optional, Sequence, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from otelmini.log import MiniLogRecord
-    from otelmini.point import MetricsData, Sum
+    from otelmini.point import MetricsData
     from otelmini.types import MiniSpan, Resource, InstrumentationScope
 
 from opentelemetry.trace import SpanKind
@@ -49,15 +50,19 @@ def _encode_resource_spans(spans: Sequence[MiniSpan]) -> list[dict]:
     for (_, resource), scopes in grouped.items():
         scope_spans = []
         for (_, scope), scope_span_list in scopes.items():
-            scope_spans.append({
-                "scope": _encode_scope(scope),
-                "spans": [_encode_span(s) for s in scope_span_list],
-            })
-        resource_spans.append({
-            "resource": _encode_resource(resource),
-            "scopeSpans": scope_spans,
-            "schemaUrl": resource.get_schema_url() or "",
-        })
+            scope_spans.append(
+                {
+                    "scope": _encode_scope(scope),
+                    "spans": [_encode_span(s) for s in scope_span_list],
+                }
+            )
+        resource_spans.append(
+            {
+                "resource": _encode_resource(resource),
+                "scopeSpans": scope_spans,
+                "schemaUrl": resource.get_schema_url() or "",
+            }
+        )
     return resource_spans
 
 
@@ -70,14 +75,20 @@ def _encode_resource_logs(logs: Sequence[MiniLogRecord]) -> list[dict]:
 
     resource_logs = []
     for (_, resource), log_list in grouped.items():
-        encoded_resource = _encode_resource(resource) if resource else {"attributes": []}
-        resource_logs.append({
-            "resource": encoded_resource,
-            "scopeLogs": [{
-                "scope": {},
-                "logRecords": [_encode_log_record(log) for log in log_list],
-            }],
-        })
+        encoded_resource = (
+            _encode_resource(resource) if resource else {"attributes": []}
+        )
+        resource_logs.append(
+            {
+                "resource": encoded_resource,
+                "scopeLogs": [
+                    {
+                        "scope": {},
+                        "logRecords": [_encode_log_record(log) for log in log_list],
+                    }
+                ],
+            }
+        )
     return resource_logs
 
 
@@ -92,16 +103,20 @@ def _encode_resource_metrics(metrics_data: MetricsData) -> list[dict]:
                 encoded_metric = _encode_metric(metric)
                 if encoded_metric:
                     metrics.append(encoded_metric)
-            scope_metrics.append({
-                "scope": _encode_scope(sm.scope),
-                "metrics": metrics,
-                "schemaUrl": sm.schema_url or "",
-            })
-        resource_metrics.append({
-            "resource": _encode_resource(rm.resource),
-            "scopeMetrics": scope_metrics,
-            "schemaUrl": rm.schema_url or "",
-        })
+            scope_metrics.append(
+                {
+                    "scope": _encode_scope(sm.scope),
+                    "metrics": metrics,
+                    "schemaUrl": sm.schema_url or "",
+                }
+            )
+        resource_metrics.append(
+            {
+                "resource": _encode_resource(rm.resource),
+                "scopeMetrics": scope_metrics,
+                "schemaUrl": rm.schema_url or "",
+            }
+        )
     return resource_metrics
 
 
@@ -183,7 +198,7 @@ def _encode_metric(metric) -> Optional[dict]:
 
     Uses polymorphism: each metric data type implements encode_otlp().
     """
-    if not hasattr(metric.data, 'encode_otlp'):
+    if not hasattr(metric.data, "encode_otlp"):
         return None
 
     base = {
@@ -217,7 +232,13 @@ def _encode_value(value: Any) -> dict:
     if isinstance(value, (list, tuple)):
         return {"arrayValue": {"values": [_encode_value(v) for v in value]}}
     if isinstance(value, Mapping):
-        return {"kvlistValue": {"values": [{"key": str(k), "value": _encode_value(v)} for k, v in value.items()]}}
+        return {
+            "kvlistValue": {
+                "values": [
+                    {"key": str(k), "value": _encode_value(v)} for k, v in value.items()
+                ]
+            }
+        }
 
     # Fallback to string
     return {"stringValue": str(value)}

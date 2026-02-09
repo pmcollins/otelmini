@@ -20,12 +20,19 @@ from otelmini.export import (
     ConsoleExporterBase,
     DEFAULT_EXPORTER_TIMEOUT,
     DEFAULT_METRICS_ENDPOINT,
-    ExportResult,
+    Exporter,
     HttpExporterBase,
 )
 from otelmini.encode import encode_metrics_request
 from otelmini.point import AggregationTemporality
-from otelmini.point import MetricsData, Metric, ResourceMetrics, ScopeMetrics, Sum, NumberDataPoint
+from otelmini.point import (
+    MetricsData,
+    Metric,
+    ResourceMetrics,
+    ScopeMetrics,
+    Sum,
+    NumberDataPoint,
+)
 from otelmini.point import HistogramData, HistogramDataPoint, Gauge
 from otelmini.env import Config
 from otelmini.resource import create_default_resource
@@ -39,6 +46,7 @@ if TYPE_CHECKING:
 
 class InstrumentType(Enum):
     """Types of metric instruments."""
+
     COUNTER = "counter"
     UP_DOWN_COUNTER = "up_down_counter"
     HISTOGRAM = "histogram"
@@ -66,7 +74,11 @@ def _key_to_attributes(key: Tuple[Tuple[str, Any], ...]) -> dict[str, Any]:
 
 
 class HttpMetricExporter(HttpExporterBase[MetricsData]):
-    def __init__(self, endpoint: str = DEFAULT_METRICS_ENDPOINT, timeout: int = DEFAULT_EXPORTER_TIMEOUT):
+    def __init__(
+        self,
+        endpoint: str = DEFAULT_METRICS_ENDPOINT,
+        timeout: int = DEFAULT_EXPORTER_TIMEOUT,
+    ):
         super().__init__(endpoint, timeout, encode_metrics_request)
 
 
@@ -76,7 +88,6 @@ class ConsoleMetricExporter(ConsoleExporterBase[MetricsData]):
 
 
 class MetricReader(ABC):
-
     @abstractmethod
     def set_metric_producer(self, metric_producer: MetricProducer) -> None:
         pass
@@ -91,7 +102,6 @@ class MetricReader(ABC):
 
 
 class ManualExportingMetricReader(MetricReader):
-
     def __init__(self, exporter: Exporter[MetricsData]):
         self.metric_producer: Optional[MetricProducer] = None
         self.exporter = exporter
@@ -154,12 +164,20 @@ class MetricProducer:
     # Dispatch table: instrument type -> (producer method name, kwargs)
     _PRODUCERS = (
         (InstrumentType.COUNTER, "_produce_sum_metric", {"is_monotonic": True}),
-        (InstrumentType.UP_DOWN_COUNTER, "_produce_sum_metric", {"is_monotonic": False}),
+        (
+            InstrumentType.UP_DOWN_COUNTER,
+            "_produce_sum_metric",
+            {"is_monotonic": False},
+        ),
         (InstrumentType.HISTOGRAM, "_produce_histogram_metric", {}),
         (InstrumentType.GAUGE, "_produce_sync_gauge_metric", {}),
         (InstrumentType.OBSERVABLE_COUNTER, "_produce_observable_counter_metric", {}),
         (InstrumentType.OBSERVABLE_GAUGE, "_produce_observable_gauge_metric", {}),
-        (InstrumentType.OBSERVABLE_UP_DOWN_COUNTER, "_produce_observable_up_down_counter_metric", {}),
+        (
+            InstrumentType.OBSERVABLE_UP_DOWN_COUNTER,
+            "_produce_observable_up_down_counter_metric",
+            {},
+        ),
     )
 
     def __init__(self, config: Config, resource: Optional[Resource] = None):
@@ -168,7 +186,9 @@ class MetricProducer:
         self.meters: dict[str, dict[InstrumentType, list[Any]]] = {}
         self._start_time_unix_nano = _time_ns()
 
-    def _get_meter_instruments(self, meter_name: str) -> dict[InstrumentType, list[Any]]:
+    def _get_meter_instruments(
+        self, meter_name: str
+    ) -> dict[InstrumentType, list[Any]]:
         if meter_name not in self.meters:
             self.meters[meter_name] = {itype: [] for itype in InstrumentType}
         return self.meters[meter_name]
@@ -209,7 +229,7 @@ class MetricProducer:
                 _key_to_attributes(attr_key),
                 self._start_time_unix_nano,
                 time_unix_nano,
-                value
+                value,
             )
             for attr_key, value in instrument.get_values().items()
         ]
@@ -218,9 +238,11 @@ class MetricProducer:
         sum_data = Sum(
             data_points,
             is_monotonic=is_monotonic,
-            aggregation_temporality=AggregationTemporality.CUMULATIVE
+            aggregation_temporality=AggregationTemporality.CUMULATIVE,
         )
-        return Metric(instrument.name, instrument.description, instrument.unit, sum_data)
+        return Metric(
+            instrument.name, instrument.description, instrument.unit, sum_data
+        )
 
     def _produce_histogram_metric(
         self, instrument: Histogram, time_unix_nano: int
@@ -231,22 +253,23 @@ class MetricProducer:
                 attributes=_key_to_attributes(attr_key),
                 start_time_unix_nano=self._start_time_unix_nano,
                 time_unix_nano=time_unix_nano,
-                count=h_data['count'],
-                sum=h_data['sum'],
-                bucket_counts=h_data['bucket_counts'],
-                explicit_bounds=h_data['explicit_bounds'],
-                min=h_data['min'],
-                max=h_data['max'],
+                count=h_data["count"],
+                sum=h_data["sum"],
+                bucket_counts=h_data["bucket_counts"],
+                explicit_bounds=h_data["explicit_bounds"],
+                min=h_data["min"],
+                max=h_data["max"],
             )
             for attr_key, h_data in instrument.get_all_histogram_data().items()
         ]
         if not data_points:
             return None
         histogram_data = HistogramData(
-            data_points,
-            aggregation_temporality=AggregationTemporality.CUMULATIVE
+            data_points, aggregation_temporality=AggregationTemporality.CUMULATIVE
         )
-        return Metric(instrument.name, instrument.description, instrument.unit, histogram_data)
+        return Metric(
+            instrument.name, instrument.description, instrument.unit, histogram_data
+        )
 
     def _produce_sync_gauge_metric(
         self, instrument: GaugeInstrument, time_unix_nano: int
@@ -257,14 +280,16 @@ class MetricProducer:
                 _key_to_attributes(attr_key),
                 self._start_time_unix_nano,
                 time_unix_nano,
-                value
+                value,
             )
             for attr_key, value in instrument.get_values().items()
         ]
         if not data_points:
             return None
         gauge_data = Gauge(data_points)
-        return Metric(instrument.name, instrument.description, instrument.unit, gauge_data)
+        return Metric(
+            instrument.name, instrument.description, instrument.unit, gauge_data
+        )
 
     def _produce_observable_counter_metric(
         self, instrument: ObservableCounter, time_unix_nano: int
@@ -276,9 +301,11 @@ class MetricProducer:
         sum_data = Sum(
             [data_point],
             is_monotonic=True,
-            aggregation_temporality=AggregationTemporality.CUMULATIVE
+            aggregation_temporality=AggregationTemporality.CUMULATIVE,
         )
-        return Metric(instrument.name, instrument.description, instrument.unit, sum_data)
+        return Metric(
+            instrument.name, instrument.description, instrument.unit, sum_data
+        )
 
     def _produce_observable_up_down_counter_metric(
         self, instrument: ObservableUpDownCounter, time_unix_nano: int
@@ -290,9 +317,11 @@ class MetricProducer:
         sum_data = Sum(
             [data_point],
             is_monotonic=False,  # UpDownCounter is not monotonic
-            aggregation_temporality=AggregationTemporality.CUMULATIVE
+            aggregation_temporality=AggregationTemporality.CUMULATIVE,
         )
-        return Metric(instrument.name, instrument.description, instrument.unit, sum_data)
+        return Metric(
+            instrument.name, instrument.description, instrument.unit, sum_data
+        )
 
     def _produce_observable_gauge_metric(
         self, instrument: ObservableGauge, time_unix_nano: int
@@ -302,11 +331,12 @@ class MetricProducer:
             {}, self._start_time_unix_nano, time_unix_nano, instrument.get_value()
         )
         gauge_data = Gauge([data_point])
-        return Metric(instrument.name, instrument.description, instrument.unit, gauge_data)
+        return Metric(
+            instrument.name, instrument.description, instrument.unit, gauge_data
+        )
 
 
 class MeterProvider(ApiMeterProvider):
-
     def __init__(
         self,
         metric_readers: Sequence[MetricReader] = (),
@@ -315,7 +345,9 @@ class MeterProvider(ApiMeterProvider):
         config: Optional[Config] = None,
     ):
         self.config = config or Config()
-        self.metric_producer = metric_producer or MetricProducer(self.config, resource=resource)
+        self.metric_producer = metric_producer or MetricProducer(
+            self.config, resource=resource
+        )
         self.metric_readers = metric_readers
         for reader in self.metric_readers:
             reader.set_metric_producer(self.metric_producer)
@@ -329,9 +361,13 @@ class MeterProvider(ApiMeterProvider):
     ) -> ApiMeter:
         return Meter(self, name, version, schema_url)
 
-    def _register_instrument(self, instrument: Any, instrument_type: InstrumentType, meter_name: str) -> None:
+    def _register_instrument(
+        self, instrument: Any, instrument_type: InstrumentType, meter_name: str
+    ) -> None:
         """Register an instrument with the metric producer."""
-        self.metric_producer._get_meter_instruments(meter_name)[instrument_type].append(instrument)
+        self.metric_producer._get_meter_instruments(meter_name)[instrument_type].append(
+            instrument
+        )
 
     def produce_metrics(self) -> MetricsData:
         return self.metric_producer.produce()
@@ -344,7 +380,14 @@ class MeterProvider(ApiMeterProvider):
 class _SumInstrument:
     """Base class for Counter and UpDownCounter instruments."""
 
-    def __init__(self, name: str, unit: str = "", description: str = "", *, monotonic: bool = False):
+    def __init__(
+        self,
+        name: str,
+        unit: str = "",
+        description: str = "",
+        *,
+        monotonic: bool = False,
+    ):
         self.name = name
         self.unit = unit
         self.description = description
@@ -368,13 +411,11 @@ class _SumInstrument:
 
 
 class Counter(_SumInstrument, ApiCounter):
-
     def __init__(self, name: str, unit: str = "", description: str = ""):
         super().__init__(name, unit, description, monotonic=True)
 
 
 class UpDownCounter(_SumInstrument, ApiUpDownCounter):
-
     def __init__(self, name: str, unit: str = "", description: str = ""):
         super().__init__(name, unit, description, monotonic=False)
 
@@ -410,8 +451,8 @@ class _HistogramAggregation:
         self.bucket_counts: list[int] = [0] * (len(boundaries) + 1)
         self._sum: float = 0.0
         self._count: int = 0
-        self._min: float = float('inf')
-        self._max: float = float('-inf')
+        self._min: float = float("inf")
+        self._max: float = float("-inf")
 
     def record(self, amount: float) -> None:
         self._sum += amount
@@ -426,17 +467,33 @@ class _HistogramAggregation:
 
     def get_data(self) -> dict[str, Any]:
         return {
-            'count': self._count,
-            'sum': self._sum,
-            'min': self._min if self._count > 0 else 0.0,
-            'max': self._max if self._count > 0 else 0.0,
-            'bucket_counts': self.bucket_counts,
-            'explicit_bounds': self.boundaries,
+            "count": self._count,
+            "sum": self._sum,
+            "min": self._min if self._count > 0 else 0.0,
+            "max": self._max if self._count > 0 else 0.0,
+            "bucket_counts": self.bucket_counts,
+            "explicit_bounds": self.boundaries,
         }
 
 
 class Histogram(ApiHistogram):
-    DEFAULT_BOUNDARIES: list[float] = [0, 5, 10, 25, 50, 75, 100, 250, 500, 750, 1000, 2500, 5000, 7500, 10000]
+    DEFAULT_BOUNDARIES: list[float] = [
+        0,
+        5,
+        10,
+        25,
+        50,
+        75,
+        100,
+        250,
+        500,
+        750,
+        1000,
+        2500,
+        5000,
+        7500,
+        10000,
+    ]
 
     def __init__(
         self,
@@ -448,8 +505,14 @@ class Histogram(ApiHistogram):
         self.name = name
         self.unit = unit
         self.description = description
-        self.boundaries: list[float] = list(explicit_bucket_boundaries) if explicit_bucket_boundaries else self.DEFAULT_BOUNDARIES
-        self._aggregations: dict[Tuple[Tuple[str, Any], ...], _HistogramAggregation] = {}
+        self.boundaries: list[float] = (
+            list(explicit_bucket_boundaries)
+            if explicit_bucket_boundaries
+            else self.DEFAULT_BOUNDARIES
+        )
+        self._aggregations: dict[
+            Tuple[Tuple[str, Any], ...], _HistogramAggregation
+        ] = {}
 
     def record(
         self,
@@ -462,7 +525,9 @@ class Histogram(ApiHistogram):
             self._aggregations[key] = _HistogramAggregation(self.boundaries)
         self._aggregations[key].record(amount)
 
-    def get_all_histogram_data(self) -> dict[Tuple[Tuple[str, Any], ...], dict[str, Any]]:
+    def get_all_histogram_data(
+        self,
+    ) -> dict[Tuple[Tuple[str, Any], ...], dict[str, Any]]:
         """Return histogram data for all attribute combinations."""
         return {key: agg.get_data() for key, agg in self._aggregations.items()}
 
@@ -492,21 +557,23 @@ class _ObservableInstrument:
 
 class ObservableGauge(_ObservableInstrument, ApiObservableGauge):
     """Observable gauge - invokes callbacks to get current values."""
+
     pass
 
 
 class ObservableCounter(_ObservableInstrument, ApiObservableCounter):
     """Observable counter - invokes callbacks to get cumulative values."""
+
     pass
 
 
 class ObservableUpDownCounter(_ObservableInstrument, ApiObservableUpDownCounter):
     """Observable up-down counter - invokes callbacks to get current values."""
+
     pass
 
 
 class Meter(ApiMeter):
-
     def __init__(
         self,
         meter_provider: MeterProvider,
@@ -518,18 +585,30 @@ class Meter(ApiMeter):
         self.meter_provider = meter_provider
         self._name = name
 
-    def create_counter(self, name: str, unit: str = "", description: str = "") -> ApiCounter:
+    def create_counter(
+        self, name: str, unit: str = "", description: str = ""
+    ) -> ApiCounter:
         counter = Counter(name=name, unit=unit, description=description)
-        self.meter_provider._register_instrument(counter, InstrumentType.COUNTER, self._name)
+        self.meter_provider._register_instrument(
+            counter, InstrumentType.COUNTER, self._name
+        )
         return counter
 
-    def create_up_down_counter(self, name: str, unit: str = "", description: str = "") -> ApiUpDownCounter:
+    def create_up_down_counter(
+        self, name: str, unit: str = "", description: str = ""
+    ) -> ApiUpDownCounter:
         up_down_counter = UpDownCounter(name=name, unit=unit, description=description)
-        self.meter_provider._register_instrument(up_down_counter, InstrumentType.UP_DOWN_COUNTER, self._name)
+        self.meter_provider._register_instrument(
+            up_down_counter, InstrumentType.UP_DOWN_COUNTER, self._name
+        )
         return up_down_counter
 
     def create_observable_counter(
-        self, name: str, callbacks: Optional[Sequence[CallbackT]] = None, unit: str = "", description: str = ""
+        self,
+        name: str,
+        callbacks: Optional[Sequence[CallbackT]] = None,
+        unit: str = "",
+        description: str = "",
     ) -> ApiObservableCounter:
         counter = ObservableCounter(
             name=name,
@@ -537,7 +616,9 @@ class Meter(ApiMeter):
             unit=unit,
             description=description,
         )
-        self.meter_provider._register_instrument(counter, InstrumentType.OBSERVABLE_COUNTER, self._name)
+        self.meter_provider._register_instrument(
+            counter, InstrumentType.OBSERVABLE_COUNTER, self._name
+        )
         return counter
 
     def create_histogram(
@@ -554,16 +635,26 @@ class Meter(ApiMeter):
             description=description,
             explicit_bucket_boundaries=explicit_bucket_boundaries_advisory,
         )
-        self.meter_provider._register_instrument(histogram, InstrumentType.HISTOGRAM, self._name)
+        self.meter_provider._register_instrument(
+            histogram, InstrumentType.HISTOGRAM, self._name
+        )
         return histogram
 
-    def create_gauge(self, name: str, unit: str = "", description: str = "") -> ApiGauge:
+    def create_gauge(
+        self, name: str, unit: str = "", description: str = ""
+    ) -> ApiGauge:
         gauge = GaugeInstrument(name=name, unit=unit, description=description)
-        self.meter_provider._register_instrument(gauge, InstrumentType.GAUGE, self._name)
+        self.meter_provider._register_instrument(
+            gauge, InstrumentType.GAUGE, self._name
+        )
         return gauge
 
     def create_observable_gauge(
-        self, name: str, callbacks: Optional[Sequence[CallbackT]] = None, unit: str = "", description: str = ""
+        self,
+        name: str,
+        callbacks: Optional[Sequence[CallbackT]] = None,
+        unit: str = "",
+        description: str = "",
     ) -> ApiObservableGauge:
         gauge = ObservableGauge(
             name=name,
@@ -571,11 +662,17 @@ class Meter(ApiMeter):
             unit=unit,
             description=description,
         )
-        self.meter_provider._register_instrument(gauge, InstrumentType.OBSERVABLE_GAUGE, self._name)
+        self.meter_provider._register_instrument(
+            gauge, InstrumentType.OBSERVABLE_GAUGE, self._name
+        )
         return gauge
 
     def create_observable_up_down_counter(
-        self, name: str, callbacks: Optional[Sequence[CallbackT]] = None, unit: str = "", description: str = ""
+        self,
+        name: str,
+        callbacks: Optional[Sequence[CallbackT]] = None,
+        unit: str = "",
+        description: str = "",
     ) -> ApiObservableUpDownCounter:
         counter = ObservableUpDownCounter(
             name=name,
@@ -583,5 +680,7 @@ class Meter(ApiMeter):
             unit=unit,
             description=description,
         )
-        self.meter_provider._register_instrument(counter, InstrumentType.OBSERVABLE_UP_DOWN_COUNTER, self._name)
+        self.meter_provider._register_instrument(
+            counter, InstrumentType.OBSERVABLE_UP_DOWN_COUNTER, self._name
+        )
         return counter

@@ -158,7 +158,10 @@ class MiniSpan(ApiSpan):
         self._attributes[key] = value
 
     def add_event(
-        self, name: str, attributes: Optional[Attributes] = None, timestamp: Optional[int] = None
+        self,
+        name: str,
+        attributes: Optional[Attributes] = None,
+        timestamp: Optional[int] = None,
     ) -> None:
         if timestamp is None:
             timestamp = _time_ns()
@@ -205,7 +208,9 @@ class MiniSpan(ApiSpan):
         return f"MiniSpan(name='{self._name}', span_context={self._span_context})"
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any], on_end_callback: Callable[["MiniSpan"], None]) -> "MiniSpan":
+    def from_dict(
+        cls, data: dict[str, Any], on_end_callback: Callable[["MiniSpan"], None]
+    ) -> "MiniSpan":
         span_context_dict = data["span_context"]
         span_context = SpanContext(
             trace_id=span_context_dict["trace_id"],
