@@ -1,9 +1,10 @@
-from dataclasses import dataclass
-import time
-from typing import Any, Callable, Optional
 import json
+import time
+from dataclasses import dataclass
+from typing import Any, Callable, Optional
 
-from opentelemetry.trace import Span as ApiSpan, SpanKind
+from opentelemetry.trace import Span as ApiSpan
+from opentelemetry.trace import SpanKind
 from opentelemetry.trace.span import SpanContext
 from opentelemetry.util.types import Attributes
 

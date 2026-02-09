@@ -15,14 +15,13 @@
 # pylint: disable=unused-import
 
 from dataclasses import asdict, dataclass
+from enum import Enum
 from json import dumps, loads
 from typing import Optional, Sequence, Union
-from enum import Enum
-
-from otelmini.encode import _encode_attributes
 
 from opentelemetry.util.types import Attributes
 
+from otelmini.encode import _encode_attributes
 from otelmini.types import InstrumentationScope, Resource
 
 

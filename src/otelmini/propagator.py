@@ -26,7 +26,6 @@ from opentelemetry.propagators.textmap import (
 )
 from opentelemetry.trace import NonRecordingSpan, SpanContext, TraceFlags
 
-
 TRACEPARENT_HEADER = "traceparent"
 TRACESTATE_HEADER = "tracestate"
 BAGGAGE_HEADER = "baggage"

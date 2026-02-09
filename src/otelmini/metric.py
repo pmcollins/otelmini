@@ -7,7 +7,6 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, Optional, Sequence, Tuple
 
 from opentelemetry.metrics import Counter as ApiCounter
-from opentelemetry.metrics import _Gauge as ApiGauge
 from opentelemetry.metrics import Histogram as ApiHistogram
 from opentelemetry.metrics import Meter as ApiMeter
 from opentelemetry.metrics import MeterProvider as ApiMeterProvider
@@ -15,28 +14,31 @@ from opentelemetry.metrics import ObservableCounter as ApiObservableCounter
 from opentelemetry.metrics import ObservableGauge as ApiObservableGauge
 from opentelemetry.metrics import ObservableUpDownCounter as ApiObservableUpDownCounter
 from opentelemetry.metrics import UpDownCounter as ApiUpDownCounter
+from opentelemetry.metrics import _Gauge as ApiGauge
 
+from otelmini.encode import encode_metrics_request
+from otelmini.env import Config
 from otelmini.export import (
-    ConsoleExporterBase,
     DEFAULT_EXPORTER_TIMEOUT,
     DEFAULT_METRICS_ENDPOINT,
+    ConsoleExporterBase,
     Exporter,
     HttpExporterBase,
 )
-from otelmini.encode import encode_metrics_request
-from otelmini.point import AggregationTemporality
 from otelmini.point import (
-    MetricsData,
+    AggregationTemporality,
+    Gauge,
+    HistogramData,
+    HistogramDataPoint,
     Metric,
+    MetricsData,
+    NumberDataPoint,
     ResourceMetrics,
     ScopeMetrics,
     Sum,
-    NumberDataPoint,
 )
-from otelmini.point import HistogramData, HistogramDataPoint, Gauge
-from otelmini.env import Config
 from otelmini.resource import create_default_resource
-from otelmini.types import Resource, InstrumentationScope, _time_ns
+from otelmini.types import InstrumentationScope, Resource, _time_ns
 
 if TYPE_CHECKING:
     from opentelemetry.context import Context

@@ -4,19 +4,19 @@ import random
 from typing import TYPE_CHECKING, Iterator, Optional, Sequence
 
 from opentelemetry import trace
-from opentelemetry.trace import INVALID_SPAN, Span as ApiSpan
-from opentelemetry.trace import SpanKind, Tracer, TracerProvider, _Links
+from opentelemetry.trace import INVALID_SPAN, SpanKind, Tracer, TracerProvider, _Links
+from opentelemetry.trace import Span as ApiSpan
 from opentelemetry.trace.span import SpanContext, TraceFlags
 from opentelemetry.util._decorator import _agnosticcontextmanager
 
-from otelmini.export import (
-    ConsoleExporterBase,
-    DEFAULT_EXPORTER_TIMEOUT,
-    DEFAULT_TRACE_ENDPOINT,
-    HttpExporterBase,
-)
 from otelmini.encode import encode_trace_request
 from otelmini.env import Config
+from otelmini.export import (
+    DEFAULT_EXPORTER_TIMEOUT,
+    DEFAULT_TRACE_ENDPOINT,
+    ConsoleExporterBase,
+    HttpExporterBase,
+)
 from otelmini.resource import create_default_resource
 from otelmini.sampler import AlwaysOnSampler, Decision, Sampler
 from otelmini.types import InstrumentationScope, MiniSpan, Resource

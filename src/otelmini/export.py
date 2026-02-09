@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import time
 from abc import ABC, abstractmethod
-from enum import Enum
 from collections.abc import Sequence
+from enum import Enum
 from typing import TYPE_CHECKING, Callable, Generic, TypeVar
 
 from otelmini.env import DEFAULT_OTLP_ENDPOINT

@@ -3,25 +3,24 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any, Optional, Sequence
 
-from opentelemetry._logs import LogRecord as ApiLogRecord
 from opentelemetry._logs import Logger as ApiLogger
 from opentelemetry._logs import LoggerProvider as ApiLoggerProvider
+from opentelemetry._logs import LogRecord as ApiLogRecord
 from opentelemetry._logs import SeverityNumber
 from opentelemetry.trace import TraceFlags, get_current_span
-
 from opentelemetry.util.types import Attributes
 
 if TYPE_CHECKING:
     from otelmini.processor import Processor
 
-from otelmini.export import (
-    ConsoleExporterBase,
-    DEFAULT_EXPORTER_TIMEOUT,
-    DEFAULT_LOG_ENDPOINT,
-    HttpExporterBase,
-)
 from otelmini.encode import encode_logs_request
 from otelmini.env import Config
+from otelmini.export import (
+    DEFAULT_EXPORTER_TIMEOUT,
+    DEFAULT_LOG_ENDPOINT,
+    ConsoleExporterBase,
+    HttpExporterBase,
+)
 from otelmini.resource import create_default_resource
 from otelmini.types import Resource
 
