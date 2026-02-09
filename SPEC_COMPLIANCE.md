@@ -1,6 +1,6 @@
-# OpenTelemetry Spec Conformance Report
+# OpenTelemetry Spec Compliance Report
 
-Based on the OpenTelemetry specification v1.53.0, this document outlines how otelmini conforms to the spec.
+Based on the OpenTelemetry specification v1.53.0, this document outlines how otelmini complies with the spec.
 
 Spec reference: https://opentelemetry.io/docs/specs/otel/
 
@@ -217,7 +217,7 @@ Spec reference: https://opentelemetry.io/docs/specs/otel/
 
 ## Summary
 
-| Signal | Conformance | Notes |
+| Signal | Compliance | Notes |
 |--------|-------------|-------|
 | **Traces** | ~90% | Core functionality works, missing AddLink after creation |
 | **Metrics** | ~90% | All instruments implemented, missing ExponentialHistogram |
