@@ -157,9 +157,9 @@ Then users can select it via environment variable:
 OTEL_TRACES_EXPORTER=my_exporter otel python app.py
 ```
 
-## Spec Conformance
+## Spec Compliance
 
-See [SPEC_CONFORMANCE.md](SPEC_CONFORMANCE.md) for details on OpenTelemetry specification compliance.
+See [SPEC_COMPLIANCE.md](SPEC_COMPLIANCE.md) for details on OpenTelemetry specification compliance.
 
 ## License
 
