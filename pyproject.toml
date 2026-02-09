@@ -105,16 +105,21 @@ otlp = "otelmini.log:HttpLogExporter"
 otlp_json_http = "otelmini.log:HttpLogExporter"
 console = "otelmini.log:ConsoleLogExporter"
 
+[tool.hatch.envs.hatch-static-analysis]
+config-path = "none"
+
 [tool.ruff]
 exclude = ["examples/", "tests/"]
 lint.ignore = [
   "UP007",    # Use X | Y for type union
+  "UP045",    # Use X | None for type annotations (conflicts with python 3.8/3.9 support)
   "FA100",    # Missing from __future__ import annotations
   "EM101",    # Exception string literal
   "EM102",    # Exception f-string literal
   "W293",     # Blank line contains whitespace
   "ARG002",   # Unused method argument
   "PLW0603",  # Global statement (used for singleton pattern)
+  "PLW2901",  # Loop variable overwritten
   "TRY003",   # Long exception messages
   "BLE001",   # Catching blind Exception (intentional for instrumentation)
 ]
