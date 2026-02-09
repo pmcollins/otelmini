@@ -7,6 +7,8 @@ from opentelemetry._logs import Logger as ApiLogger
 from opentelemetry._logs import LoggerProvider as ApiLoggerProvider
 from opentelemetry._logs import LogRecord as ApiLogRecord
 from opentelemetry._logs import SeverityNumber
+from opentelemetry._logs._internal import AnyValue
+from opentelemetry.context import Context
 from opentelemetry.trace import TraceFlags, get_current_span
 from opentelemetry.util.types import Attributes
 
@@ -88,10 +90,51 @@ class Logger(ApiLogger):
         self._attributes = attributes
         self._logger_provider = logger_provider
 
-    def emit(self, pylog_record: logging.LogRecord) -> None:
-        mini_log_record = _pylog_to_minilog(
-            pylog_record, self._logger_provider.resource
-        )
+    def emit(
+        self,
+        record: Optional[ApiLogRecord] = None,
+        *,
+        timestamp: Optional[int] = None,
+        observed_timestamp: Optional[int] = None,
+        context: Optional[Context] = None,
+        severity_number: Optional[SeverityNumber] = None,
+        severity_text: Optional[str] = None,
+        body: Optional[AnyValue] = None,
+        attributes: Optional[Attributes] = None,
+        event_name: Optional[str] = None,
+    ) -> None:
+        if record is not None:
+            if isinstance(record, MiniLogRecord):
+                mini_log_record = record
+            else:
+                # Wrap ApiLogRecord in MiniLogRecord to attach resource
+                mini_log_record = MiniLogRecord(
+                    timestamp=record.timestamp,
+                    observed_timestamp=record.observed_timestamp,
+                    trace_id=record.trace_id,
+                    span_id=record.span_id,
+                    trace_flags=record.trace_flags,
+                    severity_text=record.severity_text,
+                    severity_number=record.severity_number,
+                    body=record.body,
+                    attributes=record.attributes,
+                    resource=self._logger_provider.resource,
+                )
+        else:
+            # Build from keyword arguments
+            span_context = get_current_span().get_span_context()
+            mini_log_record = MiniLogRecord(
+                timestamp=timestamp,
+                observed_timestamp=observed_timestamp,
+                trace_id=span_context.trace_id if span_context.is_valid else None,
+                span_id=span_context.span_id if span_context.is_valid else None,
+                trace_flags=span_context.trace_flags if span_context.is_valid else None,
+                severity_text=severity_text,
+                severity_number=severity_number,
+                body=body,
+                attributes=attributes,
+                resource=self._logger_provider.resource,
+            )
         self._logger_provider.log_processor.on_end(mini_log_record)
 
 
@@ -193,7 +236,8 @@ class OtelBridgeLoggingHandler(logging.Handler):
     def emit(self, record: logging.LogRecord) -> None:
         try:
             logger = self.logger_provider.get_logger(record.name)
-            logger.emit(record)
+            mini_log_record = _pylog_to_minilog(record, self.logger_provider.resource)
+            logger.emit(mini_log_record)
         except (AttributeError, TypeError):
             logging.exception("error emitting log record")
             self.handleError(record)

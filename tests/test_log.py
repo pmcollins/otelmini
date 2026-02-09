@@ -49,8 +49,9 @@ def test_basic_logging(capsys):
         exc_info=None,
     )
 
-    # Emit the log record
-    logger.emit(log_record)
+    # Emit the log record (convert to MiniLogRecord first)
+    mini_log_record = _pylog_to_minilog(log_record, logger_provider.resource)
+    logger.emit(mini_log_record)
     batch_processor.force_flush()
 
     # Capture the output
@@ -223,7 +224,8 @@ def test_logger_provider_passes_resource_to_logs():
         args=(),
         exc_info=None,
     )
-    logger.emit(log_record)
+    mini_log_record = _pylog_to_minilog(log_record, resource)
+    logger.emit(mini_log_record)
 
     assert len(exporter.logs) == 1
     assert exporter.logs[0].get_resource() is resource
