@@ -1,0 +1,40 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Compare otelmini vs opentelemetry-sdk cold start and performance
+
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 128
+    Runtime: python3.11
+    Architectures:
+      - x86_64
+
+Resources:
+  OtelMiniFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: otelmini/
+      Handler: app.handler
+      Description: Lambda using otelmini for tracing
+      Environment:
+        Variables:
+          OTEL_SERVICE_NAME: otelmini-lambda-test
+
+  OtelPythonFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: otelpython/
+      Handler: app.handler
+      Description: Lambda using opentelemetry-sdk for tracing
+      Environment:
+        Variables:
+          OTEL_SERVICE_NAME: otelpython-lambda-test
+
+Outputs:
+  OtelMiniFunction:
+    Description: otelmini Lambda Function ARN
+    Value: !GetAtt OtelMiniFunction.Arn
+  OtelPythonFunction:
+    Description: opentelemetry-sdk Lambda Function ARN
+    Value: !GetAtt OtelPythonFunction.Arn

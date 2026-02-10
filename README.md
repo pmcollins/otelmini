@@ -83,6 +83,18 @@ Comparing `otelmini` to `opentelemetry-distro` + `opentelemetry-exporter-otlp-pr
 
 Note: Upstream otel-python doesn't support JSON/HTTP -- their OTLP exporters require protobuf.
 
+### AWS Lambda Performance
+
+Tested using SAM CLI with Python 3.11 runtime:
+
+| Metric            | otel-python | otelmini | Improvement      |
+|-------------------|-------------|----------|------------------|
+| Package size      | 7.0 MB      | 824 KB   | **8.5x smaller** |
+| Cold start (init) | ~256 ms     | ~80 ms   | **3x faster**    |
+| Import time       | ~287 ms     | ~108 ms  | **2.7x faster**  |
+
+See `examples/lambda-comparison/` to run the benchmark yourself.
+
 <details>
 <summary>Third-party packages installed by otel-python</summary>
 
