@@ -178,8 +178,8 @@ def test_batcher_pop_flushes_partial():
     batch = batcher.pop()
     assert batch == ["a", "b"]
 
-    # Second pop returns empty list
-    assert batcher.pop() == []
+    # Second pop returns None (nothing to pop)
+    assert batcher.pop() is None
 
 
 def test_timer_calls_target_periodically():

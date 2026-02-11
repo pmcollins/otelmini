@@ -85,8 +85,10 @@ class BatchProcessor(Processor[T], ForkAware):
                 self.timer.notify_sleeper()
 
     def _export(self) -> None:
-        batch = self.batcher.pop()
-        if batch is not None and len(batch) > 0:
+        while True:
+            batch = self.batcher.pop()
+            if batch is None or len(batch) == 0:
+                break
             self.exporter.export(batch)
 
     def shutdown(self) -> None:
@@ -119,8 +121,9 @@ class Batcher(Generic[T]):
             return self.batches.pop(0) if len(self.batches) > 0 else None
 
     def _batch(self) -> None:
-        self.batches.append(self.items)
-        self.items = []
+        if self.items:
+            self.batches.append(self.items)
+            self.items = []
 
 
 class Timer:
