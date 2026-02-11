@@ -229,3 +229,49 @@ def test_logger_provider_passes_resource_to_logs():
 
     assert len(exporter.logs) == 1
     assert exporter.logs[0].get_resource() is resource
+
+
+def test_logger_provider_force_flush():
+    """LoggerProvider.force_flush() should flush all pending logs."""
+    from otelmini.export import SingleAttemptResult
+
+    class RecordingExporter:
+        def __init__(self):
+            self.items = []
+
+        def export(self, items):
+            self.items.extend(items)
+            return SingleAttemptResult.SUCCESS
+
+    exporter = RecordingExporter()
+    processor = BatchProcessor(exporter, batch_size=100, interval_seconds=60)
+    provider = LoggerProvider(log_processor=processor)
+    logger = provider.get_logger("test")
+
+    log_record = logging.LogRecord(
+        name="test",
+        level=logging.INFO,
+        pathname="",
+        lineno=0,
+        msg="Test message",
+        args=(),
+        exc_info=None,
+    )
+    mini_log = _pylog_to_minilog(log_record, provider.resource)
+    logger.emit(mini_log)
+
+    # Not yet exported
+    assert len(exporter.items) == 0
+
+    # force_flush exports immediately
+    result = provider.force_flush()
+    assert result is True
+    assert len(exporter.items) == 1
+
+    provider.shutdown()
+
+
+def test_logger_provider_force_flush_no_processor():
+    """LoggerProvider.force_flush() returns True when no processor configured."""
+    provider = LoggerProvider()
+    assert provider.force_flush() is True

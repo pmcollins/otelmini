@@ -38,3 +38,14 @@ class StubbornRunner:
         else:
             self.func()
             return SingleAttemptResult.SUCCESS
+
+
+class RecordingExporter:
+    """Exporter that records all exported items for testing."""
+
+    def __init__(self):
+        self.items = []
+
+    def export(self, items):
+        self.items.extend(items)
+        return SingleAttemptResult.SUCCESS

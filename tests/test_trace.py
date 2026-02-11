@@ -1,9 +1,10 @@
 from opentelemetry.trace import Link
 
 from otelmini.export import Retrier, RetrierResult
-from otelmini.trace import MiniSpan, Resource, InstrumentationScope, SpanContext
+from otelmini.processor import BatchProcessor
+from otelmini.trace import MiniSpan, MiniTracerProvider, Resource, InstrumentationScope, SpanContext
 from otelmini.encode import _encode_span, _encode_event
-from tests._lib import StubbornRunner, FakeSleeper
+from tests._lib import StubbornRunner, FakeSleeper, RecordingExporter
 
 
 def test_retrier_eventual_success():
@@ -161,3 +162,33 @@ def test_encode_span_without_links():
 
     encoded = _encode_span(span)
     assert "links" not in encoded
+
+
+def test_tracer_provider_force_flush():
+    exporter = RecordingExporter()
+    processor = BatchProcessor(exporter, batch_size=100, interval_seconds=60)
+    provider = MiniTracerProvider(span_processor=processor)
+    tracer = provider.get_tracer("test")
+
+    with tracer.start_as_current_span("span1"):
+        pass
+    with tracer.start_as_current_span("span2"):
+        pass
+
+    # Spans are batched, not yet exported
+    assert len(exporter.items) == 0
+
+    # force_flush exports immediately
+    result = provider.force_flush()
+    assert result is True
+    assert len(exporter.items) == 2
+    assert exporter.items[0].get_name() == "span1"
+    assert exporter.items[1].get_name() == "span2"
+
+    provider.shutdown()
+
+
+def test_tracer_provider_force_flush_no_processor():
+    provider = MiniTracerProvider()
+    # Should return True when no processor is configured
+    assert provider.force_flush() is True

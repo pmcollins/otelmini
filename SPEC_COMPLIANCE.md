@@ -14,6 +14,7 @@ Spec reference: https://opentelemetry.io/docs/specs/otel/
 |-------------|--------|-------|
 | `get_tracer(name, version, schema_url, attributes)` | ✅ | Implemented |
 | Return working tracer for invalid names | ✅ | No validation/rejection |
+| `force_flush()` | ✅ | Implemented |
 | `shutdown()` | ✅ | Implemented |
 
 ### Tracer
@@ -72,6 +73,7 @@ Spec reference: https://opentelemetry.io/docs/specs/otel/
 | Requirement | Status | Notes |
 |-------------|--------|-------|
 | `get_meter(name, version, schema_url, attributes)` | ✅ | Implemented |
+| `force_flush()` | ✅ | Implemented |
 | `shutdown()` | ✅ | Implemented |
 
 ### Meter
@@ -131,8 +133,8 @@ Spec reference: https://opentelemetry.io/docs/specs/otel/
 | Requirement | Status | Notes |
 |-------------|--------|-------|
 | `get_logger(name, version, schema_url, attributes)` | ✅ | Implemented |
+| `force_flush()` | ✅ | Implemented |
 | `shutdown()` | ✅ | Implemented |
-| `force_flush()` | ❌ | Not implemented |
 
 ### Logger
 
@@ -221,7 +223,7 @@ Spec reference: https://opentelemetry.io/docs/specs/otel/
 |--------|-------------|-------|
 | **Traces** | ~90% | Core functionality works, missing AddLink after creation |
 | **Metrics** | ~90% | All instruments implemented, missing ExponentialHistogram |
-| **Logs** | ~75% | Core functionality implemented |
+| **Logs** | ~80% | Core functionality implemented |
 | **Context/Propagation** | ✅ | W3C TraceContext and Baggage implemented |
 | **Baggage** | ✅ | API from opentelemetry-api, propagation implemented |
 | **Resource** | ~70% | Merge and env var support added |

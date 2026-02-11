@@ -199,6 +199,11 @@ class LoggerProvider(ApiLoggerProvider):
             attributes=attributes,
         )
 
+    def force_flush(self, timeout_millis: float = 30_000) -> bool:
+        if self.log_processor:
+            return self.log_processor.force_flush(timeout_millis)
+        return True
+
     def shutdown(self, timeout_millis: float = 30_000) -> None:
         if self.log_processor:
             self.log_processor.shutdown()

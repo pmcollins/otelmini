@@ -622,3 +622,43 @@ def test_periodic_reader_force_flush():
 
     # Clean up
     reader.shutdown()
+
+
+# MeterProvider force_flush Tests
+
+def test_meter_provider_force_flush():
+    """MeterProvider.force_flush() should flush all readers."""
+    exporter = FakeExporter()
+    reader = ManualExportingMetricReader(exporter)
+    meter_provider = MeterProvider(metric_readers=(reader,))
+    meter = meter_provider.get_meter(name="my-meter")
+    counter = meter.create_counter(name="test_counter")
+    counter.add(42)
+
+    # force_flush should export
+    result = meter_provider.force_flush()
+    assert result is True
+    assert len(exporter.get_exports()) == 1
+
+
+def test_meter_provider_force_flush_no_readers():
+    """MeterProvider.force_flush() returns True when no readers configured."""
+    meter_provider = MeterProvider()
+    assert meter_provider.force_flush() is True
+
+
+def test_meter_provider_force_flush_multiple_readers():
+    """MeterProvider.force_flush() should flush all readers."""
+    exporter1 = FakeExporter()
+    exporter2 = FakeExporter()
+    reader1 = ManualExportingMetricReader(exporter1)
+    reader2 = ManualExportingMetricReader(exporter2)
+    meter_provider = MeterProvider(metric_readers=(reader1, reader2))
+    meter = meter_provider.get_meter(name="my-meter")
+    counter = meter.create_counter(name="test_counter")
+    counter.add(42)
+
+    result = meter_provider.force_flush()
+    assert result is True
+    assert len(exporter1.get_exports()) == 1
+    assert len(exporter2.get_exports()) == 1

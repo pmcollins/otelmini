@@ -63,6 +63,11 @@ class MiniTracerProvider(TracerProvider):
         )
         return MiniTracer(self.span_processor, self.resource, scope, self.sampler)
 
+    def force_flush(self, timeout_millis: float = 30_000) -> bool:
+        if self.span_processor:
+            return self.span_processor.force_flush(timeout_millis)
+        return True
+
     def shutdown(self, timeout_millis: float = 30_000) -> None:
         if self.span_processor:
             self.span_processor.shutdown()

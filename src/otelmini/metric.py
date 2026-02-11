@@ -374,6 +374,12 @@ class MeterProvider(ApiMeterProvider):
     def produce_metrics(self) -> MetricsData:
         return self.metric_producer.produce()
 
+    def force_flush(self, timeout_millis: float = 30_000) -> bool:
+        for reader in self.metric_readers:
+            if not reader.force_flush(timeout_millis):
+                return False
+        return True
+
     def shutdown(self, timeout_millis: float = 30_000) -> None:
         for reader in self.metric_readers:
             reader.shutdown(timeout_millis)
