@@ -46,9 +46,9 @@ class MiniTracerProvider(TracerProvider):
         sampler: Sampler = None,
         config: Config = None,
     ):
-        self.config = config or Config()
+        config = config or Config()
         self.span_processor = span_processor
-        self.resource = resource or create_default_resource(self.config)
+        self.resource = resource or create_default_resource(config)
         self.sampler = sampler or AlwaysOnSampler()
 
     def get_tracer(

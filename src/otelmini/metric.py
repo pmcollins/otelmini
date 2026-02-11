@@ -588,7 +588,6 @@ class Meter(ApiMeter):
     ):
         super().__init__(name, version, schema_url)
         self.meter_provider = meter_provider
-        self._name = name
 
     def create_counter(
         self, name: str, unit: str = "", description: str = ""

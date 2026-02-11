@@ -84,10 +84,7 @@ class Logger(ApiLogger):
         schema_url: Optional[str] = None,
         attributes: Optional[Attributes] = None,
     ):
-        self._name = name
-        self._version = version
-        self._schema_url = schema_url
-        self._attributes = attributes
+        super().__init__(name, version, schema_url, attributes)
         self._logger_provider = logger_provider
 
     def emit(
