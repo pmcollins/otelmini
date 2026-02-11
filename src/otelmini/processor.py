@@ -4,7 +4,16 @@ import atexit
 import os
 import threading
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Callable, Generic, List, Optional, Type, TypeVar
+from typing import (
+    TYPE_CHECKING,
+    Callable,
+    Generic,
+    List,
+    Optional,
+    Sequence,
+    Type,
+    TypeVar,
+)
 
 if TYPE_CHECKING:
     from otelmini.export import Exporter
@@ -47,7 +56,7 @@ class BatchProcessor(Processor[T], ForkAware):
 
     def __init__(
         self,
-        exporter: Exporter[T],
+        exporter: Exporter[Sequence[T]],
         batch_size: int = 512,
         interval_seconds: float = 5,
         batcher_factory: Optional[Type[Batcher[T]]] = None,
