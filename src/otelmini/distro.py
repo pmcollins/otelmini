@@ -12,6 +12,11 @@ def auto_instrument():
 
     # Modify PYTHONPATH to include the auto directory
     env = dict(os.environ)
+
+    # Default to new (stable) semantic conventions unless user specified otherwise
+    if "OTEL_SEMCONV_STABILITY_OPT_IN" not in env:
+        env["OTEL_SEMCONV_STABILITY_OPT_IN"] = "http,database"
+
     if "PYTHONPATH" in env:
         env["PYTHONPATH"] = auto_path + os.pathsep + env["PYTHONPATH"]
     else:

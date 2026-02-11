@@ -120,6 +120,9 @@ See `examples/lambda-comparison/` to run the benchmark yourself.
 | `OTEL_BSP_MAX_EXPORT_BATCH_SIZE` | Batch processor max batch size | `512` |
 | `OTEL_BSP_SCHEDULE_DELAY` | Batch processor schedule delay (ms) | `5000` |
 | `OTEL_METRIC_EXPORT_INTERVAL` | Metric export interval (ms) | `10000` |
+| `OTEL_SEMCONV_STABILITY_OPT_IN` | Semantic conventions to use (comma-separated) | `http,database` |
+
+otelmini defaults to stable (new) semantic conventions. Valid values: `http`, `http/dup`, `database`, `database/dup`, `gen_ai_latest_experimental`. Set to `http/dup,database/dup` to emit both old and new attributes, or set to empty string to use old conventions only.
 
 Third-party exporters can be installed and will be discovered via entry points. Use `otlp_json_http` for explicit JSON/HTTP selection.
 
