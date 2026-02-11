@@ -23,7 +23,9 @@ T = TypeVar("T")
 
 class ForkAware(ABC):
     def register_at_fork(self) -> None:
-        os.register_at_fork(after_in_child=self.reinitialize_at_fork)
+        # os.register_at_fork is only available on Unix-like systems
+        if hasattr(os, "register_at_fork"):
+            os.register_at_fork(after_in_child=self.reinitialize_at_fork)
 
     @abstractmethod
     def reinitialize_at_fork(self) -> None:
