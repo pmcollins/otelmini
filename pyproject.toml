@@ -112,7 +112,6 @@ config-path = "none"
 exclude = ["examples/", "tests/"]
 lint.ignore = [
   "UP007",    # Use X | Y for type union
-  "UP045",    # Use X | None for type annotations (conflicts with python 3.8/3.9 support)
   "FA100",    # Missing from __future__ import annotations
   "EM101",    # Exception string literal
   "EM102",    # Exception f-string literal
