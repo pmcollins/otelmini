@@ -351,7 +351,7 @@ def test_histogram_custom_boundaries():
 def test_observable_gauge_callback_invoked():
     callback_invoked = []
 
-    def my_callback():
+    def my_callback(options):
         callback_invoked.append(True)
         from opentelemetry.metrics import Observation
         return [Observation(value=42.0)]
@@ -371,7 +371,7 @@ def test_observable_gauge_callback_invoked():
 
 
 def test_observable_gauge_value_captured():
-    def my_callback():
+    def my_callback(options):
         from opentelemetry.metrics import Observation
         return [Observation(value=75.5)]
 
@@ -416,7 +416,7 @@ def test_observable_gauge_no_callback():
 def test_observable_counter_callback_invoked():
     callback_invoked = []
 
-    def my_callback():
+    def my_callback(options):
         callback_invoked.append(True)
         from opentelemetry.metrics import Observation
         return [Observation(value=1000)]
@@ -436,7 +436,7 @@ def test_observable_counter_callback_invoked():
 
 
 def test_observable_counter_value_captured():
-    def my_callback():
+    def my_callback(options):
         from opentelemetry.metrics import Observation
         return [Observation(value=5000)]
 
@@ -469,7 +469,7 @@ def test_observable_counter_value_captured():
 def test_observable_up_down_counter_callback_invoked():
     callback_invoked = []
 
-    def my_callback():
+    def my_callback(options):
         callback_invoked.append(True)
         from opentelemetry.metrics import Observation
         return [Observation(value=50)]
@@ -489,7 +489,7 @@ def test_observable_up_down_counter_callback_invoked():
 
 
 def test_observable_up_down_counter_value_captured():
-    def my_callback():
+    def my_callback(options):
         from opentelemetry.metrics import Observation
         return [Observation(value=-10)]  # Can be negative
 

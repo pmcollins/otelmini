@@ -551,8 +551,11 @@ class _ObservableInstrument:
 
     def get_value(self) -> float:
         """Invoke callbacks and return the first observation value."""
+        from opentelemetry.metrics import CallbackOptions
+
+        options = CallbackOptions()
         for callback in self.callbacks:
-            for obs in callback():
+            for obs in callback(options):
                 return obs.value
         return 0.0
 
