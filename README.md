@@ -77,7 +77,7 @@ Comparing `otelmini` to `opentelemetry-distro` + `opentelemetry-exporter-otlp-pr
 | Metric                    | otel-python | otelmini |
 |---------------------------|-------------|----------|
 | Third-party dependencies* | 9           | 0        |
-| Lines of Python           | ~47K        | ~5.9K    |
+| Lines of Python           | ~47K        | ~3.1K    |
 
 \* Excluding opentelemetry packages and Python stdlib backports
 
