@@ -22,4 +22,7 @@ def auto_instrument():
     else:
         env["PYTHONPATH"] = auto_path
 
-    subprocess.run(cmd, env=env, check=False)
+    try:
+        subprocess.run(cmd, env=env, check=False)
+    except KeyboardInterrupt:
+        sys.exit(130)
