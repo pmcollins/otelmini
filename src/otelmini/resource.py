@@ -21,7 +21,7 @@ def parse_resource_attributes(env_value: str) -> dict:
 
 def create_default_resource(config: Config) -> Resource:
     """Create a resource with default SDK attributes and OTEL_RESOURCE_ATTRIBUTES."""
-    import otelmini
+    from otelmini.__about__ import __version__
 
     # Start with env var attributes (lower priority)
     env_attrs = parse_resource_attributes(config.resource_attributes)
@@ -30,7 +30,7 @@ def create_default_resource(config: Config) -> Resource:
     sdk_attrs = {
         "telemetry.sdk.language": "python",
         "telemetry.sdk.name": "otelmini",
-        "telemetry.sdk.version": getattr(otelmini, "__version__", "0.0.1"),
+        "telemetry.sdk.version": __version__,
         "service.name": config.service_name,
     }
 
