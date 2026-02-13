@@ -67,13 +67,13 @@ This pattern works with any instrumentation library from the contrib repository,
 
 otelmini was designed with minimalism as a goal, giving you insight into your applications via OpenTelemetry instrumentation libraries while staying out of the way. No dependencies other than opentelemetry-api, which you have to use anyway if you're using OTel at all.
 
-This is useful when:
+A minimal footprint helps you:
 
-- **Avoiding dependency conflicts** -- your project requires a different version of protobuf or requests than OTel exporters expect
-- **Minimizing package size** -- serverless environments like AWS Lambda have size limits
-- **Reducing cold start time** -- fewer modules to load means faster Lambda cold starts
-- **Reducing attack surface** -- fewer dependencies means less to audit and maintain
-- **Improving performance** -- less code means potentially lower memory impact and faster execution
+- **Avoid dependency conflicts** -- your project requires a different version of protobuf or requests than OTel exporters expect
+- **Minimize package size** -- serverless environments like AWS Lambda have size limits
+- **Reduce cold start time** -- fewer modules to load means faster Lambda cold starts
+- **Reduce attack surface** -- fewer dependencies means less to audit and maintain
+- **Improve performance** -- less code means potentially lower memory impact and faster execution
 
 ## Comparison with OpenTelemetry Python
 
@@ -86,7 +86,7 @@ Comparing `otelmini` to `opentelemetry-distro` + `opentelemetry-exporter-otlp-pr
 
 \* Excluding opentelemetry packages and Python stdlib backports
 
-Note: Upstream otel-python doesn't support JSON/HTTP -- their OTLP exporters require protobuf.
+Note: Upstream otel-python doesn't support JSON/HTTP -- their OTLP exporters require protobuf. Protobuf can be a problematic dependency when automatically injecting SDKs, which is why otelmini uses JSON encoding instead.
 
 ### AWS Lambda Performance
 
