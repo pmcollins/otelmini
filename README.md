@@ -93,7 +93,7 @@ Tested using SAM CLI with Python 3.11 runtime:
 | Cold start (init) | ~256 ms     | ~80 ms   | **3x faster**    |
 | Import time       | ~287 ms     | ~108 ms  | **2.7x faster**  |
 
-See `examples/lambda-comparison/` to run the benchmark yourself.
+See `tests/oteltest/lambda-comparison/` to run the benchmark yourself.
 
 <details>
 <summary>Third-party packages installed by otel-python</summary>

@@ -109,7 +109,7 @@ console = "otelmini.log:ConsoleLogExporter"
 config-path = "none"
 
 [tool.ruff]
-exclude = ["examples/", "tests/"]
+exclude = ["tests/"]
 lint.ignore = [
   "UP007",    # Use X | Y for type union
   "FA100",    # Missing from __future__ import annotations
