@@ -75,6 +75,8 @@ A minimal footprint helps you:
 - **Reduce attack surface** -- fewer dependencies means less to audit and maintain
 - **Improve performance** -- less code means potentially lower memory impact and faster execution
 
+A smaller codebase also allows otelmini to more quickly and effectively add capabilities and address issues.
+
 ## Comparison with OpenTelemetry Python
 
 Comparing `otelmini` to `opentelemetry-distro` + `opentelemetry-exporter-otlp-proto-http`:
