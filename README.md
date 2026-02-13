@@ -45,7 +45,7 @@ That's it -- traces are exported to `localhost:4318` via OTLP/HTTP (JSON).
 
 ### Using Instrumentation Libraries
 
-otelmini works with OpenTelemetry instrumentation libraries from [opentelemetry-python-contrib](https://github.com/open-telemetry/opentelemetry-python-contrib/tree/main/instrumentation) or any other code that uses the OpenTelemetry API. For example, to automatically instrument HTTP calls made with the `requests` library, install the `requests` instrumentor from PyPI:
+otelmini works with OpenTelemetry instrumentation libraries from [opentelemetry-python-contrib](https://github.com/open-telemetry/opentelemetry-python-contrib/tree/main/instrumentation) or any other code that uses the OpenTelemetry API. For example, to automatically instrument HTTP calls made with the `requests` library:
 
 ```bash
 pip install otelmini opentelemetry-instrumentation-requests
@@ -61,7 +61,7 @@ The `otel` command automatically discovers and activates any installed instrumen
 
 This pattern works with any instrumentation library from the contrib repository, including the [genai instrumentation libraries](https://github.com/open-telemetry/opentelemetry-python-contrib/tree/main/instrumentation-genai) for observing LLM applications.
 
-**Note:** You can also wire up instrumentation manually using the otelmini SDK directly by calling the instrumentor's `instrument()` method yourself, but the `otel` command handles this discovery and activation automatically for you.
+**Note:** You can also wire up instrumentation manually using the otelmini SDK directly and calling the instrumentor's `instrument()` method yourself, but the `otel` command automatically sets up the SDK and handles instrumentation discovery and activation for you.
 
 ## Why otelmini?
 
