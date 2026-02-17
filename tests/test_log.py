@@ -50,7 +50,7 @@ def test_basic_logging(capsys):
     )
 
     # Emit the log record (convert to MiniLogRecord first)
-    mini_log_record = _pylog_to_minilog(log_record, logger_provider.resource)
+    mini_log_record = _pylog_to_minilog(log_record)
     logger.emit(mini_log_record)
     batch_processor.force_flush()
 
@@ -224,7 +224,7 @@ def test_logger_provider_passes_resource_to_logs():
         args=(),
         exc_info=None,
     )
-    mini_log_record = _pylog_to_minilog(log_record, resource)
+    mini_log_record = _pylog_to_minilog(log_record)
     logger.emit(mini_log_record)
 
     assert len(exporter.logs) == 1
@@ -257,7 +257,7 @@ def test_logger_provider_force_flush():
         args=(),
         exc_info=None,
     )
-    mini_log = _pylog_to_minilog(log_record, provider.resource)
+    mini_log = _pylog_to_minilog(log_record)
     logger.emit(mini_log)
 
     # Not yet exported

@@ -80,12 +80,14 @@ class Logger(ApiLogger):
         self,
         name: str,
         logger_provider: LoggerProvider,
+        resource: Optional[Resource] = None,
         version: Optional[str] = None,
         schema_url: Optional[str] = None,
         attributes: Optional[Attributes] = None,
     ):
         super().__init__(name, version, schema_url, attributes)
         self._logger_provider = logger_provider
+        self._resource = resource
 
     def emit(
         self,
@@ -115,7 +117,6 @@ class Logger(ApiLogger):
                     severity_number=record.severity_number,
                     body=record.body,
                     attributes=record.attributes,
-                    resource=self._logger_provider.resource,
                 )
         else:
             # Build from keyword arguments
@@ -130,21 +131,19 @@ class Logger(ApiLogger):
                 severity_number=severity_number,
                 body=body,
                 attributes=attributes,
-                resource=self._logger_provider.resource,
             )
+        mini_log_record._resource = self._resource
         # The SDK catches processor errors so they don't propagate to the
         # instrumented application's logging calls.
         try:
-            self._logger_provider.log_processor.on_end(mini_log_record)
+            self._logger_provider.emit(mini_log_record)
         except Exception:
             logging.getLogger(__name__).exception(
                 "error emitting log record to processor"
             )
 
 
-def _pylog_to_minilog(
-    pylog_record: logging.LogRecord, resource: Resource = None
-) -> MiniLogRecord:
+def _pylog_to_minilog(pylog_record: logging.LogRecord) -> MiniLogRecord:
     span_context = get_current_span().get_span_context()
     if span_context.is_valid:
         trace_id = span_context.trace_id
@@ -176,7 +175,6 @@ def _pylog_to_minilog(
             "thread": pylog_record.thread,
             "threadName": pylog_record.threadName,
         },
-        resource=resource,
     )
 
 
@@ -201,10 +199,15 @@ class LoggerProvider(ApiLoggerProvider):
         return Logger(
             name=name,
             logger_provider=self,
+            resource=self.resource,
             version=version,
             schema_url=schema_url,
             attributes=attributes,
         )
+
+    def emit(self, log_record: MiniLogRecord) -> None:
+        if self.log_processor:
+            self.log_processor.on_end(log_record)
 
     def force_flush(self, timeout_millis: float = 30_000) -> bool:
         if self.log_processor:
@@ -247,7 +250,7 @@ class OtelBridgeLoggingHandler(logging.Handler):
         # the application's stdlib logging.
         try:
             logger = self.logger_provider.get_logger(record.name)
-            mini_log_record = _pylog_to_minilog(record, self.logger_provider.resource)
+            mini_log_record = _pylog_to_minilog(record)
             logger.emit(mini_log_record)
         except Exception:
             logging.exception("error emitting log record")
