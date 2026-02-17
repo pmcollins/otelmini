@@ -1,4 +1,5 @@
 import json
+import logging
 import time
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
@@ -7,6 +8,8 @@ from opentelemetry.trace import Span as ApiSpan
 from opentelemetry.trace import SpanKind
 from opentelemetry.trace.span import SpanContext
 from opentelemetry.util.types import Attributes
+
+_logger = logging.getLogger(__name__)
 
 
 def _time_ns() -> int:
@@ -191,7 +194,12 @@ class MiniSpan(ApiSpan):
 
     def end(self, end_time: Optional[int] = None) -> None:
         self._end_time = end_time if end_time is not None else _time_ns()
-        self._on_end_callback(self)
+        # The SDK catches processor/exporter errors so they don't propagate
+        # to the instrumented application.
+        try:
+            self._on_end_callback(self)
+        except Exception:
+            _logger.exception("error in span end callback")
 
     def to_dict(self) -> dict[str, Any]:
         return {

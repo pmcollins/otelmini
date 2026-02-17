@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import atexit
+import logging
 import threading
 from abc import ABC, abstractmethod
 from enum import Enum
@@ -39,6 +40,8 @@ from otelmini.point import (
 )
 from otelmini.resource import create_default_resource
 from otelmini.types import InstrumentationScope, Resource, _time_ns
+
+_logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from opentelemetry.context import Context
@@ -112,9 +115,15 @@ class ManualExportingMetricReader(MetricReader):
         self.metric_producer = metric_producer
 
     def force_flush(self, timeout_millis: float = 10_000) -> bool:
-        metrics = self.metric_producer.produce()
-        self.exporter.export(metrics)
-        return True
+        # The SDK catches producer/exporter errors and returns False instead
+        # of propagating to the caller.
+        try:
+            metrics = self.metric_producer.produce()
+            self.exporter.export(metrics)
+            return True
+        except Exception:
+            _logger.exception("error flushing metrics")
+            return False
 
     def shutdown(self, timeout_millis: float = 30_000, **kwargs) -> None:
         pass
@@ -138,12 +147,22 @@ class PeriodicExportingMetricReader(MetricReader):
 
     def _run(self) -> None:
         while not self._stop.wait(self.export_interval_seconds):
-            self._export()
+            # The SDK catches errors here so a failed export doesn't kill
+            # the background reader thread.
+            try:
+                self._export()
+            except Exception:
+                _logger.exception("error in periodic metric export")
 
     def _export(self) -> None:
         if self.metric_producer:
-            metrics = self.metric_producer.produce()
-            self.exporter.export(metrics)
+            # The SDK catches producer/exporter errors so they don't
+            # propagate to the caller.
+            try:
+                metrics = self.metric_producer.produce()
+                self.exporter.export(metrics)
+            except Exception:
+                _logger.exception("error exporting metrics")
 
     def set_metric_producer(self, metric_producer: MetricProducer) -> None:
         self.metric_producer = metric_producer
@@ -408,8 +427,13 @@ class _SumInstrument:
         attributes: Optional[Attributes] = None,
         context: Optional[Context] = None,
     ) -> None:
+        # Log instead of raising CounterError so the instrumented application
+        # is not disrupted.
         if self._monotonic and amount < 0:
-            raise CounterError
+            _logger.warning(
+                "Counter cannot be decremented (amount must be non-negative)"
+            )
+            return
         key = _attributes_to_key(attributes)
         self._values[key] = self._values.get(key, 0.0) + amount
 
@@ -561,8 +585,13 @@ class _ObservableInstrument:
 
         options = CallbackOptions()
         for callback in self.callbacks:
-            for obs in callback(options):
-                return obs.value
+            # The SDK catches errors from user-provided callbacks so they
+            # don't disrupt metric collection.
+            try:
+                for obs in callback(options):
+                    return obs.value
+            except Exception:
+                _logger.exception("error in observable callback")
         return 0.0
 
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
@@ -12,6 +13,8 @@ if TYPE_CHECKING:
     from urllib.parse import ParseResult
 
 T = TypeVar("T")
+
+_logger = logging.getLogger(__name__)
 
 
 class Exporter(ABC, Generic[T]):
@@ -63,7 +66,13 @@ class Retrier:
         self, single_attempt_func: Callable[[], SingleAttemptResult]
     ) -> RetrierResult:
         for attempt in range(self.max_retries + 1):
-            resp = single_attempt_func()
+            # The SDK catches exceptions from exporters (ours or third-party)
+            # so they don't have to handle errors themselves.
+            try:
+                resp = single_attempt_func()
+            except Exception:
+                _logger.exception("error in export attempt")
+                resp = SingleAttemptResult.RETRY
             if resp == SingleAttemptResult.SUCCESS:
                 return RetrierResult.SUCCESS
             if resp == SingleAttemptResult.FAILURE:

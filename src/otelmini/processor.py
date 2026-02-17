@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import atexit
+import logging
 import os
 import threading
 from abc import ABC, abstractmethod
@@ -19,6 +20,8 @@ if TYPE_CHECKING:
     from otelmini.export import Exporter
 
 T = TypeVar("T")
+
+_logger = logging.getLogger(__name__)
 
 
 class ForkAware(ABC):
@@ -100,7 +103,12 @@ class BatchProcessor(Processor[T], ForkAware):
             batch = self.batcher.pop()
             if batch is None or len(batch) == 0:
                 break
-            self.exporter.export(batch)
+            # The SDK catches exporter errors so exporters (ours or third-party)
+            # don't have to handle errors themselves.
+            try:
+                self.exporter.export(batch)
+            except Exception:
+                _logger.exception("error exporting batch")
 
     def shutdown(self) -> None:
         self.stop.set()
@@ -150,7 +158,12 @@ class Timer:
         while not self._stopper.is_set():
             self._sleep()
             if not self._stopper.is_set():
-                self._target_fcn()
+                # The SDK catches errors here so a failed export doesn't kill
+                # the background timer thread.
+                try:
+                    self._target_fcn()
+                except Exception:
+                    _logger.exception("error in timer callback")
 
     def _sleep(self) -> None:
         with self._sleeper:
@@ -163,4 +176,9 @@ class Timer:
     def stop(self) -> None:
         self._stopper.set()
         self.notify_sleeper()
-        self._target_fcn()
+        # The SDK catches errors here so a failed final export doesn't
+        # prevent graceful shutdown.
+        try:
+            self._target_fcn()
+        except Exception:
+            _logger.exception("error in final timer callback")

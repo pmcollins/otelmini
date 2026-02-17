@@ -29,10 +29,7 @@ def _load_exporter(signal: str, exporter_name: str) -> Optional[Type]:
         exporter_name: Entry point name (e.g., "otlp", "console", "none")
 
     Returns:
-        Exporter class, or None if exporter_name is "none"
-
-    Raises:
-        RuntimeError: If the requested exporter is not found
+        Exporter class, or None if exporter_name is "none" or not found
     """
     if exporter_name == "none":
         return None
@@ -44,10 +41,16 @@ def _load_exporter(signal: str, exporter_name: str) -> Optional[Type]:
         if ep.name == exporter_name:
             return ep.load()
 
+    # Degrade gracefully instead of crashing auto-instrumentation startup
+    # when a requested exporter is not found.
     available = [ep.name for ep in eps]
-    raise RuntimeError(
-        f"Exporter '{exporter_name}' not found for {signal}. Available: {available}"
+    _logger.warning(
+        "Exporter '%s' not found for %s. Available: %s",
+        exporter_name,
+        signal,
+        available,
     )
+    return None
 
 
 def _discover_instrumentors():
