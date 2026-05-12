@@ -156,9 +156,13 @@ class MiniSpan(ApiSpan):
         return self._status_description
 
     def set_attributes(self, attributes: Attributes) -> None:
+        if not self.is_recording():
+            return
         self._attributes.update(attributes)
 
     def set_attribute(self, key: str, value: Any) -> None:
+        if not self.is_recording():
+            return
         self._attributes[key] = value
 
     def add_event(
@@ -167,17 +171,23 @@ class MiniSpan(ApiSpan):
         attributes: Optional[Attributes] = None,
         timestamp: Optional[int] = None,
     ) -> None:
+        if not self.is_recording():
+            return
         if timestamp is None:
             timestamp = _time_ns()
         self._events.append((name, attributes, timestamp))
 
     def update_name(self, name: str) -> None:
+        if not self.is_recording():
+            return
         self._name = name
 
     def is_recording(self) -> bool:
-        return self._status is None
+        return self._end_time is None
 
     def set_status(self, status: Any, description: Optional[str] = None) -> None:
+        if not self.is_recording():
+            return
         self._status = status
         self._status_description = description
 
@@ -188,11 +198,15 @@ class MiniSpan(ApiSpan):
         timestamp: Optional[int] = None,
         escaped: bool = False,  # noqa: FBT001, FBT002
     ) -> None:
+        if not self.is_recording():
+            return
         if timestamp is None:
             timestamp = _time_ns()
         self._events.append((exception.__class__.__name__, attributes, timestamp))
 
     def end(self, end_time: Optional[int] = None) -> None:
+        if self._end_time is not None:
+            return
         self._end_time = end_time if end_time is not None else _time_ns()
         # The SDK catches processor/exporter errors so they don't propagate
         # to the instrumented application.

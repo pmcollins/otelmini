@@ -215,6 +215,91 @@ class RecordingSpanProcessor:
         pass
 
 
+def test_span_is_recording_until_ended():
+    span = MiniSpan(
+        name="test-span",
+        span_context=SpanContext(trace_id=1, span_id=2, is_remote=False),
+        resource=Resource(""),
+        instrumentation_scope=InstrumentationScope("", ""),
+        on_end_callback=lambda s: None
+    )
+
+    assert span.is_recording()
+    span.set_status("ERROR")
+    assert span.is_recording()
+    span.end()
+    assert not span.is_recording()
+
+
+def test_span_end_is_idempotent():
+    ended_spans = []
+    span = MiniSpan(
+        name="test-span",
+        span_context=SpanContext(trace_id=1, span_id=2, is_remote=False),
+        resource=Resource(""),
+        instrumentation_scope=InstrumentationScope("", ""),
+        on_end_callback=ended_spans.append,
+    )
+
+    span.end(100)
+    span.end(200)
+
+    assert span.get_end_time() == 100
+    assert ended_spans == [span]
+
+
+def test_span_mutations_after_end_are_ignored():
+    span = MiniSpan(
+        name="original",
+        span_context=SpanContext(trace_id=1, span_id=2, is_remote=False),
+        resource=Resource(""),
+        instrumentation_scope=InstrumentationScope("", ""),
+        on_end_callback=lambda s: None,
+        attributes={"existing": "value"},
+    )
+    span.add_event("before-end", {"kept": True}, 100)
+    span.set_status("ERROR", "before end")
+    span.end()
+
+    span.set_attribute("late", "ignored")
+    span.set_attributes({"also": "ignored"})
+    span.add_event("after-end", {"ignored": True}, 200)
+    span.record_exception(ValueError("ignored"), {"ignored": True}, 300)
+    span.update_name("renamed")
+    span.set_status("OK", "after end")
+
+    assert span.get_name() == "original"
+    assert span.get_attributes() == {"existing": "value"}
+    assert span.get_events() == [("before-end", {"kept": True}, 100)]
+    assert span.get_status() == "ERROR"
+    assert span.get_status_description() == "before end"
+
+
+def test_start_span_honors_start_time():
+    provider = MiniTracerProvider(span_processor=RecordingSpanProcessor())
+    tracer = provider.get_tracer("test")
+
+    span = tracer.start_span("span", start_time=12345)
+
+    assert span.get_start_time() == 12345
+
+
+def test_start_as_current_span_honors_end_on_exit_false():
+    processor = RecordingSpanProcessor()
+    provider = MiniTracerProvider(span_processor=processor)
+    tracer = provider.get_tracer("test")
+
+    with tracer.start_as_current_span("span", end_on_exit=False) as span:
+        assert trace.get_current_span() is span
+
+    assert span.get_end_time() is None
+    assert processor.ended == []
+
+    span.end(123)
+    assert span.get_end_time() == 123
+    assert processor.ended == [span]
+
+
 def test_dropped_span_returns_non_recording_span_with_valid_context():
     processor = RecordingSpanProcessor()
     provider = MiniTracerProvider(

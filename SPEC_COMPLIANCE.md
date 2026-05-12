@@ -48,7 +48,7 @@ The previous report overstated compliance. In several places the SDK accepts a s
 
 | Area | Current conformance | Strong points | Largest blockers |
 | --- | --- | --- | --- |
-| Traces | Partial | Basic span creation/export, resources, scope grouping, parent trace ID, dropped-span non-recording context, span links at creation | Span lifecycle and `is_recording()` are wrong; `start_time` ignored; status and exception conventions not exported; no post-creation `AddLink`; sampler contract incomplete |
+| Traces | Partial | Basic span creation/export, resources, scope grouping, parent trace ID/TraceState inheritance, dropped-span non-recording context, span links at creation | Status and exception conventions are not exported; no post-creation `AddLink`; sampler default/API contract incomplete |
 | Metrics | Partial | Core sync/async instruments exist; cumulative Sum/Gauge/ExplicitBucketHistogram data is produced; identical sync instruments now share state for simple cases | No Views; no reader-specific aggregation/temporality; async callbacks only use first observation and drop attributes; histogram boundary placement is wrong; incomplete instrument identity; readers/exporters do not satisfy lifecycle semantics |
 | Logs | Low partial | LoggerProvider and stdlib bridge exist; resource attached; basic severity/body/attributes captured | Export omits trace context, observed timestamp, event name, and instrumentation scope; `context` and `event_name` args ignored; no exception handling; no LoggerConfig/filtering/Enabled; no proper `OnEmit` processor model |
 | Resource | Partial | Resource creation, merge, SDK attrs, `OTEL_RESOURCE_ATTRIBUTES`, `OTEL_SERVICE_NAME` precedence | Resource is mutable; env parsing lacks percent decoding and error reporting; default resource/detector support incomplete |
@@ -58,9 +58,9 @@ The previous report overstated compliance. In several places the SDK accepts a s
 
 ## Highest-Impact Findings
 
-1. **Trace span lifecycle is not spec compliant.** `MiniSpan.is_recording()` depends on status rather than end state, repeated `end()` calls export repeatedly, and mutations after end still change the span. Sampling also still lacks the spec default `ParentBased(root=AlwaysOn)` behavior, `RECORD_ONLY`, and the full sampler contract.
+1. **Trace sampling is still incomplete beyond dropped-span propagation.** Sampling still lacks the spec default `ParentBased(root=AlwaysOn)` behavior, `RECORD_ONLY`, sampling attributes, returned TraceState, and the full `ShouldSample` argument contract.
 
-2. **Trace exported data is missing required semantics.** Span status is never encoded, `record_exception()` creates an event named after the exception class instead of `"exception"` with `exception.*` attributes, start timestamps passed to `start_span()` are ignored, and post-creation `AddLink` is absent.
+2. **Trace exported data is missing required semantics.** Span status is never encoded, `record_exception()` creates an event named after the exception class instead of `"exception"` with `exception.*` attributes, and post-creation `AddLink` is absent.
 
 3. **Metrics needs Views and real reader semantics before it can be considered SDK compliant.** The spec requires View registration, reader-specific aggregation/temporality/cardinality behavior, and `Collect`/`ForceFlush`/`Shutdown` semantics. The current readers mostly use `force_flush()` as collection and do not propagate exporter failures or exporter shutdown.
 
@@ -79,9 +79,9 @@ The previous report overstated compliance. In several places the SDK accepts a s
 | `TracerProvider.get_tracer(name, version, schema_url, attributes)` accepts full instrumentation scope | `MiniTracerProvider.get_tracer()` accepts all args, but constructs `InstrumentationScope(name, version)` only | Partial | `schema_url` and scope `attributes` are dropped before export. Invalid names return a tracer, but no invalid-name warning is logged. |
 | Already returned tracers see provider config updates | No dynamic provider configuration model | Gap | This matters for processors/configurator behavior described in Trace SDK. |
 | `Tracer.Enabled` API | Not implemented | Gap | Required as a SHOULD in API and tied to SDK config in development sections. |
-| Span creation accepts context, kind, attributes, links, start timestamp | Mostly accepted | Partial | `context`, `kind`, `attributes`, and creation `links` work. `start_time` is not passed to `MiniSpan`, so it is ignored. |
-| `start_as_current_span()` honors `record_exception`, `set_status_on_exception`, and `end_on_exit` | Parameters are accepted but mishandled | Gap | Positional call passes `end_on_exit` into `record_exception`, ignores `set_status_on_exception`, and always calls `trace.use_span(..., end_on_exit=True)`. |
-| Child span trace ID matches parent and inherits parent `TraceState` | Trace ID and parent span ID are preserved | Partial | New `SpanContext` does not carry parent `trace_state`, so TraceState inheritance is missing. |
+| Span creation accepts context, kind, attributes, links, start timestamp | Implemented | Compliant | `context`, `kind`, `attributes`, creation `links`, and `start_time` are applied. |
+| `start_as_current_span()` honors `record_exception`, `set_status_on_exception`, and `end_on_exit` | Argument forwarding is implemented | Partial | `end_on_exit=False` is honored and exception/status flags are forwarded, but the underlying exception/status behavior is still incomplete. |
+| Child span trace ID matches parent and inherits parent `TraceState` | Trace ID, parent span ID, and TraceState are preserved | Compliant | Child `SpanContext.is_remote` is set to false as required. |
 | Root span creation option and new trace ID per root span | New trace ID generated when current/explicit context has no valid span | Partial | Explicit root creation depends on passing an empty context through upstream API patterns; no dedicated API behavior is documented locally. |
 
 ### Span Behavior
@@ -89,10 +89,10 @@ The previous report overstated compliance. In several places the SDK accepts a s
 | Spec requirement | Current implementation | Status | Notes |
 | --- | --- | --- | --- |
 | `get_span_context()` returns stable context | Implemented | Compliant | Uses upstream `SpanContext`. |
-| `is_recording()` true while recording and false after end | `return self._status is None` | Gap | Setting status makes an active span non-recording; ending a span with no status leaves it recording. |
-| After `End`, subsequent span methods should be ignored | Mutations after `end()` still apply | Gap | `end()` can be called repeatedly and each call invokes the processor again. |
+| `is_recording()` true while recording and false after end | Based on whether `_end_time` is set | Compliant | Setting status no longer changes recording state. |
+| After `End`, subsequent span methods should be ignored | Mutating methods no-op after end; `end()` is idempotent | Compliant | Subsequent `end()` calls do not update end time or invoke the processor again. |
 | `End` should not perform blocking I/O on caller thread | Batch processor enqueue is non-I/O | Partial | The default batch path is non-I/O, but custom processors are called synchronously and there is no processor interface contract/timeout. |
-| Set attributes and add events | Implemented | Partial | Basic storage works, but no span limits, dropped counts, or post-end guard. |
+| Set attributes and add events | Implemented | Partial | Basic storage and post-end no-op behavior work, but no span limits or dropped counts. |
 | Add links after creation | No `add_link()` implementation | Gap | Creation-time links are supported and encoded. |
 | Set status with spec semantics | Stored but not exported | Gap | `_encode_span()` always emits `"status": {}`. No status precedence, no `OK` finality, no description restrictions. |
 | Record exception event | Adds event named exception class | Gap | Spec requires an event named `"exception"` with exception semantic attributes such as type, message, and stacktrace. |
@@ -291,8 +291,6 @@ The previous report overstated compliance. In several places the SDK accepts a s
 
 The test suite is useful for current behavior but does not yet prove spec compliance. It covers basic encoding, batching, propagator happy paths, resource env parsing, and metric aggregation. Important missing compliance tests include:
 
-- `MiniSpan.is_recording()`, post-end mutation guards, and idempotent `end()`.
-- `start_span(start_time=...)` and `start_as_current_span(end_on_exit=False)`.
 - Status and exception event OTLP encoding.
 - Parent TraceState inheritance and `tracestate` propagation.
 - Metric View behavior, case-insensitive instrument identity, duplicate conflict warnings, and full instrumentation scope.
@@ -305,7 +303,7 @@ The test suite is useful for current behavior but does not yet prove spec compli
 
 ## Recommended Remediation Order
 
-1. Fix trace correctness first: span lifecycle/idempotent end, start timestamp propagation, status export, exception event conventions, post-creation links, sampler API completeness, and `start_as_current_span()` parameter handling.
+1. Fix remaining trace correctness gaps first: status export, exception event conventions, post-creation links, sampler API completeness/defaults, and ID generation guarantees.
 
 2. Fix log exported data model: include scope, observed timestamp, trace context fields, event name, AnyValue body encoding, and exception attributes. Add log-specific `OnEmit` processor shape after the data model is correct.
 

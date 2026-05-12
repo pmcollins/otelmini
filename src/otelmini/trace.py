@@ -145,6 +145,7 @@ class MiniTracer(Tracer):
             self.scope,
             self.span_processor.on_end,
             parent_span_id=parent_span_id,
+            start_time=start_time,
             links=list(links) if links else None,
             kind=kind,
             attributes=attributes,
@@ -166,9 +167,21 @@ class MiniTracer(Tracer):
         end_on_exit: bool = True,  # noqa: FBT001, FBT002
     ) -> Iterator[ApiSpan]:
         span = self.start_span(
-            name, context, kind, attributes, links, start_time, end_on_exit
+            name,
+            context=context,
+            kind=kind,
+            attributes=attributes,
+            links=links,
+            start_time=start_time,
+            record_exception=record_exception,
+            set_status_on_exception=set_status_on_exception,
         )
-        with trace.use_span(span, end_on_exit=True) as active_span:
+        with trace.use_span(
+            span,
+            end_on_exit=end_on_exit,
+            record_exception=record_exception,
+            set_status_on_exception=set_status_on_exception,
+        ) as active_span:
             yield active_span
 
 
