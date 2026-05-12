@@ -127,6 +127,10 @@ class FakeExporter(Exporter):
         return self.exports
 
 
+def _metrics_from_first_export(exporter):
+    return exporter.get_exports()[0].resource_metrics[0].scope_metrics[0].metrics
+
+
 # Attribute Aggregation Tests
 
 def test_counter_with_attributes():
@@ -179,6 +183,85 @@ def test_counter_no_attributes_separate_from_with_attributes():
     assert len(data_points) == 2
     assert data_points[()] == 13  # 10 + 3
     assert data_points[(("region", "us"),)] == 5
+
+
+def test_identical_counter_instruments_are_aggregated():
+    """Repeated creation of the same instrument returns one aggregate."""
+    exporter = FakeExporter()
+    reader = ManualExportingMetricReader(exporter)
+    meter_provider = MeterProvider(metric_readers=(reader,))
+    meter = meter_provider.get_meter(name="my-meter")
+
+    counter1 = meter.create_counter(
+        name="requests", unit="1", description="Number of requests"
+    )
+    counter2 = meter.create_counter(
+        name="requests", unit="1", description="Number of requests"
+    )
+
+    assert counter1 is counter2
+
+    counter1.add(1, {"method": "GET"})
+    counter2.add(2, {"method": "GET"})
+    counter2.add(3, {"method": "POST"})
+
+    reader.force_flush()
+
+    metrics = _metrics_from_first_export(exporter)
+    assert len(metrics) == 1
+    assert metrics[0].name == "requests"
+
+    data_points = {
+        tuple(sorted(dp.attributes.items())): dp.value
+        for dp in metrics[0].data.data_points
+    }
+    assert data_points[(("method", "GET"),)] == 3
+    assert data_points[(("method", "POST"),)] == 3
+
+
+def test_identical_instruments_are_aggregated_across_meter_instances():
+    """Meters with the same name share canonical instruments."""
+    exporter = FakeExporter()
+    reader = ManualExportingMetricReader(exporter)
+    meter_provider = MeterProvider(metric_readers=(reader,))
+    meter1 = meter_provider.get_meter(name="my-meter")
+    meter2 = meter_provider.get_meter(name="my-meter")
+
+    counter1 = meter1.create_counter(name="requests")
+    counter2 = meter2.create_counter(name="requests")
+
+    assert counter1 is counter2
+
+    counter1.add(2)
+    counter2.add(3)
+
+    reader.force_flush()
+
+    metrics = _metrics_from_first_export(exporter)
+    assert len(metrics) == 1
+    assert metrics[0].data.data_points[0].value == 5
+
+
+def test_counter_instruments_with_different_identity_stay_distinct():
+    """Different unit or description creates distinct instruments."""
+    exporter = FakeExporter()
+    reader = ManualExportingMetricReader(exporter)
+    meter_provider = MeterProvider(metric_readers=(reader,))
+    meter = meter_provider.get_meter(name="my-meter")
+
+    counter1 = meter.create_counter(name="requests", unit="1")
+    counter2 = meter.create_counter(name="requests", unit="ms")
+
+    assert counter1 is not counter2
+
+    counter1.add(1)
+    counter2.add(2)
+
+    reader.force_flush()
+
+    metrics = _metrics_from_first_export(exporter)
+    assert len(metrics) == 2
+    assert {metric.unit for metric in metrics} == {"1", "ms"}
 
 
 def test_histogram_with_attributes():
@@ -322,6 +405,41 @@ def test_histogram_bucket_distribution():
     data_point = metric.data.data_points[0]
 
     assert data_point.bucket_counts == [1, 2, 1, 1]  # [<10, <50, <100, >=100]
+
+
+def test_identical_histogram_instruments_are_aggregated():
+    exporter = FakeExporter()
+    reader = ManualExportingMetricReader(exporter)
+    meter_provider = MeterProvider(metric_readers=(reader,))
+    meter = meter_provider.get_meter(name="my-meter")
+
+    histogram1 = meter.create_histogram(
+        name="latency",
+        unit="ms",
+        description="Request latency",
+        explicit_bucket_boundaries_advisory=[10, 100],
+    )
+    histogram2 = meter.create_histogram(
+        name="latency",
+        unit="ms",
+        description="Request latency",
+        explicit_bucket_boundaries_advisory=[10, 100],
+    )
+
+    assert histogram1 is histogram2
+
+    histogram1.record(5)
+    histogram2.record(50)
+    histogram2.record(200)
+
+    reader.force_flush()
+
+    metrics = _metrics_from_first_export(exporter)
+    assert len(metrics) == 1
+    data_point = metrics[0].data.data_points[0]
+    assert data_point.count == 3
+    assert data_point.sum == 255
+    assert data_point.bucket_counts == [1, 1, 1]
 
 
 def test_histogram_custom_boundaries():

@@ -5,7 +5,7 @@ import logging
 import threading
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Optional, Sequence, Tuple
 
 from opentelemetry.metrics import Counter as ApiCounter
 from opentelemetry.metrics import Histogram as ApiHistogram
@@ -370,6 +370,8 @@ class MeterProvider(ApiMeterProvider):
             self.config, resource=resource
         )
         self.metric_readers = metric_readers
+        self._instrument_lock = threading.RLock()
+        self._instruments: dict[tuple[str, InstrumentType, str, str, str], Any] = {}
         for reader in self.metric_readers:
             reader.set_metric_producer(self.metric_producer)
 
@@ -389,6 +391,26 @@ class MeterProvider(ApiMeterProvider):
         self.metric_producer.register_instrument(
             instrument, instrument_type, meter_name
         )
+
+    def get_or_create_instrument(
+        self,
+        instrument_type: InstrumentType,
+        meter_name: str,
+        name: str,
+        unit: str,
+        description: str,
+        factory: Callable[[], Any],
+    ) -> Any:
+        """Return the canonical instrument for this meter/type/name/unit/description."""
+        key = (meter_name, instrument_type, name, unit, description)
+        with self._instrument_lock:
+            if key in self._instruments:
+                return self._instruments[key]
+
+            instrument = factory()
+            self._instruments[key] = instrument
+            self.register_instrument(instrument, instrument_type, meter_name)
+            return instrument
 
     def produce_metrics(self) -> MetricsData:
         return self.metric_producer.produce()
@@ -627,20 +649,26 @@ class Meter(ApiMeter):
     def create_counter(
         self, name: str, unit: str = "", description: str = ""
     ) -> ApiCounter:
-        counter = Counter(name=name, unit=unit, description=description)
-        self.meter_provider.register_instrument(
-            counter, InstrumentType.COUNTER, self._name
+        return self.meter_provider.get_or_create_instrument(
+            InstrumentType.COUNTER,
+            self._name,
+            name,
+            unit,
+            description,
+            lambda: Counter(name=name, unit=unit, description=description),
         )
-        return counter
 
     def create_up_down_counter(
         self, name: str, unit: str = "", description: str = ""
     ) -> ApiUpDownCounter:
-        up_down_counter = UpDownCounter(name=name, unit=unit, description=description)
-        self.meter_provider.register_instrument(
-            up_down_counter, InstrumentType.UP_DOWN_COUNTER, self._name
+        return self.meter_provider.get_or_create_instrument(
+            InstrumentType.UP_DOWN_COUNTER,
+            self._name,
+            name,
+            unit,
+            description,
+            lambda: UpDownCounter(name=name, unit=unit, description=description),
         )
-        return up_down_counter
 
     def create_observable_counter(
         self,
@@ -649,16 +677,19 @@ class Meter(ApiMeter):
         unit: str = "",
         description: str = "",
     ) -> ApiObservableCounter:
-        counter = ObservableCounter(
-            name=name,
-            callbacks=callbacks,
-            unit=unit,
-            description=description,
+        return self.meter_provider.get_or_create_instrument(
+            InstrumentType.OBSERVABLE_COUNTER,
+            self._name,
+            name,
+            unit,
+            description,
+            lambda: ObservableCounter(
+                name=name,
+                callbacks=callbacks,
+                unit=unit,
+                description=description,
+            ),
         )
-        self.meter_provider.register_instrument(
-            counter, InstrumentType.OBSERVABLE_COUNTER, self._name
-        )
-        return counter
 
     def create_histogram(
         self,
@@ -668,23 +699,31 @@ class Meter(ApiMeter):
         *,
         explicit_bucket_boundaries_advisory: Optional[Sequence[float]] = None,
     ) -> ApiHistogram:
-        histogram = Histogram(
-            name=name,
-            unit=unit,
-            description=description,
-            explicit_bucket_boundaries=explicit_bucket_boundaries_advisory,
+        return self.meter_provider.get_or_create_instrument(
+            InstrumentType.HISTOGRAM,
+            self._name,
+            name,
+            unit,
+            description,
+            lambda: Histogram(
+                name=name,
+                unit=unit,
+                description=description,
+                explicit_bucket_boundaries=explicit_bucket_boundaries_advisory,
+            ),
         )
-        self.meter_provider.register_instrument(
-            histogram, InstrumentType.HISTOGRAM, self._name
-        )
-        return histogram
 
     def create_gauge(
         self, name: str, unit: str = "", description: str = ""
     ) -> ApiGauge:
-        gauge = GaugeInstrument(name=name, unit=unit, description=description)
-        self.meter_provider.register_instrument(gauge, InstrumentType.GAUGE, self._name)
-        return gauge
+        return self.meter_provider.get_or_create_instrument(
+            InstrumentType.GAUGE,
+            self._name,
+            name,
+            unit,
+            description,
+            lambda: GaugeInstrument(name=name, unit=unit, description=description),
+        )
 
     def create_observable_gauge(
         self,
@@ -693,16 +732,19 @@ class Meter(ApiMeter):
         unit: str = "",
         description: str = "",
     ) -> ApiObservableGauge:
-        gauge = ObservableGauge(
-            name=name,
-            callbacks=callbacks,
-            unit=unit,
-            description=description,
+        return self.meter_provider.get_or_create_instrument(
+            InstrumentType.OBSERVABLE_GAUGE,
+            self._name,
+            name,
+            unit,
+            description,
+            lambda: ObservableGauge(
+                name=name,
+                callbacks=callbacks,
+                unit=unit,
+                description=description,
+            ),
         )
-        self.meter_provider.register_instrument(
-            gauge, InstrumentType.OBSERVABLE_GAUGE, self._name
-        )
-        return gauge
 
     def create_observable_up_down_counter(
         self,
@@ -711,13 +753,16 @@ class Meter(ApiMeter):
         unit: str = "",
         description: str = "",
     ) -> ApiObservableUpDownCounter:
-        counter = ObservableUpDownCounter(
-            name=name,
-            callbacks=callbacks,
-            unit=unit,
-            description=description,
+        return self.meter_provider.get_or_create_instrument(
+            InstrumentType.OBSERVABLE_UP_DOWN_COUNTER,
+            self._name,
+            name,
+            unit,
+            description,
+            lambda: ObservableUpDownCounter(
+                name=name,
+                callbacks=callbacks,
+                unit=unit,
+                description=description,
+            ),
         )
-        self.meter_provider.register_instrument(
-            counter, InstrumentType.OBSERVABLE_UP_DOWN_COUNTER, self._name
-        )
-        return counter
