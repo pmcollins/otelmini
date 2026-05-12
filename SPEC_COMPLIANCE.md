@@ -48,7 +48,7 @@ The previous report overstated compliance. In several places the SDK accepts a s
 
 | Area | Current conformance | Strong points | Largest blockers |
 | --- | --- | --- | --- |
-| Traces | Partial | Basic span creation/export, resources, scope grouping, parent trace ID, span links at creation | Dropped spans return `INVALID_SPAN`; span lifecycle and `is_recording()` are wrong; `start_time` ignored; status and exception conventions not exported; no post-creation `AddLink`; sampler contract incomplete |
+| Traces | Partial | Basic span creation/export, resources, scope grouping, parent trace ID, dropped-span non-recording context, span links at creation | Span lifecycle and `is_recording()` are wrong; `start_time` ignored; status and exception conventions not exported; no post-creation `AddLink`; sampler contract incomplete |
 | Metrics | Partial | Core sync/async instruments exist; cumulative Sum/Gauge/ExplicitBucketHistogram data is produced; identical sync instruments now share state for simple cases | No Views; no reader-specific aggregation/temporality; async callbacks only use first observation and drop attributes; histogram boundary placement is wrong; incomplete instrument identity; readers/exporters do not satisfy lifecycle semantics |
 | Logs | Low partial | LoggerProvider and stdlib bridge exist; resource attached; basic severity/body/attributes captured | Export omits trace context, observed timestamp, event name, and instrumentation scope; `context` and `event_name` args ignored; no exception handling; no LoggerConfig/filtering/Enabled; no proper `OnEmit` processor model |
 | Resource | Partial | Resource creation, merge, SDK attrs, `OTEL_RESOURCE_ATTRIBUTES`, `OTEL_SERVICE_NAME` precedence | Resource is mutable; env parsing lacks percent decoding and error reporting; default resource/detector support incomplete |
@@ -58,7 +58,7 @@ The previous report overstated compliance. In several places the SDK accepts a s
 
 ## Highest-Impact Findings
 
-1. **Trace sampling and span lifecycle are not spec compliant.** The SDK returns `INVALID_SPAN` for `DROP`, which loses the valid trace context that the spec requires a non-recording span to carry. `MiniSpan.is_recording()` depends on status rather than end state, repeated `end()` calls export repeatedly, and mutations after end still change the span.
+1. **Trace span lifecycle is not spec compliant.** `MiniSpan.is_recording()` depends on status rather than end state, repeated `end()` calls export repeatedly, and mutations after end still change the span. Sampling also still lacks the spec default `ParentBased(root=AlwaysOn)` behavior, `RECORD_ONLY`, and the full sampler contract.
 
 2. **Trace exported data is missing required semantics.** Span status is never encoded, `record_exception()` creates an event named after the exception class instead of `"exception"` with `exception.*` attributes, start timestamps passed to `start_span()` are ignored, and post-creation `AddLink` is absent.
 
@@ -103,7 +103,7 @@ The previous report overstated compliance. In several places the SDK accepts a s
 | Spec requirement | Current implementation | Status | Notes |
 | --- | --- | --- | --- |
 | Default sampler is ParentBased(root=AlwaysOn) | Provider defaults to `AlwaysOnSampler()` | Gap | Unsampled parents can produce sampled children by default. |
-| Span creation order: generate trace ID, call sampler, generate span ID independent of decision, create span according to decision | Span ID generated only after sample decision | Gap | `DROP` returns `INVALID_SPAN`, not a valid non-recording span context. |
+| Span creation order: generate trace ID, call sampler, generate span ID independent of decision, create span according to decision | Span ID is generated before the sampled/drop branch; `DROP` returns `NonRecordingSpan` with valid unsampled context | Compliant | Dropped spans preserve trace ID, span ID, and parent TraceState. |
 | `DROP`, `RECORD_ONLY`, `RECORD_AND_SAMPLE` decisions | Only `DROP` and `RECORD_AND_SAMPLE` exist | Gap | No `RECORD_ONLY`; no sampled flag distinction for record-only spans. |
 | `ShouldSample` receives context, trace ID, name, span kind, attributes, links | Sampler receives trace ID, name, optional parent context | Gap | Samplers cannot inspect kind, attributes, links, or full context. |
 | Sampling result can add attributes and return TraceState | `SamplingResult` only has `decision` | Gap | No sampling attributes and no TraceState updates. |
@@ -291,7 +291,6 @@ The previous report overstated compliance. In several places the SDK accepts a s
 
 The test suite is useful for current behavior but does not yet prove spec compliance. It covers basic encoding, batching, propagator happy paths, resource env parsing, and metric aggregation. Important missing compliance tests include:
 
-- Dropped sampled-out spans preserve valid trace context as non-recording spans.
 - `MiniSpan.is_recording()`, post-end mutation guards, and idempotent `end()`.
 - `start_span(start_time=...)` and `start_as_current_span(end_on_exit=False)`.
 - Status and exception event OTLP encoding.
@@ -306,7 +305,7 @@ The test suite is useful for current behavior but does not yet prove spec compli
 
 ## Recommended Remediation Order
 
-1. Fix trace correctness first: non-recording sampled-out spans, span lifecycle/idempotent end, start timestamp propagation, status export, exception event conventions, post-creation links, and `start_as_current_span()` parameter handling.
+1. Fix trace correctness first: span lifecycle/idempotent end, start timestamp propagation, status export, exception event conventions, post-creation links, sampler API completeness, and `start_as_current_span()` parameter handling.
 
 2. Fix log exported data model: include scope, observed timestamp, trace context fields, event name, AnyValue body encoding, and exception attributes. Add log-specific `OnEmit` processor shape after the data model is correct.
 

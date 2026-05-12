@@ -1,7 +1,10 @@
-from opentelemetry.trace import Link
+from opentelemetry import trace
+from opentelemetry.trace import Link, NonRecordingSpan, TraceFlags
+from opentelemetry.trace.span import TraceState
 
 from otelmini.export import Retrier, RetrierResult
 from otelmini.processor import BatchProcessor
+from otelmini.sampler import AlwaysOffSampler
 from otelmini.trace import MiniSpan, MiniTracerProvider, Resource, InstrumentationScope, SpanContext
 from otelmini.encode import _encode_span, _encode_event
 from tests._lib import StubbornRunner, FakeSleeper, RecordingExporter
@@ -192,3 +195,88 @@ def test_tracer_provider_force_flush_no_processor():
     provider = MiniTracerProvider()
     # Should return True when no processor is configured
     assert provider.force_flush() is True
+
+
+class RecordingSpanProcessor:
+    def __init__(self):
+        self.started = []
+        self.ended = []
+
+    def on_start(self, span):
+        self.started.append(span)
+
+    def on_end(self, span):
+        self.ended.append(span)
+
+    def force_flush(self, timeout_millis=30_000):
+        return True
+
+    def shutdown(self):
+        pass
+
+
+def test_dropped_span_returns_non_recording_span_with_valid_context():
+    processor = RecordingSpanProcessor()
+    provider = MiniTracerProvider(
+        span_processor=processor, sampler=AlwaysOffSampler()
+    )
+    tracer = provider.get_tracer("test")
+
+    span = tracer.start_span("dropped")
+    span_context = span.get_span_context()
+
+    assert isinstance(span, NonRecordingSpan)
+    assert span_context.is_valid
+    assert span_context.trace_id != 0
+    assert span_context.span_id != 0
+    assert not span.is_recording()
+    assert not span_context.trace_flags & TraceFlags.SAMPLED
+    assert processor.started == []
+    assert processor.ended == []
+
+    span.end()
+    assert processor.ended == []
+
+
+def test_dropped_child_span_preserves_parent_trace_id():
+    provider = MiniTracerProvider(sampler=AlwaysOffSampler())
+    tracer = provider.get_tracer("test")
+    parent = tracer.start_span("parent")
+
+    child = tracer.start_span(
+        "child",
+        context=trace.set_span_in_context(parent),
+    )
+
+    parent_context = parent.get_span_context()
+    child_context = child.get_span_context()
+
+    assert isinstance(child, NonRecordingSpan)
+    assert child_context.is_valid
+    assert child_context.trace_id == parent_context.trace_id
+    assert child_context.span_id != parent_context.span_id
+    assert not child_context.trace_flags & TraceFlags.SAMPLED
+
+
+def test_dropped_span_inherits_parent_trace_state():
+    trace_state = TraceState([("vendor", "value")])
+    parent_context = SpanContext(
+        trace_id=0x1234567890ABCDEF1234567890ABCDEF,
+        span_id=0x1234567890ABCDEF,
+        is_remote=True,
+        trace_flags=TraceFlags.DEFAULT,
+        trace_state=trace_state,
+    )
+    parent = NonRecordingSpan(parent_context)
+    provider = MiniTracerProvider(sampler=AlwaysOffSampler())
+    tracer = provider.get_tracer("test")
+
+    span = tracer.start_span(
+        "child",
+        context=trace.set_span_in_context(parent),
+    )
+    span_context = span.get_span_context()
+
+    assert isinstance(span, NonRecordingSpan)
+    assert span_context.trace_state.get("vendor") == "value"
+    assert not span_context.is_remote

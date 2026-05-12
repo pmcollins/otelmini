@@ -4,7 +4,13 @@ import random
 from typing import TYPE_CHECKING, Iterator, Optional, Sequence
 
 from opentelemetry import trace
-from opentelemetry.trace import INVALID_SPAN, SpanKind, Tracer, TracerProvider, _Links
+from opentelemetry.trace import (
+    NonRecordingSpan,
+    SpanKind,
+    Tracer,
+    TracerProvider,
+    _Links,
+)
 from opentelemetry.trace import Span as ApiSpan
 from opentelemetry.trace.span import SpanContext, TraceFlags
 from opentelemetry.util._decorator import _agnosticcontextmanager
@@ -103,21 +109,34 @@ class MiniTracer(Tracer):
         if parent_span_context.is_valid:
             trace_id = parent_span_context.trace_id
             parent_span_id = parent_span_context.span_id
+            trace_state = parent_span_context.trace_state
         else:
             trace_id = _generate_trace_id()
             parent_span_id = None
+            trace_state = None
 
         result = self.sampler.should_sample(
             trace_id,
             name,
             parent_span_context if parent_span_context.is_valid else None,
         )
-        if result.decision == Decision.DROP:
-            return INVALID_SPAN
-
         span_id = _generate_span_id()
+        if result.decision == Decision.DROP:
+            span_context = SpanContext(
+                trace_id,
+                span_id,
+                is_remote=False,
+                trace_flags=TraceFlags.DEFAULT,
+                trace_state=trace_state,
+            )
+            return NonRecordingSpan(span_context)
+
         span_context = SpanContext(
-            trace_id, span_id, is_remote=False, trace_flags=TraceFlags.SAMPLED
+            trace_id,
+            span_id,
+            is_remote=False,
+            trace_flags=TraceFlags.SAMPLED,
+            trace_state=trace_state,
         )
         span = MiniSpan(
             name,
