@@ -14,7 +14,7 @@ impact is valued.
 - Trace-log correlation
 - Auto-instrumentation support
 - W3C TraceContext and Baggage propagation
-- Python 3.9+
+- Python 3.10+
 
 ## Installation
 
